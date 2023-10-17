@@ -1,0 +1,18 @@
+{{ $post := .Content }}
+<article class="post">
+    <header>
+        <span class="date">{{ $post.Date }}</span>
+        {{ if $post.Title }}<span class="title">{{ $post.Title }}</span>{{ end }}
+        {{ if .FileName }}
+        <a href="/post/{{ .FileName }}" class="permalink"><i class="fa-solid fa-link"></i></a>
+        {{ end }}
+    </header>
+    <section class="content">
+        {{ $post.Body }}
+    </section>
+    {{ if $post.Tags }}
+    <footer>
+        {{@ post-tags.html @}}
+    </footer>
+    {{ end }}
+</article>

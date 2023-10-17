@@ -1,0 +1,20 @@
+{{ if $embeddedMedia }}
+<section class="embedded">
+{{ range $em := $embeddedMedia }}
+    {{ if eq $em.MediaType.String "youtube" }}
+    <div class="video">
+        <div class="iframe-responsive">
+            <iframe frameborder="0" allowfullscreen allow="fullscreen; picture-in-picture; encrypted-media" src="https://www.youtube.com/embed/{{ $em.Code }}"></iframe>
+        </div>
+    </div>
+    {{ end }}
+    {{ if eq $em.MediaType.String "vimeo" }}
+    <div class="video">
+        <div class="iframe-responsive">
+            <iframe frameborder="0" allowfullscreen allow="fullscreen; picture-in-picture; encrypted-media" src="https://player.vimeo.com/video/{{ $em.Code }}"></iframe>
+        </div>
+    </div>
+    {{ end }}
+{{ end }}
+</section>
+{{ end }}

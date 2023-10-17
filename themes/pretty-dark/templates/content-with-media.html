@@ -1,0 +1,23 @@
+{{ $pos := index .Props "p" }}
+{{ $size := index .Props "s" }}
+{{ $ccStr := index .Props "cc" }}
+<section class="with-media{{ if $pos }} pos-{{ $pos }}{{ end }}{{ if $size }} size-{{ $size }}{{ end }}">
+    <section class="media">
+        {{ $media := .Videos }}
+        {{ if $media }}
+            {{ $fcc := 1 }}
+            {{@ media-items.html @}}
+        {{ end }}
+        {{ $media := .Images }}
+        {{ if $media }}
+            {{ $fcc := 0 }}
+            {{ if $ccStr }}
+                {{ $fcc = $ccStr | toInt }}
+            {{ end }}
+            {{@ media-items.html @}}
+        {{ end }}
+    </section>
+    <section class="text">
+        {{ .Text }}
+    </section>
+</section>

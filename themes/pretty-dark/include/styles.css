@@ -1,0 +1,33 @@
+body > header {
+    background-color: #2b2b2b;
+    font-family: JetBrainsMono, monospace;
+    padding: 1em;
+    display: flex;
+    column-gap: 1em;
+    border-bottom: 2px solid #555;
+    border-left: 2px solid #555;
+    border-right: 2px solid #555;
+    border-radius: 0 0 4px 4px;
+    box-shadow: 0 4px 8px 0 rgba(0,0,0,0.5);
+    position: sticky;
+    z-index: 999;
+    top: 0;
+}
+
+body > header .links {
+    flex-grow: 1;
+}
+
+body > header .links .link-list {
+    float: right;
+    display: flex;
+    flex-direction: column;
+}
+
+body > header .links .link-list .link {
+    white-space: nowrap;
+}
+
+body > header .links .link-list .link a {
+    color: #bababa;
+}

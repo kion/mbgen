@@ -1,0 +1,20 @@
+{{ $ccStr := index .Props "cc" }}
+<section class="media">
+    {{ if .Embed }}
+        {{ $embeddedMedia := .Embed }}
+        {{@ media-embedded.html @}}
+    {{ end }}
+    {{ $media := .Videos }}
+    {{ if $media }}
+        {{ $fcc := 1 }}
+        {{@ media-items.html @}}
+    {{ end }}
+    {{ $media := .Images }}
+    {{ if $media }}
+        {{ $fcc := 0 }}
+        {{ if $ccStr }}
+            {{ $fcc = $ccStr | toInt }}
+        {{ end }}
+        {{@ media-items.html @}}
+    {{ end }}
+</section>

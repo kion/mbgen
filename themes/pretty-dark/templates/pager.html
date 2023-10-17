@@ -1,0 +1,22 @@
+<section class="pager">
+    {{ if gt .CurrPageNum 1 }}
+        <a class="nav-link" href="{{ .IndexPageUri }}"><i class="fa-solid fa-backward-fast"></i></a>
+    {{ else }}
+        <span class="nav-link disabled"><i class="fa-solid fa-backward-fast"></i></span>
+    {{ end }}
+    {{ if eq .CurrPageNum 2 }}
+        <a class="nav-link" href="{{ .IndexPageUri }}"><i class="fa-solid fa-backward-step"></i></a>
+    {{ else if gt .CurrPageNum 2 }}
+        <a class="nav-link" href="{{ .PageUriPrefix }}/{{ minus .CurrPageNum 1 }}.html"><i class="fa-solid fa-backward-step"></i></a>
+    {{ else }}
+        <span class="nav-link disabled"><i class="fa-solid fa-backward-step"></i></span>
+    {{ end }}
+    <span class="curr-page">[{{ .CurrPageNum }}/{{ .TotalPageCnt }}]</span>
+    {{ if lt .CurrPageNum .TotalPageCnt }}
+        <a class="nav-link" href="{{ .PageUriPrefix }}/{{ plus .CurrPageNum 1 }}.html"><i class="fa-solid fa-forward-step"></i></a>
+        <a class="nav-link" href="{{ .PageUriPrefix }}/{{ .TotalPageCnt }}.html"><i class="fa-solid fa-forward-fast"></i></a>
+    {{ else }}
+        <span class="nav-link disabled"><i class="fa-solid fa-forward-step"></i></span>
+        <span class="nav-link disabled"><i class="fa-solid fa-forward-fast"></i></span>
+    {{ end }}
+</section>

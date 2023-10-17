@@ -1,0 +1,24 @@
+<html>
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/resources/fonts/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="/resources/fonts/jetbrainsmono/css/all.css">
+    <link rel="stylesheet" href="/resources/fonts/sourcecodepro/css/all.css">
+    <link rel="stylesheet" href="/resources/styles.css">
+    {{@ styles @}}
+    {{# head.html #}}
+    {{ if .EntityType.Page }}
+    {{# page-head.html #}}
+    {{@ page-head @}}
+    {{ end }}
+    <title>{{ .Title }}</title>
+</head>
+<body>
+    <header>
+        {{# header.html #}}
+    </header>
+    <main>
+        {{@ sub-template @}}
+    </main>
+</body>
+</html>

@@ -1,0 +1,59 @@
+{{ if $media }}
+{{ $cc := $fcc }}
+{{ if eq $cc 0 }}
+    {{ $cc = 1 }}
+{{ end }}
+{{ $cnt := len $media }}
+{{ $multi := gt $cnt 1 }}
+{{ if $multi }}
+    {{ if eq $fcc 0 }}
+        {{ if and (ge $cnt 8) (eq (mod $cnt 4) 0) }}
+            {{ $cc = 4 }}
+        {{ else if or (eq $cnt 3) (ge $cnt 5) }}
+            {{ $cc = 3 }}
+        {{ else }}
+            {{ $cc = 2 }}
+        {{ end }}
+    {{ end }}
+{{ end }}
+<section class="items">
+    {{ range $it := iter $cc }}
+        <div class="column">
+        {{ range $m := everyNthMediaItem $media $cc $it }}
+            {{ if $m.Type.Image }}
+                <div class="image">
+                    <a target="_blank" href="{{ $m.Uri }}" aria-label="Image">
+                        <img src="{{ $m.ThumbUri 1 }}" srcset="{{ $m.SrcSet }}" alt="Image" />
+                    </a>
+                </div>
+            {{ end }}
+            {{ if $m.Type.Video }}
+                <div class="video">
+                    <video controls="controls" src="{{ $m.Uri }}"></video>
+                </div>
+            {{ end }}
+        {{ end }}
+        </div>
+    {{ end }}
+    <!--
+    {{ range $it := iter $cnt }}
+        {{ range $idx, $m := $media }}
+            {{ if eq (mod $idx $cc) $it }}
+                {{ if $m.Type.Image }}
+                    <div class="image">
+                        <a target="_blank" href="{{ $m.Uri }}" aria-label="Image">
+                            <img src="{{ $m.ThumbUri 1 }}" srcset="{{ $m.SrcSet }}" alt="Image" />
+                        </a>
+                    </div>
+                {{ end }}
+                {{ if $m.Type.Video }}
+                    <div class="video">
+                        <video controls="controls" src="{{ $m.Uri }}"></video>
+                    </div>
+                {{ end }}
+            {{ end }}
+        {{ end }}
+    {{ end }}
+    -->
+</section>
+{{ end }}

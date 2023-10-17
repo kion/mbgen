@@ -1,0 +1,7 @@
+{{ if $post.Tags }}
+<span class="tags">
+    {{ range $tag := $post.Tags }}
+    <a class="tag" href="/tag/{{ $tag | toLowerCase }}/">{{ $tag }}</a>
+    {{ end }}
+</span>
+{{ end }}
