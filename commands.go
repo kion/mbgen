@@ -241,7 +241,7 @@ func _theme(config appConfig, commandArgs ...string) {
 			if err != nil {
 				log.Println(fmt.Sprintf("error updating theme:\n\n" + err.Error()))
 			} else {
-				deleteIfExists(themeDir)
+				recreateDir(themeDir)
 				copyDir(themeDlDir, themeDir)
 				deleteIfExists(themeDlDir)
 				copyThemeIncludes(theme)
