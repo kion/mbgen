@@ -81,12 +81,23 @@ body > main .post:last-of-type {
     column-gap: 1em;
 }
 
-.post header .date {
+.post header .date-time {
     color: #777;
     white-space: nowrap;
+}
+
+.post header .date-time .date {
     &:before {
         font-family: FontAwesome;
         content: '\f073';
+        margin-right: 0.6em;
+    }
+}
+
+.post header .date-time .time {
+    &:before {
+        font-family: FontAwesome;
+        content: '\f017';
         margin-right: 0.6em;
     }
 }

@@ -36,6 +36,7 @@ const (
 	deployPageDirName                           = "page"
 	deployTagDirName                            = "tag"
 	metaDataKeyDate                             = "date"
+	metaDataKeyTime                             = "time"
 	metaDataKeyTitle                            = "title"
 	metaDataKeyTags                             = "tags"
 	configFileName                              = "config.yml"

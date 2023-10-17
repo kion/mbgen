@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cloud.google.com/go/civil"
 	"fmt"
 	"os"
 	"regexp"
@@ -55,20 +56,22 @@ func basicTest(t *testing.T, customHomePage bool) {
 	post1Id := "post-1"
 	post1 := post{
 		id:    post1Id,
-		Date:  "2023-08-01",
 		Title: "Test Post 1 Title",
 		Body:  "Test Post 1 Body",
 		Tags:  []string{tag1, tag2},
 	}
+	post1.Date, _ = civil.ParseDate("2023-08-01")
+	post1.Time, _ = civil.ParseTime("19:15:00")
 
 	post2Id := "post-2"
 	post2 := post{
 		id:    post2Id,
-		Date:  "2023-09-01",
 		Title: "Test Post 2 Title",
 		Body:  "Test Post 2 Body",
 		Tags:  []string{tag1, tag3},
 	}
+	post2.Date, _ = civil.ParseDate("2023-09-01")
+	post2.Time, _ = civil.ParseTime("09:05:00")
 
 	posts := []post{post1, post2}
 
@@ -122,7 +125,7 @@ func basicTest(t *testing.T, customHomePage bool) {
 		expectedIndexFileContent = append(expectedIndexFileContent,
 			"<title>"+testSiteName+"</title>")
 		for _, post := range posts {
-			expectedIndexFileContent = append(expectedIndexFileContent, "<a href=\"/"+deployPostDirName+"/"+post.id+contentFileExtension+"\">")
+			expectedIndexFileContent = append(expectedIndexFileContent, "<a href=\"/"+deployPostDirName+"/"+post.id+contentFileExtension+"\"")
 			for _, epc := range getExpectedPostFileContent(post) {
 				expectedIndexFileContent = append(expectedIndexFileContent, epc)
 			}
@@ -379,9 +382,14 @@ func getExpectedPageFileContent(p page) []string {
 
 func getExpectedPostFileContent(p post) []string {
 	expectedContent := []string{
-		fmt.Sprintf("<span class=\"date\">%s</span>", p.Date),
 		fmt.Sprintf("<span class=\"title\">%s</span>", p.Title),
 		fmt.Sprintf("<section class=\"content\">%s</section>", p.Body),
+	}
+	if !p.Date.IsZero() {
+		expectedContent = append(expectedContent, fmt.Sprintf("<span class=\"date\">%s</span>", p.FmtDate()))
+	}
+	if !p.Time.IsZero() {
+		expectedContent = append(expectedContent, fmt.Sprintf("<span class=\"time\">%s</span>", p.FmtTime()))
 	}
 	if len(p.Tags) > 0 {
 		expectedTagsContent := "<span class=\"tags\">"

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cloud.google.com/go/civil"
 	"fmt"
 	"regexp"
 	"strings"
@@ -242,10 +243,33 @@ type page struct {
 
 type post struct {
 	id    string
-	Date  string
+	Date  civil.Date
+	Time  civil.Time
 	Title string
 	Body  string
 	Tags  []string
+}
+
+func (p post) HasDateOrTime() bool {
+	return !p.Date.IsZero() || !p.Time.IsZero()
+}
+
+func (p post) FmtDate() string {
+	if !p.Date.IsZero() {
+		return p.Date.String()
+	}
+	return ""
+}
+
+func (p post) FmtTime() string {
+	if !p.Time.IsZero() {
+		time := p.Time.String()
+		if strings.HasSuffix(time, ":00") {
+			time, _ = strings.CutSuffix(time, ":00")
+		}
+		return time
+	}
+	return ""
 }
 
 type tuple2[T1, T2 any] struct {

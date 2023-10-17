@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"cloud.google.com/go/civil"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/yuin/goldmark"
@@ -16,7 +17,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 )
 
 var mainTemplateMarkup /* const */ string
@@ -137,9 +137,17 @@ func parsePost(postId string, content string, config appConfig, resLoader resour
 	post.Body = handleContentDirectivePlaceholderReplacements(post.Body, cdPhReps)
 	metaData := meta.Get(context)
 	if date, ok := metaData[metaDataKeyDate].(string); ok {
-		d, err := time.Parse(time.DateOnly, date)
+		d, err := civil.ParseDate(date)
 		check(err)
-		post.Date = d.Format(time.DateOnly)
+		post.Date = d
+	}
+	if time, ok := metaData[metaDataKeyTime].(string); ok {
+		if len(time) == 5 {
+			time += ":00"
+		}
+		t, err := civil.ParseTime(time)
+		check(err)
+		post.Time = t
 	}
 	if title, ok := metaData[metaDataKeyTitle].(string); ok {
 		if strings.Contains(title, "\n") {

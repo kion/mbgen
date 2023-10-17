@@ -126,6 +126,7 @@ $ mbgen help [command]
     ```
     ---
     date: 2023-08-01
+    time: 19:15
     title: Post title
     tags:
       - Tag1
