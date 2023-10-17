@@ -266,4 +266,4 @@ or can even be completely omitted from the config):
 
 Distributed under the GNU AGPLv3 license.
 
-See [LICENSE.txt](https://github.com/kion/mbgen/blob/main/LICENSE.txt) for more information.
+See [LICENSE](https://github.com/kion/mbgen/blob/main/LICENSE) for more information.
