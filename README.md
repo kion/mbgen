@@ -6,7 +6,7 @@ embracing the convention-over-configuration philosophy.
 ## Demo
 
 My personal website - [kion.name](https://kion.name/) - 
-is generated with mbgen (using the default theme).
+is generated using mbgen with the default theme.
 
 ## Installation
 
