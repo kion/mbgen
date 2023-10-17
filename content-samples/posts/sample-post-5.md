@@ -2,7 +2,9 @@
 date: 2023-08-07
 time: 19:15
 title: Sample Post 5 - with a cover
-template: with-cover
+tags:
+  - Tag1
+  - Tag3
 ---
 
 {with-media(p=l)}
