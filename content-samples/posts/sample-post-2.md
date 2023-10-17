@@ -1,5 +1,6 @@
 ---
 date: 2023-08-05
+time: 09:05
 title: Sample Post 2 - with a few images
 tags:
   - Tag1
