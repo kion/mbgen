@@ -13,7 +13,7 @@ is generated using mbgen with the default theme.
 If you have Go installed:
 
 ```sh
-go get github.com/kion/mbgen
+go install github.com/kion/mbgen
 ```
 
 Otherwise, download the latest binary 
