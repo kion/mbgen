@@ -81,7 +81,8 @@ func usage(usageHelp string) {
 		}
 		sort.Strings(commands)
 		fmt.Println("")
-		fmt.Println("where <command> is one of the following: " + strings.Join(commands, ", "))
+		fmt.Println("where <command> is one of the following:")
+		fmt.Println("\n - " + strings.Join(commands, "\n - "))
 		fmt.Println("")
 		fmt.Println("use the following to get help on a specific command:")
 		fmt.Println("")

@@ -15,7 +15,7 @@ func processImgThumbnails(imgDirPath string, config appConfig) {
 	// ==================================================
 	// delete any old / no longer needed thumbnails
 	// ==================================================
-	imgFiles := listFilesByExtRegexp(imgDirPath, thumbImageFileExtensions)
+	imgFiles := listFilesByExt(imgDirPath, thumbImageFileExtensions...)
 	if len(imgFiles) > 0 {
 		for _, imgFile := range imgFiles {
 			thm := thumbImgFileNameRegexp.FindStringSubmatch(imgFile)
@@ -23,9 +23,9 @@ func processImgThumbnails(imgDirPath string, config appConfig) {
 				thSize, err := strconv.Atoi(thm[1])
 				check(err)
 				if !slices.Contains(config.thumbSizes, thSize) {
-					imgFilePath := fmt.Sprintf("%s%c%s", imgDirPath, os.PathSeparator, imgFile)
-					deleteFile(imgFilePath)
-					log.Println(" - deleted an old / no longer needed thumbnail: " + imgFilePath)
+					thumbFilePath := fmt.Sprintf("%s%c%s", imgDirPath, os.PathSeparator, imgFile)
+					deleteFile(thumbFilePath)
+					log.Println(" - deleted an old / no longer needed thumbnail: " + thumbFilePath)
 				}
 			}
 		}
@@ -33,7 +33,7 @@ func processImgThumbnails(imgDirPath string, config appConfig) {
 	// ==================================================
 	// generate thumbnails
 	// ==================================================
-	imgFiles = listFilesByExtRegexp(imgDirPath, thumbImageFileExtensions)
+	imgFiles = listFilesByExt(imgDirPath, thumbImageFileExtensions...)
 	for _, imgFile := range imgFiles {
 		if strings.Contains(imgFile, thumbImgFileSuffix) {
 			continue
@@ -93,6 +93,20 @@ func processImgThumbnails(imgDirPath string, config appConfig) {
 						log.Println(fmt.Sprintf(" - original image file size: %.2f MB, thumbnail file size: %.2f MB\n", imgFileSizeInMb, thumbFileSizeInMb))
 					}
 				}
+			}
+		}
+	}
+}
+
+func deleteImgThumbnails(imgDirPath string, config appConfig) {
+	imgFiles := listFilesByExt(imgDirPath, thumbImageFileExtensions...)
+	if len(imgFiles) > 0 {
+		for _, imgFile := range imgFiles {
+			thm := thumbImgFileNameRegexp.FindStringSubmatch(imgFile)
+			if thm != nil {
+				thumbFilePath := fmt.Sprintf("%s%c%s", imgDirPath, os.PathSeparator, imgFile)
+				deleteFile(thumbFilePath)
+				log.Println(" - deleted thumbnail: " + thumbFilePath)
 			}
 		}
 	}

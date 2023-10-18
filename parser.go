@@ -388,13 +388,13 @@ func listAllMedia(entryId string, skipFiles []string) []string {
 	var allMedia []string
 	mediaDirPath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, entryId)
 	if dirExists(mediaDirPath) {
-		videoFiles := listFilesByExtRegexp(mediaDirPath, videoFileExtensions)
+		videoFiles := listFilesByExt(mediaDirPath, videoFileExtensions...)
 		for _, video := range videoFiles {
 			if !slices.Contains(skipFiles, video) {
 				allMedia = append(allMedia, video)
 			}
 		}
-		imageFiles := listFilesByExtRegexp(mediaDirPath, imageFileExtensions)
+		imageFiles := listFilesByExt(mediaDirPath, imageFileExtensions...)
 		for _, image := range imageFiles {
 			if !slices.Contains(skipFiles, image) && !strings.Contains(image, thumbImgFileSuffix) {
 				allMedia = append(allMedia, image)

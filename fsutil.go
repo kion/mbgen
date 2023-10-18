@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 )
 
-func listFilesByExtRegexp(dir string, extensions []string) []string {
+func listFilesByExt(dir string, extensions ...string) []string {
 	var files []string
 	extSet := make(map[string]bool)
 	for _, v := range extensions {

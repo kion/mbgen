@@ -32,6 +32,15 @@ var (
 		usage:     "mbgen init\n\n",
 		reqConfig: false,
 	}
+	commandCleanup = /* const */ appCommandDescriptor{
+		command:     "cleanup",
+		description: "perform a cleanup",
+		reqArgCnt:   1,
+		usage: "mbgen cleanup <target>\n\n" +
+			" - <target> is one of the following:\n\n" +
+			"   - thumbs: deletes all previously generated thumbnail files",
+		reqConfig: true,
+	}
 	commandGenerate = /* const */ appCommandDescriptor{
 		command:     "generate",
 		description: "parse content and generate site",
@@ -78,6 +87,7 @@ func getSupportedCommands() map[string]tuple2[appCommand, appCommandDescriptor] 
 		commandVersion.command:  {_version, commandVersion},
 		commandHelp.command:     {_help, commandHelp},
 		commandInit.command:     {_init, commandInit},
+		commandCleanup.command:  {_cleanup, commandCleanup},
 		commandGenerate.command: {_generate, commandGenerate},
 		commandStats.command:    {_stats, commandStats},
 		commandServe.command:    {_serve, commandServe},
@@ -148,6 +158,21 @@ func _init(config appConfig, commandArgs ...string) {
 	_theme(config, "install", defaultThemeName)
 	_theme(config, "activate", defaultThemeName)
 	copyThemeIncludes(defaultThemeName)
+}
+
+func _cleanup(config appConfig, commandArgs ...string) {
+	target := commandArgs[0]
+	switch target {
+	case "thumbs":
+		resLoader := getResourceLoader(config)
+		parsePages(config, resLoader, deleteImgThumbnails)
+		parsePosts(config, resLoader, deleteImgThumbnails)
+	default:
+		fmt.Println("")
+		fmt.Println("error: invalid cleanup command target: " + target)
+		usageHelp := "usage:\n\n" + commandCleanup.usage
+		usage(usageHelp)
+	}
 }
 
 func _generate(config appConfig, commandArgs ...string) {
@@ -282,6 +307,7 @@ func _theme(config appConfig, commandArgs ...string) {
 			}
 		}
 	default:
+		fmt.Println("")
 		fmt.Println("error: invalid theme command action: " + action)
 		usageHelp := "usage:\n\n" + commandTheme.usage
 		usage(usageHelp)
