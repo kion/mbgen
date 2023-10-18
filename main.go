@@ -58,7 +58,7 @@ func main() {
 
 func initializeAndRunCommand(cmdFn appCommand, cmdDescr appCommandDescriptor, config appConfig, commandArgs []string) {
 	cmdFn(config, commandArgs...)
-	if cmdDescr.command != commandHelp.command {
+	if cmdDescr.command != commandVersion.command && cmdDescr.command != commandHelp.command {
 		fmt.Println("")
 		fmt.Println("[ ------- done ------- ]")
 	}
@@ -77,9 +77,7 @@ func usage(usageHelp string) {
 		var commands []string
 		for _, sc := range scs {
 			cmd := sc.V2.command
-			if cmd != commandHelp.command {
-				commands = append(commands, cmd)
-			}
+			commands = append(commands, cmd)
 		}
 		sort.Strings(commands)
 		fmt.Println("")

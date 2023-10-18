@@ -8,6 +8,12 @@ import (
 )
 
 var (
+	commandVersion = /* const */ appCommandDescriptor{
+		command:     "version",
+		description: "print out version info",
+		usage:       "mbgen version",
+		reqConfig:   false,
+	}
 	commandHelp = /* const */ appCommandDescriptor{
 		command:     "help",
 		description: "print out help/usage information",
@@ -69,6 +75,7 @@ var (
 
 func getSupportedCommands() map[string]tuple2[appCommand, appCommandDescriptor] {
 	return map[string]tuple2[appCommand, appCommandDescriptor]{
+		commandVersion.command:  {_version, commandVersion},
 		commandHelp.command:     {_help, commandHelp},
 		commandInit.command:     {_init, commandInit},
 		commandGenerate.command: {_generate, commandGenerate},
@@ -76,6 +83,10 @@ func getSupportedCommands() map[string]tuple2[appCommand, appCommandDescriptor] 
 		commandServe.command:    {_serve, commandServe},
 		commandTheme.command:    {_theme, commandTheme},
 	}
+}
+
+func _version(config appConfig, commandArgs ...string) {
+	fmt.Println("mbgen " + appVersion)
 }
 
 func _help(config appConfig, commandArgs ...string) {
