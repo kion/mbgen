@@ -117,8 +117,7 @@ func _init(config appConfig, commandArgs ...string) {
 		config = defaultConfig()
 		config.siteName = "Sample Site Name"
 		writeConfig(config)
-		fmt.Println("")
-		log.Println(" - generated sample config file: " + configFileName)
+		sprintln(" - generated sample config file: " + configFileName)
 	}
 	// download content samples
 	if dirExists(markdownPagesDirName) {
@@ -168,8 +167,7 @@ func _cleanup(config appConfig, commandArgs ...string) {
 		parsePages(config, resLoader, deleteImgThumbnails)
 		parsePosts(config, resLoader, deleteImgThumbnails)
 	default:
-		fmt.Println("")
-		fmt.Println("error: invalid cleanup command target: " + target)
+		sprintln("error: invalid cleanup command target: " + target)
 		usageHelp := "usage:\n\n" + commandCleanup.usage
 		usage(usageHelp)
 	}
@@ -186,7 +184,7 @@ func _generate(config appConfig, commandArgs ...string) {
 	themeResourcesDirPath := fmt.Sprintf("%s%c%s", config.theme, os.PathSeparator, resourcesDirName)
 	deployResourcesDirPath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, resourcesDirName)
 	copyDir(themeResourcesDirPath, deployResourcesDirPath)
-	log.Println(" - copied theme resources")
+	logSprintln(" - copied theme resources")
 
 	for _, level := range templateIncludeLevels {
 		stylesIncludeFilePath := getIncludeFilePath(stylesFileName, level, resLoader.config)
@@ -195,7 +193,6 @@ func _generate(config appConfig, commandArgs ...string) {
 		}
 	}
 
-	fmt.Println("")
 	generatedCnt := 0
 	stats := process(parsePages(config, resLoader, processImgThumbnails),
 		parsePosts(config, resLoader, processImgThumbnails),
@@ -218,7 +215,6 @@ func _generate(config appConfig, commandArgs ...string) {
 }
 
 func _stats(config appConfig, commandArgs ...string) {
-	fmt.Println("")
 	resLoader := getResourceLoader(config)
 	handleStats(process(parsePages(config, resLoader, nil),
 		parsePosts(config, resLoader, nil),
@@ -241,21 +237,17 @@ func _theme(config appConfig, commandArgs ...string) {
 	switch action {
 	case "activate":
 		if !themeInstalled {
-			fmt.Println("")
-			fmt.Println("theme is not installed: " + theme)
+			sprintln("theme is not installed: " + theme)
 		} else {
 			config.theme = themeDir
 			writeConfig(config)
-			fmt.Println("")
-			log.Println(" - " + configFileName + " updated to activate new theme: " + theme)
+			logSprintln(" - " + configFileName + " updated to activate new theme: " + theme)
 		}
 	case "install":
 		if themeInstalled {
-			fmt.Println("")
-			fmt.Println("theme is already installed: " + theme)
+			sprintln("theme is already installed: " + theme)
 		} else {
-			fmt.Println("")
-			log.Println(" - installing theme: " + theme)
+			logSprintln(" - installing theme: " + theme)
 			themeUrl := fmt.Sprintf("%s/%s", defaultGitHubRepoThemesUrl, theme)
 			err := download(themeUrl, themeDir)
 			if err != nil {
@@ -266,8 +258,7 @@ func _theme(config appConfig, commandArgs ...string) {
 		}
 	case "update":
 		if !themeInstalled {
-			fmt.Println("")
-			fmt.Println("theme is not installed: " + theme)
+			sprintln("theme is not installed: " + theme)
 		} else {
 			log.Println(" - updating theme: " + theme)
 			themeUrl := fmt.Sprintf("%s/%s", defaultGitHubRepoThemesUrl, theme)
@@ -285,20 +276,17 @@ func _theme(config appConfig, commandArgs ...string) {
 		}
 	case "refresh":
 		if !themeInstalled {
-			fmt.Println("")
-			fmt.Println("theme is not installed: " + theme)
+			sprintln("theme is not installed: " + theme)
 		} else {
 			log.Println(" - refreshing theme: " + theme)
 			copyThemeIncludes(theme)
 		}
 	case "delete":
 		if !themeInstalled {
-			fmt.Println("")
-			fmt.Println("theme is not installed: " + theme)
+			sprintln("theme is not installed: " + theme)
 		} else {
 			if config.theme == themeDir {
-				fmt.Println("")
-				fmt.Println("cannot delete theme being currently in use: " + theme)
+				sprintln("cannot delete theme being currently in use: " + theme)
 			} else {
 				log.Println(" - deleting theme: " + theme)
 				deleteIfExists(themeDir)
@@ -307,8 +295,7 @@ func _theme(config appConfig, commandArgs ...string) {
 			}
 		}
 	default:
-		fmt.Println("")
-		fmt.Println("error: invalid theme command action: " + action)
+		sprintln("error: invalid theme command action: " + action)
 		usageHelp := "usage:\n\n" + commandTheme.usage
 		usage(usageHelp)
 	}
@@ -329,8 +316,7 @@ func copyThemeIncludes(theme string) {
 				includeFileDstPath := fmt.Sprintf("%s%c%s", themeDstIncludeDir, os.PathSeparator, includeFileName)
 				if !fileExists(includeFileDstPath) {
 					includeFileSrcPath := fmt.Sprintf("%s%c%s", themeSrcIncludeDir, os.PathSeparator, includeFileName)
-					fmt.Println("")
-					log.Println(" - copying include file:")
+					logSprintln(" - copying include file:")
 					log.Println("   - src: " + includeFileSrcPath)
 					log.Println("   - dst: " + includeFileDstPath)
 					copyFile(includeFileSrcPath, includeFileDstPath)
@@ -338,4 +324,32 @@ func copyThemeIncludes(theme string) {
 			}
 		}
 	}
+}
+
+func getResourceLoader(config appConfig) resourceLoader {
+	return resourceLoader{
+		config: config,
+		loadTemplate: func(templateFileName string) ([]byte, error) {
+			templateFilePath := fmt.Sprintf("%s%c%s%c%s",
+				config.theme, os.PathSeparator, templatesDirName, os.PathSeparator, templateFileName)
+			return os.ReadFile(templateFilePath)
+		},
+		loadInclude: func(includeFileName string, level templateIncludeLevel) ([]byte, error) {
+			includeFilePath := getIncludeFilePath(includeFileName, level, config)
+			if includeFilePath != "" {
+				return os.ReadFile(includeFilePath)
+			} else {
+				return nil, nil
+			}
+		},
+	}
+}
+
+func handleStats(stats stats) {
+	sprintln("[------- stats --------]\n")
+	fmt.Printf(" - pages: %d\n", stats.pageCnt)
+	fmt.Printf(" - posts: %d\n", stats.postCnt)
+	fmt.Printf(" - tags: %d\n", stats.tagCnt)
+	fmt.Printf(" - files generated: %d\n", stats.genCnt)
+	sprintln("[----------------------]")
 }

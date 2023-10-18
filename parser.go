@@ -47,7 +47,7 @@ func parsePages(config appConfig, resLoader resourceLoader, thumbHandler imageTh
 		return nil
 	}
 
-	log.Println(" - parsing pages ...")
+	logSprintln(" - parsing pages ...")
 
 	var pages []page
 	for _, pageEntry := range markdownPageDirEntries {
@@ -85,7 +85,7 @@ func parsePosts(config appConfig, resLoader resourceLoader, thumbHandler imageTh
 		return markdownPostDirEntries[i].Name() > markdownPostDirEntries[j].Name()
 	})
 
-	log.Println(" - parsing posts ...")
+	logSprintln(" - parsing posts ...")
 
 	var posts []post
 	for _, postEntry := range markdownPostDirEntries {

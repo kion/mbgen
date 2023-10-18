@@ -49,8 +49,7 @@ func main() {
 		initializeAndRunCommand(commandFn, commandDescr, config, commandArgs)
 	} else {
 		if err != "" {
-			fmt.Println("")
-			fmt.Println(err)
+			sprintln(err)
 		}
 		usage(usageHelp)
 	}
@@ -59,20 +58,16 @@ func main() {
 func initializeAndRunCommand(cmdFn appCommand, cmdDescr appCommandDescriptor, config appConfig, commandArgs []string) {
 	cmdFn(config, commandArgs...)
 	if cmdDescr.command != commandVersion.command && cmdDescr.command != commandHelp.command {
-		fmt.Println("")
-		fmt.Println("[ ------- done ------- ]")
+		sprintln("[ ------- done ------- ]")
 	}
 }
 
 func usage(usageHelp string) {
 	if usageHelp != "" {
-		fmt.Println("")
-		fmt.Println(usageHelp)
+		sprintln(usageHelp)
 	} else {
-		fmt.Println("")
-		fmt.Println("usage:")
-		fmt.Println("")
-		fmt.Println("mbgen <command> [options]")
+		sprintln("usage:")
+		sprintln("mbgen <command> [options]")
 		scs := getSupportedCommands()
 		var commands []string
 		for _, sc := range scs {
@@ -80,13 +75,9 @@ func usage(usageHelp string) {
 			commands = append(commands, cmd)
 		}
 		sort.Strings(commands)
-		fmt.Println("")
-		fmt.Println("where <command> is one of the following:")
+		sprintln("where <command> is one of the following:")
 		fmt.Println("\n - " + strings.Join(commands, "\n - "))
-		fmt.Println("")
-		fmt.Println("use the following to get help on a specific command:")
-		fmt.Println("")
-		fmt.Println("mbgen help <command>")
-		fmt.Println("")
+		sprintln("use the following to get help on a specific command:")
+		sprintln("mbgen help <command>\n")
 	}
 }

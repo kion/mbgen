@@ -33,17 +33,14 @@ func listenAndServe(addr string) {
 	if !dirExists(deployDirName) {
 		exitWithError(deployDirName + " directory not found")
 	}
-	fmt.Println("")
-	fmt.Println("[ ----- serving ------ ]")
-	fmt.Println("")
+	sprintln("[ ----- serving ------ ]")
 	url := addr
 	if strings.Contains(url, "localhost") {
 		url = "http://" + url
 	} else {
 		url = "https://" + url
 	}
-	fmt.Println(" - " + url)
-	fmt.Println("")
+	sprintln(" - " + url + "\n")
 	err := http.ListenAndServe(addr, nil)
 	log.Fatal(err)
 }

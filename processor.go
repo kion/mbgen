@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -27,7 +26,7 @@ func process(pages []page, posts []post,
 func processPages(pages []page, channel chan int,
 	resLoader resourceLoader, handleOutput processorOutputHandler) {
 	if pages != nil {
-		log.Println(" - processing pages ...")
+		logSprintln(" - processing pages ...")
 
 		title := resLoader.config.siteName
 		homePage := resLoader.config.homePage
@@ -80,7 +79,7 @@ func processPosts(posts []post, channel chan tuple2[int, int],
 	resLoader resourceLoader, handleOutput processorOutputHandler) {
 	ptCounts := tuple2[int, int]{V1: len(posts)}
 	if posts != nil {
-		log.Println(" - processing posts ...")
+		logSprintln(" - processing posts ...")
 
 		title := resLoader.config.siteName
 		homePage := resLoader.config.homePage

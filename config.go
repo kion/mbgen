@@ -30,8 +30,7 @@ func readConfig() appConfig {
 		exitWithError(configFileName + " not found")
 	}
 
-	fmt.Println("")
-	fmt.Println("[ ------ config ------ ]")
+	sprintln("[ ------ config ------ ]\n")
 
 	config := defaultConfig()
 	configFile, err := os.ReadFile(configFileName)
@@ -141,7 +140,7 @@ func readConfig() appConfig {
 	}
 	fmt.Println(fmt.Sprintf(" - serve port: %d", config.servePort))
 
-	fmt.Println("[----------------------]")
+	sprintln("[----------------------]")
 	return config
 }
 

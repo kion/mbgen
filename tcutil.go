@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -233,4 +234,25 @@ func processDirectives(templateMarkup string, resLoader resourceLoader) string {
 func readTemplateFile(templateFileName string, resLoader resourceLoader) (string, error) {
 	templateMarkupBytes, err := resLoader.loadTemplate(templateFileName)
 	return string(templateMarkupBytes), err
+}
+
+func getIncludeFilePath(includeFileName string, level templateIncludeLevel, config appConfig) string {
+	var includeFilePath string
+	if Global == level {
+		includeFilePath = fmt.Sprintf("%s%c%s", includeDirName, os.PathSeparator, includeFileName)
+	} else if Theme == level {
+		themeName := config.theme
+		if strings.ContainsRune(themeName, os.PathSeparator) {
+			themePathSegments := strings.Split(themeName, string(os.PathSeparator))
+			themeName = themePathSegments[len(themePathSegments)-1]
+		}
+		includeFilePath = fmt.Sprintf("%s%c%s%c%s", includeDirName, os.PathSeparator, themeName, os.PathSeparator, includeFileName)
+	} else {
+		panic("invalid template include level for: " + includeDirName)
+	}
+	if !fileExists(includeFilePath) {
+		// ignore non-existing include files (includes are optional)
+		includeFilePath = ""
+	}
+	return includeFilePath
 }
