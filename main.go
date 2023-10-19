@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"sort"
 	"strings"
@@ -66,8 +65,10 @@ func usage(usageHelp string) {
 	if usageHelp != "" {
 		sprintln(usageHelp)
 	} else {
-		sprintln("usage:")
-		sprintln("mbgen <command> [options]")
+		sprintln(
+			"usage:",
+			"mbgen <command> [options]",
+		)
 		scs := getSupportedCommands()
 		var commands []string
 		for _, sc := range scs {
@@ -75,9 +76,11 @@ func usage(usageHelp string) {
 			commands = append(commands, cmd)
 		}
 		sort.Strings(commands)
-		sprintln("where <command> is one of the following:")
-		fmt.Println("\n - " + strings.Join(commands, "\n - "))
-		sprintln("use the following to get help on a specific command:")
-		sprintln("mbgen help <command>\n")
+		sprintln(
+			"where <command> is one of the following:",
+			" - "+strings.Join(commands, "\n - "),
+			"use the following to get help on a specific command:",
+			"mbgen help <command>\n",
+		)
 	}
 }

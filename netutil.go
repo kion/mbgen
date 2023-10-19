@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/hashicorp/go-getter"
-	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -14,7 +13,7 @@ import (
 func listenAndServe(addr string) {
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		path := request.URL.Path
-		log.Println(" - request received: " + path)
+		println(" - request received: " + path)
 		specificResourceRequested := strings.Contains(path, ".")
 		if !specificResourceRequested && path[len(path)-1] != '/' {
 			path += "/"
@@ -33,16 +32,18 @@ func listenAndServe(addr string) {
 	if !dirExists(deployDirName) {
 		exitWithError(deployDirName + " directory not found")
 	}
-	sprintln("[ ----- serving ------ ]")
 	url := addr
 	if strings.Contains(url, "localhost") {
 		url = "http://" + url
 	} else {
 		url = "https://" + url
 	}
-	sprintln(" - " + url + "\n")
+	sprintln(
+		"[ ----- serving ------ ]\n",
+		" - "+url+"\n",
+	)
 	err := http.ListenAndServe(addr, nil)
-	log.Fatal(err)
+	exitWithError(err.Error())
 }
 
 func download(sourceUrl string, destinationDir string) error {

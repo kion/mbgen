@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -189,13 +188,13 @@ func processDirectives(templateMarkup string, resLoader resourceLoader) string {
 				includeMarkup = ""
 				ic, err := resLoader.loadInclude(ti.fileName, Global)
 				if err != nil {
-					log.Println("failed to load global include: " + err.Error())
+					println("failed to load global include: " + err.Error())
 				} else if ic != nil && len(ic) > 0 { // includes are optional
 					includeMarkup += string(ic)
 				}
 				ic, err = resLoader.loadInclude(ti.fileName, Theme)
 				if err != nil {
-					log.Println("failed to load theme include: " + err.Error())
+					println("failed to load theme include: " + err.Error())
 				} else if ic != nil && len(ic) > 0 { // includes are optional
 					includeMarkup += string(ic)
 				}

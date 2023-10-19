@@ -10,7 +10,6 @@ import (
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/renderer/html"
-	"log"
 	"os"
 	"path/filepath"
 	"slices"
@@ -47,7 +46,7 @@ func parsePages(config appConfig, resLoader resourceLoader, thumbHandler imageTh
 		return nil
 	}
 
-	logSprintln(" - parsing pages ...")
+	sprintln(" - parsing pages ...")
 
 	var pages []page
 	for _, pageEntry := range markdownPageDirEntries {
@@ -85,7 +84,7 @@ func parsePosts(config appConfig, resLoader resourceLoader, thumbHandler imageTh
 		return markdownPostDirEntries[i].Name() > markdownPostDirEntries[j].Name()
 	})
 
-	logSprintln(" - parsing posts ...")
+	sprintln(" - parsing posts ...")
 
 	var posts []post
 	for _, postEntry := range markdownPostDirEntries {
@@ -268,7 +267,7 @@ func parseContentDirectives(entryId string, bodyContent string, config appConfig
 			allMedia := parseMediaFileNames(mediaFileNames, entryId, config)
 			contentDirectiveTemplate, err := compileContentDirectiveTemplate(directive, resLoader)
 			if err != nil {
-				log.Fatal(" - failed to process " + directive + " directive for " + entryId + ": " + err.Error())
+				exitWithError(" - failed to process " + directive + " directive for " + entryId + ": " + err.Error())
 			}
 			var contentDirectiveMarkupBuffer bytes.Buffer
 			err = contentDirectiveTemplate.Execute(&contentDirectiveMarkupBuffer, contentDirectiveData{

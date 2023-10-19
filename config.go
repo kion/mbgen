@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"gopkg.in/yaml.v3"
 	"os"
@@ -30,8 +29,6 @@ func readConfig() appConfig {
 		exitWithError(configFileName + " not found")
 	}
 
-	sprintln("[ ------ config ------ ]\n")
-
 	config := defaultConfig()
 	configFile, err := os.ReadFile(configFileName)
 	check(err)
@@ -40,46 +37,33 @@ func readConfig() appConfig {
 	check(err)
 
 	config.siteName = cm["siteName"]
-	if config.siteName != "" {
-		fmt.Println(" - site name: " + config.siteName)
-	}
 
 	config.theme = cm["theme"]
+
 	if config.theme == "" {
-		panic(errors.New("missing config theme value"))
-	} else {
-		fmt.Println(" - theme: " + config.theme)
+		exitWithError("missing config `theme` property value")
 	}
 
 	config.homePage = cm["homePage"]
-	if config.homePage != "" {
-		fmt.Println(" - home page: " + config.homePage)
-	}
 
 	pageSize := cm["pageSize"]
 	if pageSize != "" {
 		ps, err := strconv.Atoi(pageSize)
 		if err != nil || ps <= 0 {
-			fmt.Println(" - invalid config thumb size value: " + pageSize)
-			fmt.Println(" - will use the default value instead")
+			println(
+				" - invalid config thumb size value: "+pageSize,
+				" - will use the default value instead",
+			)
 		} else {
 			config.pageSize = ps
 		}
 	}
-	fmt.Println(fmt.Sprintf(" - page size: %d", config.pageSize))
 
 	useThumbs := cm["useThumbs"]
 	if useThumbs != "" {
 		v := strings.ToLower(useThumbs)
 		config.useThumbs = v != "no" && v != "false"
 	}
-	var usingThumbs string
-	if config.useThumbs {
-		usingThumbs = "yes"
-	} else {
-		usingThumbs = "no"
-	}
-	fmt.Println(" - using thumbs: " + usingThumbs)
 
 	thumbSizes := cm["thumbSizes"]
 	if thumbSizes != "" {
@@ -94,8 +78,10 @@ func readConfig() appConfig {
 				} else if s < minAllowedThumbWidth {
 					errMsg += fmt.Sprintf(" (min allowed width value: %d)", minAllowedThumbWidth)
 				}
-				fmt.Println(" - invalid config thumb widths value: " + thumbSizes + errMsg)
-				fmt.Println(" - will use the default widths instead")
+				println(
+					" - invalid config thumb widths value: "+thumbSizes+errMsg,
+					" - will use the default widths instead",
+				)
 			} else {
 				if !slices.Contains(sizes, s) {
 					sizes = append(sizes, s)
@@ -106,7 +92,6 @@ func readConfig() appConfig {
 			config.thumbSizes = sizes
 		}
 	}
-	fmt.Println(" - thumb sizes: " + strings.Trim(strings.Join(strings.Fields(fmt.Sprint(config.thumbSizes)), ", "), "[]"))
 
 	thumbThreshold := cm["thumbThreshold"]
 	if thumbThreshold != "" {
@@ -118,29 +103,29 @@ func readConfig() appConfig {
 			} else if tts < minAllowedThumbThreshold {
 				errMsg += fmt.Sprintf(" (min allowed value: %.2f)", minAllowedThumbThreshold)
 			}
-			fmt.Println(" - invalid config thumb threshold size value: " + thumbThreshold + errMsg)
-			fmt.Println(" - will use the default value instead")
+			println(
+				" - invalid config thumb threshold size value: "+thumbThreshold+errMsg,
+				" - will use the default value instead",
+			)
 		} else {
 			config.thumbThreshold = tts
 		}
 	}
-	fmt.Println(fmt.Sprintf(" - thumb threshold: %.2f", config.thumbThreshold))
 
 	if serveHost, ok := cm["serveHost"]; ok && serveHost != "" {
 		config.serveHost = serveHost
 	}
-	fmt.Println(" - serve host: " + config.serveHost)
 
 	if servePort, ok := cm["servePort"]; ok && servePort != "" {
 		config.servePort, err = strconv.Atoi(servePort)
 		if err != nil {
-			fmt.Println(" - invalid config serve port value: " + servePort)
-			fmt.Println(" - will use the default value instead")
+			println(
+				" - invalid config serve port value: "+servePort,
+				" - will use the default value instead",
+			)
 		}
 	}
-	fmt.Println(fmt.Sprintf(" - serve port: %d", config.servePort))
 
-	sprintln("[----------------------]")
 	return config
 }
 
@@ -218,4 +203,28 @@ func writeConfig(config appConfig) {
 	}
 
 	writeDataToFileIfChanged(configFileName, []byte(yml))
+}
+
+func printConfig(config appConfig) {
+	sprintln("[ ------ config ------ ]\n")
+	if config.siteName != "" {
+		println(" - site name: " + config.siteName)
+	}
+	println(" - theme: " + config.theme)
+	if config.homePage != "" {
+		println(" - home page: " + config.homePage)
+	}
+	println(fmt.Sprintf(" - page size: %d", config.pageSize))
+	var usingThumbs string
+	if config.useThumbs {
+		usingThumbs = "yes"
+	} else {
+		usingThumbs = "no"
+	}
+	println(" - using thumbs: " + usingThumbs)
+	println(" - thumb sizes: " + strings.Trim(strings.Join(strings.Fields(fmt.Sprint(config.thumbSizes)), ", "), "[]"))
+	println(fmt.Sprintf(" - thumb threshold: %.2f", config.thumbThreshold))
+	println(" - serve host: " + config.serveHost)
+	println(fmt.Sprintf(" - serve port: %d", config.servePort))
+	sprintln("[----------------------]")
 }

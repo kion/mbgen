@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strings"
 )
@@ -96,7 +95,7 @@ func getSupportedCommands() map[string]tuple2[appCommand, appCommandDescriptor] 
 }
 
 func _version(config appConfig, commandArgs ...string) {
-	fmt.Println("mbgen " + appVersion)
+	println("mbgen " + appVersion)
 }
 
 func _help(config appConfig, commandArgs ...string) {
@@ -112,7 +111,7 @@ func _help(config appConfig, commandArgs ...string) {
 func _init(config appConfig, commandArgs ...string) {
 	// generate sample config file
 	if fileExists(configFileName) {
-		log.Println(" - config file already exists: " + configFileName)
+		println(" - config file already exists: " + configFileName)
 	} else {
 		config = defaultConfig()
 		config.siteName = "Sample Site Name"
@@ -121,36 +120,36 @@ func _init(config appConfig, commandArgs ...string) {
 	}
 	// download content samples
 	if dirExists(markdownPagesDirName) {
-		log.Println(" - page content dir already exists: " + markdownPagesDirName)
+		println(" - page content dir already exists: " + markdownPagesDirName)
 	} else {
 		createDir(markdownPagesDirName)
 		err := download(defaultGitHubRepoPageContentSamplesUrl, markdownPagesDirName)
 		if err != nil {
-			log.Println(fmt.Sprintf("error downloading page content samples:\n\n" + err.Error()))
+			println(fmt.Sprintf("error downloading page content samples:\n\n" + err.Error()))
 		} else {
-			log.Println(" - downloaded page content samples")
+			println(" - downloaded page content samples")
 		}
 	}
 	if dirExists(markdownPostsDirName) {
-		log.Println(" - post content dir already exists: " + markdownPostsDirName)
+		println(" - post content dir already exists: " + markdownPostsDirName)
 	} else {
 		createDir(markdownPostsDirName)
 		err := download(defaultGitHubRepoPostContentSamplesUrl, markdownPostsDirName)
 		if err != nil {
-			log.Println(fmt.Sprintf("error downloading post content samples:\n\n" + err.Error()))
+			println(fmt.Sprintf("error downloading post content samples:\n\n" + err.Error()))
 		} else {
-			log.Println(" - downloaded post content samples")
+			println(" - downloaded post content samples")
 		}
 	}
 	if dirExists(deployDirName) {
-		log.Println(" - deploy dir already exists: " + deployDirName)
+		println(" - deploy dir already exists: " + deployDirName)
 	} else {
 		createDir(deployDirName)
 		err := download(defaultGitHubRepoDeployDirContentSamplesUrl, deployDirName)
 		if err != nil {
-			log.Println(fmt.Sprintf("error downloading deploy dir content samples:\n\n" + err.Error()))
+			println(fmt.Sprintf("error downloading deploy dir content samples:\n\n" + err.Error()))
 		} else {
-			log.Println(" - downloaded deploy dir content samples")
+			println(" - downloaded deploy dir content samples")
 		}
 	}
 	// install and activate default theme
@@ -184,7 +183,7 @@ func _generate(config appConfig, commandArgs ...string) {
 	themeResourcesDirPath := fmt.Sprintf("%s%c%s", config.theme, os.PathSeparator, resourcesDirName)
 	deployResourcesDirPath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, resourcesDirName)
 	copyDir(themeResourcesDirPath, deployResourcesDirPath)
-	logSprintln(" - copied theme resources")
+	sprintln(" - copied theme resources")
 
 	for _, level := range templateIncludeLevels {
 		stylesIncludeFilePath := getIncludeFilePath(stylesFileName, level, resLoader.config)
@@ -205,7 +204,7 @@ func _generate(config appConfig, commandArgs ...string) {
 			}
 			generated := writeDataToFileIfChanged(outputFilePath, data)
 			if generated {
-				log.Println(" - generated file: " + outputFilePath)
+				println(" - generated file: " + outputFilePath)
 				generatedCnt++
 			}
 			return generated
@@ -241,17 +240,17 @@ func _theme(config appConfig, commandArgs ...string) {
 		} else {
 			config.theme = themeDir
 			writeConfig(config)
-			logSprintln(" - " + configFileName + " updated to activate new theme: " + theme)
+			sprintln(" - " + configFileName + " updated to activate new theme: " + theme)
 		}
 	case "install":
 		if themeInstalled {
 			sprintln("theme is already installed: " + theme)
 		} else {
-			logSprintln(" - installing theme: " + theme)
+			sprintln(" - installing theme: " + theme)
 			themeUrl := fmt.Sprintf("%s/%s", defaultGitHubRepoThemesUrl, theme)
 			err := download(themeUrl, themeDir)
 			if err != nil {
-				log.Println(fmt.Sprintf("error installing theme:\n\n" + err.Error()))
+				println(fmt.Sprintf("error installing theme:\n\n" + err.Error()))
 			} else {
 				copyThemeIncludes(theme)
 			}
@@ -260,13 +259,13 @@ func _theme(config appConfig, commandArgs ...string) {
 		if !themeInstalled {
 			sprintln("theme is not installed: " + theme)
 		} else {
-			log.Println(" - updating theme: " + theme)
+			println(" - updating theme: " + theme)
 			themeUrl := fmt.Sprintf("%s/%s", defaultGitHubRepoThemesUrl, theme)
 			themeDlDir := themeDir + downloadedThemeDirSuffix
 			deleteIfExists(themeDlDir)
 			err := download(themeUrl, themeDlDir)
 			if err != nil {
-				log.Println(fmt.Sprintf("error updating theme:\n\n" + err.Error()))
+				println(fmt.Sprintf("error updating theme:\n\n" + err.Error()))
 			} else {
 				recreateDir(themeDir)
 				copyDir(themeDlDir, themeDir)
@@ -278,7 +277,7 @@ func _theme(config appConfig, commandArgs ...string) {
 		if !themeInstalled {
 			sprintln("theme is not installed: " + theme)
 		} else {
-			log.Println(" - refreshing theme: " + theme)
+			println(" - refreshing theme: " + theme)
 			copyThemeIncludes(theme)
 		}
 	case "delete":
@@ -288,7 +287,7 @@ func _theme(config appConfig, commandArgs ...string) {
 			if config.theme == themeDir {
 				sprintln("cannot delete theme being currently in use: " + theme)
 			} else {
-				log.Println(" - deleting theme: " + theme)
+				println(" - deleting theme: " + theme)
 				deleteIfExists(themeDir)
 				themeDstIncludeDir := fmt.Sprintf("%s%c%s", includeDirName, os.PathSeparator, theme)
 				deleteIfExists(themeDstIncludeDir)
@@ -316,9 +315,11 @@ func copyThemeIncludes(theme string) {
 				includeFileDstPath := fmt.Sprintf("%s%c%s", themeDstIncludeDir, os.PathSeparator, includeFileName)
 				if !fileExists(includeFileDstPath) {
 					includeFileSrcPath := fmt.Sprintf("%s%c%s", themeSrcIncludeDir, os.PathSeparator, includeFileName)
-					logSprintln(" - copying include file:")
-					log.Println("   - src: " + includeFileSrcPath)
-					log.Println("   - dst: " + includeFileDstPath)
+					sprintln(
+						" - copying include file:",
+						"   - src: "+includeFileSrcPath,
+						"   - dst: "+includeFileDstPath,
+					)
 					copyFile(includeFileSrcPath, includeFileDstPath)
 				}
 			}
@@ -346,10 +347,12 @@ func getResourceLoader(config appConfig) resourceLoader {
 }
 
 func handleStats(stats stats) {
-	sprintln("[------- stats --------]\n")
-	fmt.Printf(" - pages: %d\n", stats.pageCnt)
-	fmt.Printf(" - posts: %d\n", stats.postCnt)
-	fmt.Printf(" - tags: %d\n", stats.tagCnt)
-	fmt.Printf(" - files generated: %d\n", stats.genCnt)
-	sprintln("[----------------------]")
+	sprintln(
+		"[------- stats --------]\n",
+		fmt.Sprintf(" - pages: %d", stats.pageCnt),
+		fmt.Sprintf(" - posts: %d", stats.postCnt),
+		fmt.Sprintf(" - tags: %d", stats.tagCnt),
+		fmt.Sprintf(" - files generated: %d\n", stats.genCnt),
+		"[----------------------]",
+	)
 }

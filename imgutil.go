@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"github.com/disintegration/imaging"
-	"log"
 	"os"
 	"path/filepath"
 	"slices"
@@ -25,7 +24,7 @@ func processImgThumbnails(imgDirPath string, config appConfig) {
 				if !slices.Contains(config.thumbSizes, thSize) {
 					thumbFilePath := fmt.Sprintf("%s%c%s", imgDirPath, os.PathSeparator, imgFile)
 					deleteFile(thumbFilePath)
-					log.Println(" - deleted an old / no longer needed thumbnail: " + thumbFilePath)
+					println(" - deleted an old / no longer needed thumbnail: " + thumbFilePath)
 				}
 			}
 		}
@@ -48,16 +47,14 @@ func processImgThumbnails(imgDirPath string, config appConfig) {
 					var err error
 					imgFileSizeInMb, err = getFileSizeInMb(imgFilePath)
 					if err != nil {
-						log.Println(" - error reading image file info before thumbnail generation: " + imgFilePath)
-						log.Println(err)
+						println(" - error reading image file info before thumbnail generation: "+imgFilePath, err)
 						continue
 					}
 				}
 				if imgFileSizeInMb >= config.thumbThreshold {
 					srcImg, err := imaging.Open(imgFilePath)
 					if err != nil {
-						log.Println(" - error opening image for thumbnail generation: " + imgFilePath)
-						log.Println(err)
+						println(" - error opening image for thumbnail generation: "+imgFilePath, err)
 						continue
 					}
 					iw := srcImg.Bounds().Dx()
@@ -77,20 +74,20 @@ func processImgThumbnails(imgDirPath string, config appConfig) {
 						thImg := imaging.Resize(srcImg, tw, th, imaging.Lanczos)
 						err = imaging.Save(thImg, thumbFilePath)
 						if err != nil {
-							log.Println(" - error generating a thumbnail for image: " + imgFilePath)
-							log.Println(err)
+							println(" - error generating a thumbnail for image: "+imgFilePath, err)
 							continue
 						}
-						log.Println(" - generated a thumbnail: " + thumbFilePath)
-						log.Println(" - original image: " + imgFilePath)
-						log.Println(fmt.Sprintf(" - original image dimensions: %dx%d, thumbnail dimensions: %dx%d", iw, ih, tw, th))
+						println(
+							" - generated a thumbnail: "+thumbFilePath,
+							" - original image: "+imgFilePath,
+							fmt.Sprintf(" - original image dimensions: %dx%d, thumbnail dimensions: %dx%d", iw, ih, tw, th),
+						)
 						thumbFileSizeInMb, err := getFileSizeInMb(thumbFilePath)
 						if err != nil {
-							log.Println(" - error reading thumbnail file info: " + thumbFilePath)
-							log.Println(err)
+							println(" - error reading thumbnail file info: "+thumbFilePath, err)
 							continue
 						}
-						log.Println(fmt.Sprintf(" - original image file size: %.2f MB, thumbnail file size: %.2f MB\n", imgFileSizeInMb, thumbFileSizeInMb))
+						println(fmt.Sprintf(" - original image file size: %.2f MB, thumbnail file size: %.2f MB\n", imgFileSizeInMb, thumbFileSizeInMb))
 					}
 				}
 			}
@@ -106,7 +103,7 @@ func deleteImgThumbnails(imgDirPath string, config appConfig) {
 			if thm != nil {
 				thumbFilePath := fmt.Sprintf("%s%c%s", imgDirPath, os.PathSeparator, imgFile)
 				deleteFile(thumbFilePath)
-				log.Println(" - deleted thumbnail: " + thumbFilePath)
+				println(" - deleted thumbnail: " + thumbFilePath)
 			}
 		}
 	}

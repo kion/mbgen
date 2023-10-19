@@ -2,12 +2,11 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 )
 
 func exitWithError(err string) {
-	fmt.Println(err)
+	println(err)
 	os.Exit(-1)
 }
 
@@ -17,16 +16,15 @@ func check(err error) {
 	}
 }
 
-func sprintln(strings ...string) {
-	fmt.Println("")
+func println(strings ...interface{}) {
 	for _, s := range strings {
 		fmt.Println(s)
 	}
 }
 
-func logSprintln(strings ...string) {
+func sprintln(strings ...interface{}) {
 	fmt.Println("")
 	for _, s := range strings {
-		log.Println(s)
+		fmt.Println(s)
 	}
 }

@@ -26,7 +26,7 @@ func process(pages []page, posts []post,
 func processPages(pages []page, channel chan int,
 	resLoader resourceLoader, handleOutput processorOutputHandler) {
 	if pages != nil {
-		logSprintln(" - processing pages ...")
+		sprintln(" - processing pages ...")
 
 		title := resLoader.config.siteName
 		homePage := resLoader.config.homePage
@@ -43,7 +43,7 @@ func processPages(pages []page, channel chan int,
 				}
 			}
 			if !found {
-				panic(fmt.Errorf("home page not found: '%s'", homePage))
+				exitWithError(fmt.Sprintf("home page not found: '%s'", homePage))
 			}
 		}
 
@@ -79,7 +79,7 @@ func processPosts(posts []post, channel chan tuple2[int, int],
 	resLoader resourceLoader, handleOutput processorOutputHandler) {
 	ptCounts := tuple2[int, int]{V1: len(posts)}
 	if posts != nil {
-		logSprintln(" - processing posts ...")
+		sprintln(" - processing posts ...")
 
 		title := resLoader.config.siteName
 		homePage := resLoader.config.homePage
