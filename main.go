@@ -44,6 +44,7 @@ func main() {
 		var config appConfig
 		if commandDescr.reqConfig {
 			config = readConfig()
+			printConfig(config)
 		}
 		initializeAndRunCommand(commandFn, commandDescr, config, commandArgs)
 	} else {
