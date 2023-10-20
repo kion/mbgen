@@ -210,18 +210,17 @@ $ mbgen help [command]
 
 ## Configuration
 
-A number of configuration options can be specified in the `config.yml` 
+A number of configuration options can be specified in the `config.yml`  
 to customize the app behavior / generated output 
-(the options marked as **[required]** must be present 
-and have a value defined for the `generate` command to work, 
+(the options marked as **[required]** must be present and have a value defined, 
 while the [optional] ones do not require a value to be defined 
 or can even be completely omitted from the config):
 
-* **[required]** `siteName` - the name of the site
+* **[required]** `theme` - path to the active theme dir
+  (either relevant to the working dir or an absolute one)
+* [optional] `siteName` - the name of the site
   - if `:` needs to be used in the site name, 
     the property value must be enclosed in double quotes
-* **[required]** `theme` - path to the active theme dir 
-  (either relevant to the working dir or an absolute one)
 * [optional] `homePage` - an id of the page to use as the site's home page
   - for example, if there was a `pages/sample-page.md` content file, 
     it would be possible to set the value to `sample-page`
