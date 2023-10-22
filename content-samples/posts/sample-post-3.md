@@ -1,5 +1,5 @@
 ---
-date: 2023-08-03
+date: 2023-09-03
 title: Sample Post 3 - with a cover and multiple inline images
 tags:
   - Tag1

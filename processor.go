@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
+	"text/template"
 )
 
 func process(pages []page, posts []post,
@@ -109,6 +111,10 @@ func processPosts(posts []post, channel chan tuple2[int, int],
 
 		var postPageContent string
 
+		var archIdxData archiveIndexData
+		archivePostCnt := make(map[string]int)
+		archiveContent := make(map[string][]string)
+
 		tagPostCnt := make(map[string]int)
 		tagContent := make(map[string][]string)
 
@@ -124,13 +130,13 @@ func processPosts(posts []post, channel chan tuple2[int, int],
 			err := postContentTemplate.Execute(&singlePostContentBuffer, templateContent{EntityType: Post, Title: pTitle, Content: post})
 			check(err)
 
-			var pagePostContentBuffer bytes.Buffer
-			err = postContentTemplate.Execute(&pagePostContentBuffer, templateContent{EntityType: Post, Title: pTitle, Content: post, FileName: outputFileName})
+			var postContentBuffer bytes.Buffer
+			err = postContentTemplate.Execute(&postContentBuffer, templateContent{EntityType: Post, Title: pTitle, Content: post, FileName: outputFileName})
 			check(err)
 
-			pagePostContent := strings.TrimSpace(pagePostContentBuffer.String())
+			postContent := strings.TrimSpace(postContentBuffer.String())
 
-			postPageContent += pagePostContent
+			postPageContent += postContent
 
 			fullTemplate := compileFullTemplate(outputFileName, singlePostContentBuffer.String(), nil, resLoader)
 
@@ -166,11 +172,47 @@ func processPosts(posts []post, channel chan tuple2[int, int],
 				ppd.CurrPageNum++
 			}
 
+			if !post.Date.IsZero() {
+				year := post.Date.Year
+				month := post.Date.Month
+				yearIdx := slices.IndexFunc(archIdxData.YearData, func(data archiveYearData) bool {
+					return data.Year == year
+				})
+				if yearIdx != -1 {
+					monthData := archIdxData.YearData[yearIdx].MonthData
+					monthIdx := slices.IndexFunc(monthData, func(data archiveMonthData) bool {
+						return data.Month == month
+					})
+					if monthIdx != -1 {
+						archIdxData.YearData[yearIdx].MonthData[monthIdx].PostCnt++
+					} else {
+						archIdxData.YearData[yearIdx].MonthData = append(archIdxData.YearData[yearIdx].MonthData,
+							archiveMonthData{
+								Month:   month,
+								PostCnt: 1,
+							})
+					}
+				} else {
+					archIdxData.YearData = append(archIdxData.YearData, archiveYearData{
+						Year: year,
+						MonthData: []archiveMonthData{
+							{
+								Month:   month,
+								PostCnt: 1,
+							},
+						},
+					})
+				}
+				postYearAndMonth := formatYearAndMonth(year, month)
+				archivePostCnt[postYearAndMonth]++
+				archiveContent[postYearAndMonth] = append(archiveContent[postYearAndMonth], postContent)
+			}
+
 			if len(post.Tags) > 0 {
 				for _, tag := range post.Tags {
 					t := strings.ToLower(tag)
 					tagPostCnt[t]++
-					tagContent[t] = append(tagContent[t], pagePostContent)
+					tagContent[t] = append(tagContent[t], postContent)
 				}
 			}
 		}
@@ -194,64 +236,84 @@ func processPosts(posts []post, channel chan tuple2[int, int],
 			processContent(fileName, Post, postPageContent, outputFilePath, resLoader, handleOutput)
 		}
 
+		if len(archivePostCnt) > 0 {
+			archiveTemplate := compileArchiveTemplate(resLoader)
+			outputFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployArchiveDirName, os.PathSeparator, indexPageFileName)
+			var archiveContentBuffer bytes.Buffer
+			err := archiveTemplate.Execute(&archiveContentBuffer, templateContent{EntityType: Page, Title: "Archive", Content: archIdxData})
+			check(err)
+			if handleOutput != nil {
+				handleOutput(outputFilePath, archiveContentBuffer.Bytes())
+			}
+			processPaginatedPostContent(archivePostCnt, archiveContent, pageSize, deployArchiveDirName, pagerTemplate, resLoader, handleOutput)
+		}
+
 		tagPostCntLen := len(tagPostCnt)
 		if tagPostCntLen > 0 {
 			ptCounts.V2 = tagPostCntLen
-			for tag, cnt := range tagPostCnt {
-				totalTagPageCnt := cnt / pageSize
-				if cnt%pageSize > 0 {
-					totalTagPageCnt++
-				}
-				tagDirName := strings.ToLower(tag)
-				tagIndexUri := "/" + deployTagDirName + "/" + tagDirName
-				tpd := pagerData{
-					CurrPageNum:   1,
-					TotalPageCnt:  totalTagPageCnt,
-					PageUriPrefix: tagIndexUri,
-					IndexPageUri:  tagIndexUri,
-				}
-				tagPagePostCnt := 0
-				tagPageContent := ""
-				for i := 0; i < cnt; i++ {
-					tagPagePostCnt++
-					tagPageContent += tagContent[tag][i]
-					if tagPagePostCnt == pageSize {
-						var pagerBuffer bytes.Buffer
-						err := pagerTemplate.Execute(&pagerBuffer, tpd)
-						check(err)
-						tagPageContent += pagerBuffer.String()
-						var fileName string
-						if tpd.CurrPageNum == 1 {
-							fileName = indexPageFileName
-						} else {
-							fileName = strconv.Itoa(tpd.CurrPageNum) + contentFileExtension
-						}
-						outputFilePath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, deployTagDirName, os.PathSeparator, tagDirName, os.PathSeparator, fileName)
-						processContent(fileName, Post, tagPageContent, outputFilePath, resLoader, handleOutput)
-						tagPagePostCnt = 0
-						tagPageContent = ""
-						tpd.CurrPageNum++
-					}
-				}
-				if tagPagePostCnt > 0 {
-					tagDirName := strings.ToLower(tag)
-					var fileName string
-					if tpd.CurrPageNum == 1 {
-						fileName = indexPageFileName
-					} else {
-						fileName = strconv.Itoa(tpd.CurrPageNum) + contentFileExtension
-						var pagerBuffer bytes.Buffer
-						err := pagerTemplate.Execute(&pagerBuffer, tpd)
-						check(err)
-						tagPageContent += pagerBuffer.String()
-					}
-					outputFilePath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, deployTagDirName, os.PathSeparator, tagDirName, os.PathSeparator, fileName)
-					processContent(fileName, Post, tagPageContent, outputFilePath, resLoader, handleOutput)
-				}
-			}
+			processPaginatedPostContent(tagPostCnt, tagContent, pageSize, deployTagDirName, pagerTemplate, resLoader, handleOutput)
 		}
 	}
 	channel <- ptCounts
+}
+
+func processPaginatedPostContent(postCnt map[string]int, content map[string][]string, pageSize int,
+	contentDeployDirName string, pagerTemplate *template.Template,
+	resLoader resourceLoader, handleOutput processorOutputHandler) {
+	postCntLen := len(postCnt)
+	if postCntLen > 0 {
+		for key, cnt := range postCnt {
+			totalPageCnt := cnt / pageSize
+			if cnt%pageSize > 0 {
+				totalPageCnt++
+			}
+			subDirName := strings.ToLower(key)
+			pdIndexUri := "/" + contentDeployDirName + "/" + subDirName
+			pd := pagerData{
+				CurrPageNum:   1,
+				TotalPageCnt:  totalPageCnt,
+				PageUriPrefix: pdIndexUri,
+				IndexPageUri:  pdIndexUri,
+			}
+			pagePostCnt := 0
+			pageContent := ""
+			for i := 0; i < cnt; i++ {
+				pagePostCnt++
+				pageContent += content[key][i]
+				if pagePostCnt == pageSize {
+					var pagerBuffer bytes.Buffer
+					err := pagerTemplate.Execute(&pagerBuffer, pd)
+					check(err)
+					pageContent += pagerBuffer.String()
+					var fileName string
+					if pd.CurrPageNum == 1 {
+						fileName = indexPageFileName
+					} else {
+						fileName = strconv.Itoa(pd.CurrPageNum) + contentFileExtension
+					}
+					outputFilePath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, contentDeployDirName, os.PathSeparator, subDirName, os.PathSeparator, fileName)
+					processContent(fileName, Post, pageContent, outputFilePath, resLoader, handleOutput)
+					pagePostCnt = 0
+					pageContent = ""
+					pd.CurrPageNum++
+				}
+			}
+			if pagePostCnt > 0 {
+				var fileName string
+				if pd.CurrPageNum == 1 {
+					fileName = indexPageFileName
+				} else {
+					fileName = strconv.Itoa(pd.CurrPageNum) + contentFileExtension
+					var pagerBuffer bytes.Buffer
+					err := pagerTemplate.Execute(&pagerBuffer, pd)
+					check(err)
+					pageContent += pagerBuffer.String()
+				}
+				outputFilePath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, contentDeployDirName, os.PathSeparator, subDirName, os.PathSeparator, fileName)
+				processContent(fileName, Post, pageContent, outputFilePath, resLoader, handleOutput)
+			}
+		}
+	}
 }
 
 func processContent(templateName string, ceType contentEntityType, content string, outputFilePath string, resLoader resourceLoader, handleOutput processorOutputHandler) {

@@ -60,7 +60,8 @@ body > main .post:last-of-type {
 }
 
 .page,
-.post {
+.post,
+.archive {
     margin-top: 1em;
     border: 2px solid #555;
     border-radius: 4px;
@@ -163,7 +164,8 @@ body > main .post:last-of-type {
 }
 
 .page .content a,
-.post .content a {
+.post .content a,
+.archive a {
     color: #FF9C57;
 }
 
@@ -274,6 +276,41 @@ body > main .post:last-of-type {
     position: absolute;
     left: 0;
     top: 0;
+}
+
+.archive .archive-breakdown {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    padding: 1em;
+    column-gap: 1em;
+    row-gap: 1em;
+}
+
+.archive .archive-breakdown .year-breakdown {
+    flex: 1;
+    border: 2px solid #555;
+    border-radius: 4px;
+}
+
+.archive .archive-breakdown .year-breakdown .year {
+    font-weight: bold;
+    padding: 1em;
+    border-bottom: 2px dashed #555;
+    &:before {
+        font-family: FontAwesome;
+        content: '\f073';
+        margin-right: 0.6em;
+    }
+}
+
+.archive .archive-breakdown .year-breakdown .months {
+    padding: 1em;
+}
+
+.archive .archive-breakdown .year-breakdown .months .month-post-cnt .month-post-cnt-link {
+    display: flex;
+    justify-content: space-between;
 }
 
 .pager {

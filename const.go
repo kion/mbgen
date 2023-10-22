@@ -20,6 +20,7 @@ const (
 	pageTemplateFileName                        = "page" + templateFileExtension
 	postTemplateFileName                        = "post" + templateFileExtension
 	mediaTemplateFileName                       = "media" + templateFileExtension
+	archiveTemplateFileName                     = "archive" + templateFileExtension
 	pagerTemplateFileName                       = "pager" + templateFileExtension
 	contentDirectiveTemplateFileNameFormat      = "content-%s" + templateFileExtension
 	contentFileExtension                        = ".html"
@@ -35,6 +36,7 @@ const (
 	deployPostDirName                           = "post"
 	deployPostsDirName                          = "posts"
 	deployPageDirName                           = "page"
+	deployArchiveDirName                        = "archive"
 	deployTagDirName                            = "tag"
 	metaDataKeyDate                             = "date"
 	metaDataKeyTime                             = "time"

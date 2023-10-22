@@ -42,7 +42,8 @@ var (
 			}
 			return i
 		},
-		"toLowerCase": strings.ToLower,
+		"fmtYearAndMonth": formatYearAndMonth,
+		"toLowerCase":     strings.ToLower,
 	}
 )
 
@@ -55,6 +56,14 @@ func compilePageTemplate(p page, resLoader resourceLoader) *template.Template {
 				"{{# "+pageHeadIncludePrefix+p.id+contentFileExtension+" #}}", 1)
 		}, resLoader)
 	return pageTemplate
+}
+
+func compileArchiveTemplate(resLoader resourceLoader) *template.Template {
+	archiveTemplateMarkup, err := readTemplateFile(archiveTemplateFileName, resLoader)
+	check(err)
+	archiveTemplateMarkup = strings.Replace(archiveTemplateMarkup, pageHeadTemplatePlaceholder, "", 1)
+	archiveTemplate := compileFullTemplate(archiveTemplateFileName, archiveTemplateMarkup, nil, resLoader)
+	return archiveTemplate
 }
 
 func compilePagerTemplate(resLoader resourceLoader) *template.Template {

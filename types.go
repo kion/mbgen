@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 )
 
 type appConfig struct {
@@ -270,6 +271,20 @@ func (p post) FmtTime() string {
 		return time
 	}
 	return ""
+}
+
+type archiveIndexData struct {
+	YearData []archiveYearData
+}
+
+type archiveYearData struct {
+	Year      int
+	MonthData []archiveMonthData
+}
+
+type archiveMonthData struct {
+	Month   time.Month
+	PostCnt int
 }
 
 type tuple2[T1, T2 any] struct {
