@@ -43,6 +43,7 @@ const (
 	metaDataKeyTitle                            = "title"
 	metaDataKeyTags                             = "tags"
 	configFileName                              = "config.yml"
+	defaultGenerateArchive                      = true
 	defaultPageSize                             = 10
 	minAllowedThumbWidth                        = 320
 	minAllowedThumbThreshold                    = 0.3

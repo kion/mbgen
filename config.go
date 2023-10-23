@@ -12,15 +12,16 @@ import (
 
 func defaultConfig() appConfig {
 	return appConfig{
-		siteName:       "",
-		theme:          "",
-		homePage:       "",
-		pageSize:       defaultPageSize,
-		useThumbs:      defaultUseThumbs,
-		thumbSizes:     defaultThumbSizes,
-		thumbThreshold: defaultThumbThreshold,
-		serveHost:      defaultServeHost,
-		servePort:      defaultServePort,
+		siteName:        "",
+		theme:           "",
+		homePage:        "",
+		generateArchive: defaultGenerateArchive,
+		pageSize:        defaultPageSize,
+		useThumbs:       defaultUseThumbs,
+		thumbSizes:      defaultThumbSizes,
+		thumbThreshold:  defaultThumbThreshold,
+		serveHost:       defaultServeHost,
+		servePort:       defaultServePort,
 	}
 }
 
@@ -45,6 +46,12 @@ func readConfig() appConfig {
 	}
 
 	config.homePage = cm["homePage"]
+
+	generateArchive := cm["generateArchive"]
+	if generateArchive != "" {
+		v := strings.ToLower(generateArchive)
+		config.generateArchive = v != "no" && v != "false"
+	}
 
 	pageSize := cm["pageSize"]
 	if pageSize != "" {
@@ -150,6 +157,21 @@ func writeConfig(config appConfig) {
 	}
 
 	yml += "\n"
+	var generateArchive bool
+	if defaultGenerateArchive == config.generateArchive {
+		generateArchive = defaultGenerateArchive
+		yml += "#useThumbs: "
+	} else {
+		generateArchive = config.generateArchive
+		yml += "useThumbs: "
+	}
+	if generateArchive {
+		yml += "yes"
+	} else {
+		yml += "no"
+	}
+
+	yml += "\n"
 	if defaultPageSize == config.pageSize {
 		yml += "#pageSize: " + strconv.Itoa(defaultPageSize)
 	} else {
@@ -214,6 +236,13 @@ func printConfig(config appConfig) {
 	if config.homePage != "" {
 		println(" - home page: " + config.homePage)
 	}
+	var generateArchive string
+	if config.generateArchive {
+		generateArchive = "yes"
+	} else {
+		generateArchive = "no"
+	}
+	println(" - generate archive: " + generateArchive)
 	println(fmt.Sprintf(" - page size: %d", config.pageSize))
 	var usingThumbs string
 	if config.useThumbs {
@@ -221,7 +250,7 @@ func printConfig(config appConfig) {
 	} else {
 		usingThumbs = "no"
 	}
-	println(" - using thumbs: " + usingThumbs)
+	println(" - use thumbs: " + usingThumbs)
 	println(" - thumb sizes: " + strings.Trim(strings.Join(strings.Fields(fmt.Sprint(config.thumbSizes)), ", "), "[]"))
 	println(fmt.Sprintf(" - thumb threshold: %.2f", config.thumbThreshold))
 	println(" - serve host: " + config.serveHost)

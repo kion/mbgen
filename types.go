@@ -9,15 +9,16 @@ import (
 )
 
 type appConfig struct {
-	siteName       string
-	theme          string
-	homePage       string
-	pageSize       int
-	useThumbs      bool
-	thumbSizes     []int
-	thumbThreshold float64
-	serveHost      string
-	servePort      int
+	siteName        string
+	theme           string
+	homePage        string
+	generateArchive bool
+	pageSize        int
+	useThumbs       bool
+	thumbSizes      []int
+	thumbThreshold  float64
+	serveHost       string
+	servePort       int
 }
 
 type appCommandDescriptor struct {

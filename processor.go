@@ -83,10 +83,12 @@ func processPosts(posts []post, channel chan tuple2[int, int],
 	if posts != nil {
 		sprintln(" - processing posts ...")
 
-		title := resLoader.config.siteName
-		homePage := resLoader.config.homePage
+		config := resLoader.config
 
-		pageSize := resLoader.config.pageSize
+		title := config.siteName
+		homePage := config.homePage
+
+		pageSize := config.pageSize
 
 		postContentTemplate := compilePostTemplate(resLoader)
 		pagerTemplate := compilePagerTemplate(resLoader)
@@ -172,7 +174,7 @@ func processPosts(posts []post, channel chan tuple2[int, int],
 				ppd.CurrPageNum++
 			}
 
-			if !post.Date.IsZero() {
+			if config.generateArchive && !post.Date.IsZero() {
 				year := post.Date.Year
 				month := post.Date.Month
 				yearIdx := slices.IndexFunc(archIdxData.YearData, func(data archiveYearData) bool {
@@ -236,7 +238,7 @@ func processPosts(posts []post, channel chan tuple2[int, int],
 			processContent(fileName, Post, postPageContent, outputFilePath, resLoader, handleOutput)
 		}
 
-		if len(archivePostCnt) > 0 {
+		if config.generateArchive && len(archivePostCnt) > 0 {
 			archiveTemplate := compileArchiveTemplate(resLoader)
 			outputFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployArchiveDirName, os.PathSeparator, indexPageFileName)
 			var archiveContentBuffer bytes.Buffer
