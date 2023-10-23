@@ -165,6 +165,10 @@ func _cleanup(config appConfig, commandArgs ...string) {
 		resLoader := getResourceLoader(config)
 		parsePages(config, resLoader, deleteImgThumbnails)
 		parsePosts(config, resLoader, deleteImgThumbnails)
+	case "archive":
+		deployArchivePath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, deployArchiveDirName)
+		deleteIfExists(deployArchivePath)
+		println(" - deleted archive dir: " + deployArchivePath)
 	default:
 		sprintln("error: invalid cleanup command target: " + target)
 		usageHelp := "usage:\n\n" + commandCleanup.usage
