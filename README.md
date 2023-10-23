@@ -224,12 +224,20 @@ or can even be completely omitted from the config):
 * [optional] `homePage` - an id of the page to use as the site's home page
   - for example, if there was a `pages/sample-page.md` content file, 
     it would be possible to set the value to `sample-page`
+* [optional] `generateArchive` - the posts archive generation is enabled by default, 
+  unless this setting is set to `no`
+  - `generate` command generates an archive index page, 
+    as well as pages with posts for all the relevant year/month combinations 
+    (retrieved from the `date` property of each corresponding post content `.md` file) - 
+    the generated index page lists all the year/month combinations with links to the corresponding content pages
+  - the generated archive index page is available under `/archive/` URI, e.g.:
+    - `<a href="/archive/">Archive</a>`
+  - set this setting to `no` to disable archive generation
 * [optional] `pageSize` - controls the maximum number of posts 
   on any page that renders a list of posts
   - if not specified, the default value of `10` is used
-* [optional] `useThumbs` 
-  - if not specified (or set to `yes` explicitly), 
-    enables the thumbnail behavior (to optimize the page size / load time): 
+* [optional] `useThumbs` - the thumbnail behavior (to optimize the page size / load time) 
+  is enabled by default, unless this setting is set to `no`: 
     - `generate` command generates a number of thumbnails 
       (preserving the original image aspect ratio)  
       with widths/heights (whichever one is larger) 
@@ -247,7 +255,7 @@ or can even be completely omitted from the config):
     - the following image formats are supported:
       - JPEG (`.jpg` and `.jpeg` file extensions)
       - PNG (`.png` file extension)
-  - set to `no` to disable the thumbnail behavior
+    - set this setting to `no` to disable the thumbnail behavior
 * [optional] `thumbSizes` - defines the set of size values for the generated thumbnails, 
   where each value corresponds to either the width or the height of the generated thumbnail  
   (depending on which one is larger for the original image)
