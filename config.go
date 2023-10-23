@@ -160,10 +160,10 @@ func writeConfig(config appConfig) {
 	var generateArchive bool
 	if defaultGenerateArchive == config.generateArchive {
 		generateArchive = defaultGenerateArchive
-		yml += "#useThumbs: "
+		yml += "#generateArchive: "
 	} else {
 		generateArchive = config.generateArchive
-		yml += "useThumbs: "
+		yml += "generateArchive: "
 	}
 	if generateArchive {
 		yml += "yes"
