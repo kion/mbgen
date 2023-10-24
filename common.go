@@ -9,7 +9,7 @@ import (
 
 func exitWithError(err string) {
 	println(err)
-	os.Exit(-1)
+	os.Exit(1)
 }
 
 func check(err error) {
