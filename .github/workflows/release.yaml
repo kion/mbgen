@@ -28,3 +28,4 @@ jobs:
           goos: ${{ matrix.goos }}
           goarch: ${{ matrix.goarch }}
           asset_name: "${{ env.REPOSITORY_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }}"
+          compress_assets: OFF
