@@ -16,9 +16,8 @@ If you have Go installed:
 go install github.com/kion/mbgen
 ```
 
-Otherwise, download the latest binary 
-from the [releases](https://github.com/kion/mbgen/releases) page, 
-make it executable (`chmod +x mbgen` on any Unix-like system), 
+Otherwise, download the [latest binary release](https://github.com/kion/mbgen/releases/latest) for your OS, 
+rename it to `mbgen`, make it executable (`chmod +x mbgen` on any Unix-like system), 
 and either add it to your `PATH` to make the `mbgen` command available globally 
 or just place it in any dir to limit its usage from that dir only.
 
