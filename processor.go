@@ -159,15 +159,15 @@ func processPosts(posts []post, channel chan tuple2[int, int],
 				if ppd.CurrPageNum == 1 {
 					if homePage == "" {
 						outputFilePath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, indexPageFileName)
-						processContent(indexPageFileName, Post, postPageContent, outputFilePath, resLoader, handleOutput)
+						processContent(indexPageFileName, Post, config.siteName, postPageContent, outputFilePath, resLoader, handleOutput)
 					} else {
 						outputFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployPostsDirName, os.PathSeparator, indexPageFileName)
-						processContent(deployPostsDirName+"/"+indexPageFileName, Post, postPageContent, outputFilePath, resLoader, handleOutput)
+						processContent(deployPostsDirName+"/"+indexPageFileName, Post, config.siteName, postPageContent, outputFilePath, resLoader, handleOutput)
 					}
 				} else {
 					fileName := strconv.Itoa(ppd.CurrPageNum) + contentFileExtension
 					outputFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployPostsDirName, os.PathSeparator, fileName)
-					processContent(fileName, Post, postPageContent, outputFilePath, resLoader, handleOutput)
+					processContent(fileName, Post, config.siteName, postPageContent, outputFilePath, resLoader, handleOutput)
 				}
 				pagePostCnt = 0
 				postPageContent = ""
@@ -235,14 +235,14 @@ func processPosts(posts []post, channel chan tuple2[int, int],
 				check(err)
 				postPageContent += pagerBuffer.String()
 			}
-			processContent(fileName, Post, postPageContent, outputFilePath, resLoader, handleOutput)
+			processContent(fileName, Post, config.siteName, postPageContent, outputFilePath, resLoader, handleOutput)
 		}
 
 		if config.generateArchive && len(archivePostCnt) > 0 {
 			archiveTemplate := compileArchiveTemplate(resLoader)
 			outputFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployArchiveDirName, os.PathSeparator, indexPageFileName)
 			var archiveContentBuffer bytes.Buffer
-			err := archiveTemplate.Execute(&archiveContentBuffer, templateContent{EntityType: Page, Title: "Archive", Content: archIdxData})
+			err := archiveTemplate.Execute(&archiveContentBuffer, templateContent{EntityType: Page, Title: config.siteName + " - Archive", Content: archIdxData})
 			check(err)
 			if handleOutput != nil {
 				handleOutput(outputFilePath, archiveContentBuffer.Bytes())
@@ -294,7 +294,7 @@ func processPaginatedPostContent(postCnt map[string]int, content map[string][]st
 						fileName = strconv.Itoa(pd.CurrPageNum) + contentFileExtension
 					}
 					outputFilePath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, contentDeployDirName, os.PathSeparator, subDirName, os.PathSeparator, fileName)
-					processContent(fileName, Post, pageContent, outputFilePath, resLoader, handleOutput)
+					processContent(fileName, Post, resLoader.config.siteName+" - "+key, pageContent, outputFilePath, resLoader, handleOutput)
 					pagePostCnt = 0
 					pageContent = ""
 					pd.CurrPageNum++
@@ -312,16 +312,16 @@ func processPaginatedPostContent(postCnt map[string]int, content map[string][]st
 					pageContent += pagerBuffer.String()
 				}
 				outputFilePath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, contentDeployDirName, os.PathSeparator, subDirName, os.PathSeparator, fileName)
-				processContent(fileName, Post, pageContent, outputFilePath, resLoader, handleOutput)
+				processContent(fileName, Post, resLoader.config.siteName+" - "+key, pageContent, outputFilePath, resLoader, handleOutput)
 			}
 		}
 	}
 }
 
-func processContent(templateName string, ceType contentEntityType, content string, outputFilePath string, resLoader resourceLoader, handleOutput processorOutputHandler) {
+func processContent(templateName string, ceType contentEntityType, title string, content string, outputFilePath string, resLoader resourceLoader, handleOutput processorOutputHandler) {
 	tmplt := compileFullTemplate(templateName, content, nil, resLoader)
 	var contentBuffer bytes.Buffer
-	err := tmplt.Execute(&contentBuffer, templateContent{EntityType: ceType, Title: resLoader.config.siteName})
+	err := tmplt.Execute(&contentBuffer, templateContent{EntityType: ceType, Title: title})
 	check(err)
 	if handleOutput != nil {
 		handleOutput(outputFilePath, contentBuffer.Bytes())
