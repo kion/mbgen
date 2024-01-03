@@ -234,7 +234,7 @@ body > main .post:last-of-type {
 }
 
 .content .media .image {
-    display: block;
+    display: flex;
     width: calc(100% - 0.5em);
     height: auto;
     padding: 4px;
