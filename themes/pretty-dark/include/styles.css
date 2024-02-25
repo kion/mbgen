@@ -28,6 +28,6 @@ body > header .links .link-list .link {
     white-space: nowrap;
 }
 
-body > header .links .link-list .link a {
-    color: #bababa;
+body > header * a {
+    color: #fbc5a0;
 }
