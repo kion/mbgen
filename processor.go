@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"slices"
@@ -12,21 +13,22 @@ import (
 
 func process(pages []page, posts []post,
 	resLoader resourceLoader, handleOutput processorOutputHandler) stats {
-	pagesChan := make(chan int)
-	go processPages(pages, pagesChan, resLoader, handleOutput)
-	postsChan := make(chan tuple2[int, int])
-	go processPosts(posts, postsChan, resLoader, handleOutput)
-	pageCnt := <-pagesChan
-	ptCnt := <-postsChan
+	var searchIndex = mapSlice{}
+	pageCnt := processPages(pages, &searchIndex, resLoader, handleOutput)
+	postCnt, tagCnt := processPosts(posts, &searchIndex, resLoader, handleOutput)
+	searchIndexJson, err := json.Marshal(searchIndex)
+	check(err)
+	searchIndexOutputFilePath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, searchIndexFileName)
+	writeDataToFileIfChanged(searchIndexOutputFilePath, searchIndexJson)
 	return stats{
 		pageCnt: pageCnt,
-		postCnt: ptCnt.V1,
-		tagCnt:  ptCnt.V2,
+		postCnt: postCnt,
+		tagCnt:  tagCnt,
 	}
 }
 
-func processPages(pages []page, channel chan int,
-	resLoader resourceLoader, handleOutput processorOutputHandler) {
+func processPages(pages []page, searchIndex *mapSlice,
+	resLoader resourceLoader, handleOutput processorOutputHandler) int {
 	if pages != nil {
 		sprintln(" - processing pages ...")
 
@@ -68,15 +70,16 @@ func processPages(pages []page, channel chan int,
 			if handleOutput != nil {
 				handleOutput(outputFilePath, pageContentBuffer.Bytes())
 			}
+
+			*searchIndex = append(*searchIndex, mapItem{Key: page.SearchData.TypeId, Value: page.SearchData.Content})
 		}
 	}
-
-	channel <- len(pages)
+	return len(pages)
 }
 
-func processPosts(posts []post, channel chan tuple2[int, int],
-	resLoader resourceLoader, handleOutput processorOutputHandler) {
-	ptCounts := tuple2[int, int]{V1: len(posts)}
+func processPosts(posts []post, searchIndex *mapSlice,
+	resLoader resourceLoader, handleOutput processorOutputHandler) (int, int) {
+	tagCnt := 0
 	if posts != nil {
 		sprintln(" - processing posts ...")
 
@@ -213,6 +216,8 @@ func processPosts(posts []post, channel chan tuple2[int, int],
 					tagContent[t] = append(tagContent[t], postContent)
 				}
 			}
+
+			*searchIndex = append(*searchIndex, mapItem{Key: post.SearchData.TypeId, Value: post.SearchData.Content})
 		}
 
 		if pagePostCnt > 0 {
@@ -246,13 +251,24 @@ func processPosts(posts []post, channel chan tuple2[int, int],
 			processPaginatedPostContent(archivePostCnt, archiveContent, pageSize, deployArchiveDirName, pagerTemplate, resLoader, handleOutput)
 		}
 
+		if config.enableSearch {
+			searchTemplate := compileSearchTemplate(resLoader)
+			outputFilePath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, searchPageFileName)
+			var searchContentBuffer bytes.Buffer
+			err := searchTemplate.Execute(&searchContentBuffer, templateContent{EntityType: Page, Title: config.siteName + " - Search", Config: map[string]any{"PageSize": config.pageSize}})
+			check(err)
+			if handleOutput != nil {
+				handleOutput(outputFilePath, searchContentBuffer.Bytes())
+			}
+		}
+
 		tagPostCntLen := len(tagPostCnt)
 		if tagPostCntLen > 0 {
-			ptCounts.V2 = tagPostCntLen
+			tagCnt = tagPostCntLen
 			processPaginatedPostContent(tagPostCnt, tagContent, pageSize, deployTagDirName, pagerTemplate, resLoader, handleOutput)
 		}
 	}
-	channel <- ptCounts
+	return len(posts), tagCnt
 }
 
 func processPaginatedPostContent(postCnt map[string]int, content map[string][]string, pageSize int,

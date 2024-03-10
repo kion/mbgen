@@ -16,6 +16,7 @@ func defaultConfig() appConfig {
 		theme:           "",
 		homePage:        "",
 		generateArchive: defaultGenerateArchive,
+		enableSearch:    defaultEnableSearch,
 		pageSize:        defaultPageSize,
 		useThumbs:       defaultUseThumbs,
 		thumbSizes:      defaultThumbSizes,
@@ -51,6 +52,12 @@ func readConfig() appConfig {
 	if generateArchive != "" {
 		v := strings.ToLower(generateArchive)
 		config.generateArchive = v != "no" && v != "false"
+	}
+
+	enableSearch := cm["enableSearch"]
+	if enableSearch != "" {
+		v := strings.ToLower(enableSearch)
+		config.enableSearch = v != "no" && v != "false"
 	}
 
 	pageSize := cm["pageSize"]
@@ -172,6 +179,21 @@ func writeConfig(config appConfig) {
 	}
 
 	yml += "\n"
+	var enableSearch bool
+	if defaultEnableSearch == config.enableSearch {
+		enableSearch = defaultEnableSearch
+		yml += "#enableSearch: "
+	} else {
+		enableSearch = config.enableSearch
+		yml += "enableSearch: "
+	}
+	if enableSearch {
+		yml += "yes"
+	} else {
+		yml += "no"
+	}
+
+	yml += "\n"
 	if defaultPageSize == config.pageSize {
 		yml += "#pageSize: " + strconv.Itoa(defaultPageSize)
 	} else {
@@ -243,6 +265,13 @@ func printConfig(config appConfig) {
 		generateArchive = "no"
 	}
 	println(" - generate archive: " + generateArchive)
+	var enableSearch string
+	if config.enableSearch {
+		enableSearch = "yes"
+	} else {
+		enableSearch = "no"
+	}
+	println(" - enable search: " + enableSearch)
 	println(fmt.Sprintf(" - page size: %d", config.pageSize))
 	var usingThumbs string
 	if config.useThumbs {

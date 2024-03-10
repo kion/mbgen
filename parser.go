@@ -108,31 +108,37 @@ func parsePosts(config appConfig, resLoader resourceLoader, thumbHandler imageTh
 
 func parsePage(pageId string, content string, config appConfig, resLoader resourceLoader) page {
 	page := page{id: pageId}
-	content, cdPhReps, _ := parseContentDirectives(pageId, content, config, resLoader)
+	content, rawBodyContent, cdPhReps, _ := parseContentDirectives(pageId, content, config, resLoader)
 	var buf bytes.Buffer
 	context := parser.NewContext()
 	err := markdown.Convert([]byte(content), &buf, parser.WithContext(context))
 	check(err)
-	page.Body = handleBodyContent(buf.String())
+	page.Body = strings.TrimSpace(buf.String())
 	page.Body = handleContentDirectivePlaceholderReplacements(page.Body, cdPhReps)
 	metaData := meta.Get(context)
+	rawTitle := ""
 	if title, ok := metaData[metaDataKeyTitle].(string); ok {
+		rawTitle = strings.ToLower(title)
 		if strings.Contains(title, "\n") {
 			title = strings.Replace(title, "\n", "<br>", -1)
 		}
 		page.Title = title
+	}
+	page.SearchData = searchData{
+		TypeId:  "page/" + page.id,
+		Content: rawTitle + " " + rawBodyContent,
 	}
 	return page
 }
 
 func parsePost(postId string, content string, config appConfig, resLoader resourceLoader) post {
 	post := post{id: postId}
-	content, cdPhReps, hashTags := parseContentDirectives(postId, content, config, resLoader)
+	content, rawBodyContent, cdPhReps, hashTags := parseContentDirectives(postId, content, config, resLoader)
 	var buf bytes.Buffer
 	context := parser.NewContext()
 	err := markdown.Convert([]byte(content), &buf, parser.WithContext(context))
 	check(err)
-	post.Body = handleBodyContent(buf.String())
+	post.Body = strings.TrimSpace(buf.String())
 	post.Body = handleContentDirectivePlaceholderReplacements(post.Body, cdPhReps)
 	metaData := meta.Get(context)
 	if date, ok := metaData[metaDataKeyDate].(string); ok {
@@ -148,7 +154,9 @@ func parsePost(postId string, content string, config appConfig, resLoader resour
 		check(err)
 		post.Time = t
 	}
+	rawTitle := ""
 	if title, ok := metaData[metaDataKeyTitle].(string); ok {
+		rawTitle = strings.ToLower(title)
 		if strings.Contains(title, "\n") {
 			title = strings.Replace(title, "\n", "<br>", -1)
 		}
@@ -171,11 +179,11 @@ func parsePost(postId string, content string, config appConfig, resLoader resour
 			}
 		}
 	}
+	post.SearchData = searchData{
+		TypeId:  "post/" + post.id,
+		Content: rawTitle + " " + rawBodyContent + " " + strings.ToLower(strings.Join(post.Tags[:], " ")),
+	}
 	return post
-}
-
-func handleBodyContent(content string) string {
-	return strings.TrimSpace(content)
 }
 
 func handleThumbnails(mediaDirPath string, config appConfig, thumbHandler imageThumbnailHandler) {
@@ -187,21 +195,25 @@ func handleThumbnails(mediaDirPath string, config appConfig, thumbHandler imageT
 	}
 }
 
-func parseContentDirectives(entryId string, bodyContent string, config appConfig, resLoader resourceLoader) (string, map[string]string, []string) {
+func parseContentDirectives(entryId string, content string, config appConfig, resLoader resourceLoader) (string, string, map[string]string, []string) {
+	rawBodyContent := metaDataPlaceholderRegexp.ReplaceAllString(content, "")
+	rawBodyContent = contentDirectivePlaceholderRegexp.ReplaceAllString(rawBodyContent, "")
+	rawBodyContent = whitespacePlaceholderRegexp.ReplaceAllString(rawBodyContent, " ")
+	rawBodyContent = strings.ToLower(strings.TrimSpace(rawBodyContent))
 	var phReps map[string]string
 	var tags []string
-	hashTagPlaceholders := hashTagRegex.FindAllStringSubmatch(bodyContent, -1)
+	hashTagPlaceholders := hashTagRegex.FindAllStringSubmatch(content, -1)
 	if hashTagPlaceholders != nil {
 		for _, htp := range hashTagPlaceholders {
 			placeholder := htp[0]
 			tag := htp[1]
 			replacement := fmt.Sprintf(hashTagMarkdownReplacementFormat, tag, strings.ToLower(tag))
-			bodyContent = strings.Replace(bodyContent, placeholder, replacement, 1)
+			content = strings.Replace(content, placeholder, replacement, 1)
 			tags = append(tags, tag)
 		}
 	}
 	var expListMedia []string
-	wrapPlaceholders := wrapPlaceholderRegexp.FindAllStringSubmatch(bodyContent, -1)
+	wrapPlaceholders := wrapPlaceholderRegexp.FindAllStringSubmatch(content, -1)
 	if wrapPlaceholders != nil {
 		sortContentDirectivePlaceholders(wrapPlaceholders)
 		for _, wp := range wrapPlaceholders {
@@ -214,7 +226,7 @@ func parseContentDirectives(entryId string, bodyContent string, config appConfig
 			}
 		}
 	}
-	mediaPlaceholders := mediaPlaceholderRegexp.FindAllStringSubmatch(bodyContent, -1)
+	mediaPlaceholders := mediaPlaceholderRegexp.FindAllStringSubmatch(content, -1)
 	if mediaPlaceholders != nil {
 		sortContentDirectivePlaceholders(mediaPlaceholders)
 		for _, mp := range mediaPlaceholders {
@@ -273,7 +285,7 @@ func parseContentDirectives(entryId string, bodyContent string, config appConfig
 				phReps = make(map[string]string)
 			}
 			phReps[ph] = strings.TrimSpace(contentDirectiveMarkupBuffer.String())
-			bodyContent = strings.Replace(bodyContent, placeholder, ph, 1)
+			content = strings.Replace(content, placeholder, ph, 1)
 		}
 	}
 	if mediaPlaceholders != nil {
@@ -313,11 +325,11 @@ func parseContentDirectives(entryId string, bodyContent string, config appConfig
 					phReps = make(map[string]string)
 				}
 				phReps[ph] = strings.TrimSpace(inlineMediaMarkupBuffer.String())
-				bodyContent = strings.Replace(bodyContent, placeholder, ph, 1)
+				content = strings.Replace(content, placeholder, ph, 1)
 			}
 		}
 	}
-	embedMediaPlaceholders := embedMediaPlaceholderRegexp.FindAllStringSubmatch(bodyContent, -1)
+	embedMediaPlaceholders := embedMediaPlaceholderRegexp.FindAllStringSubmatch(content, -1)
 	if embedMediaPlaceholders != nil {
 		var em []embeddedMedia
 		for _, emp := range embedMediaPlaceholders {
@@ -345,11 +357,11 @@ func parseContentDirectives(entryId string, bodyContent string, config appConfig
 					phReps = make(map[string]string)
 				}
 				phReps[ph] = strings.TrimSpace(inlineMediaMarkupBuffer.String())
-				bodyContent = strings.Replace(bodyContent, placeholder, ph, 1)
+				content = strings.Replace(content, placeholder, ph, 1)
 			}
 		}
 	}
-	return bodyContent, phReps, tags
+	return content, rawBodyContent, phReps, tags
 }
 
 func sortContentDirectivePlaceholders(cdPlaceholders [][]string) {

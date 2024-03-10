@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"cloud.google.com/go/civil"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -13,6 +15,7 @@ type appConfig struct {
 	theme           string
 	homePage        string
 	generateArchive bool
+	enableSearch    bool
 	pageSize        int
 	useThumbs       bool
 	thumbSizes      []int
@@ -107,6 +110,7 @@ type templateContent struct {
 	Title      string
 	FileName   string
 	Content    any
+	Config     map[string]any
 }
 
 type contentDirectiveData struct {
@@ -236,20 +240,27 @@ func (m media) ThumbUri(sizeIdx int) string {
 	return m.thumbs[sizeIdx-1].Uri
 }
 
+type searchData struct {
+	TypeId  string
+	Content string
+}
+
 type page struct {
-	id    string
-	Title string
-	Body  string
-	Media []media
+	id         string
+	Title      string
+	Body       string
+	Media      []media
+	SearchData searchData
 }
 
 type post struct {
-	id    string
-	Date  civil.Date
-	Time  civil.Time
-	Title string
-	Body  string
-	Tags  []string
+	id         string
+	Date       civil.Date
+	Time       civil.Time
+	Title      string
+	Body       string
+	Tags       []string
+	SearchData searchData
 }
 
 func (p post) HasDateOrTime() bool {
@@ -291,6 +302,30 @@ type archiveMonthData struct {
 type tuple2[T1, T2 any] struct {
 	V1 T1
 	V2 T2
+}
+
+type mapItem struct {
+	Key, Value interface{}
+}
+
+type mapSlice []mapItem
+
+func (ms mapSlice) MarshalJSON() ([]byte, error) {
+	buf := &bytes.Buffer{}
+	buf.Write([]byte{'{'})
+	for i, mi := range ms {
+		b, err := json.Marshal(&mi.Value)
+		if err != nil {
+			return nil, err
+		}
+		buf.WriteString(fmt.Sprintf("%q:", fmt.Sprintf("%v", mi.Key)))
+		buf.Write(b)
+		if i < len(ms)-1 {
+			buf.Write([]byte{','})
+		}
+	}
+	buf.Write([]byte{'}'})
+	return buf.Bytes(), nil
 }
 
 type resourceLoader struct {

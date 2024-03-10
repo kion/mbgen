@@ -5,16 +5,13 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"text/template"
 )
 
 var (
-	templateIncludeCache = /* const */ make(map[string]string)
-	templateCache        = /* const */ make(map[string]*template.Template)
-	templateCacheMutex   = /* const */ sync.RWMutex{}
-
-	funcMap = /* const */ template.FuncMap{
+	templateIncludeCache = make(map[string]string)
+	templateCache        = make(map[string]*template.Template)
+	funcMap              = /* const */ template.FuncMap{
 		"mod":   func(a, b int) int { return a % b },
 		"minus": func(a, b int) int { return a - b },
 		"plus":  func(a, b int) int { return a + b },
@@ -66,6 +63,14 @@ func compileArchiveTemplate(resLoader resourceLoader) *template.Template {
 	return archiveTemplate
 }
 
+func compileSearchTemplate(resLoader resourceLoader) *template.Template {
+	searchTemplateMarkup, err := readTemplateFile(searchTemplateFileName, resLoader)
+	check(err)
+	searchTemplateMarkup = strings.Replace(searchTemplateMarkup, pageHeadTemplatePlaceholder, "", 1)
+	searchTemplate := compileFullTemplate(searchTemplateFileName, searchTemplateMarkup, nil, resLoader)
+	return searchTemplate
+}
+
 func compilePagerTemplate(resLoader resourceLoader) *template.Template {
 	pagerTemplateMarkup, err := readTemplateFile(pagerTemplateFileName, resLoader)
 	check(err)
@@ -76,9 +81,7 @@ func compilePagerTemplate(resLoader resourceLoader) *template.Template {
 }
 
 func compilePostTemplate(resLoader resourceLoader) *template.Template {
-	templateCacheMutex.RLock()
 	postTemplate, ok := templateCache[postTemplateFileName]
-	templateCacheMutex.RUnlock()
 	if !ok {
 		postTemplateMarkup, err := readTemplateFile(postTemplateFileName, resLoader)
 		check(err)
@@ -86,19 +89,14 @@ func compilePostTemplate(resLoader resourceLoader) *template.Template {
 		tmplt, err := template.New(postTemplateMarkup).Funcs(funcMap).Parse(postTemplateMarkup)
 		check(err)
 		postTemplate = tmplt
-		templateCacheMutex.Lock()
 		templateCache[postTemplateFileName] = tmplt
-		templateCacheMutex.Unlock()
 	}
-
 	return postTemplate
 }
 
 func compileContentDirectiveTemplate(directive string, resLoader resourceLoader) (*template.Template, error) {
 	templateFileName := fmt.Sprintf(contentDirectiveTemplateFileNameFormat, directive)
-	templateCacheMutex.RLock()
 	contentDirectiveTemplate, ok := templateCache[templateFileName]
-	templateCacheMutex.RUnlock()
 	if !ok {
 		contentDirectiveMarkup, err := readTemplateFile(templateFileName, resLoader)
 		if err != nil {
@@ -108,17 +106,13 @@ func compileContentDirectiveTemplate(directive string, resLoader resourceLoader)
 		tmplt, err := template.New(contentDirectiveMarkup).Funcs(funcMap).Parse(contentDirectiveMarkup)
 		check(err)
 		contentDirectiveTemplate = tmplt
-		templateCacheMutex.Lock()
 		templateCache[templateFileName] = tmplt
-		templateCacheMutex.Unlock()
 	}
 	return contentDirectiveTemplate, nil
 }
 
 func compileMediaTemplate(resLoader resourceLoader) *template.Template {
-	templateCacheMutex.RLock()
 	inlineMediaTemplate, ok := templateCache[mediaTemplateFileName]
-	templateCacheMutex.RUnlock()
 	if !ok {
 		inlineMediaTemplateMarkup, err := readTemplateFile(mediaTemplateFileName, resLoader)
 		check(err)
@@ -126,9 +120,7 @@ func compileMediaTemplate(resLoader resourceLoader) *template.Template {
 		tmplt, err := template.New(mediaTemplateFileName).Funcs(funcMap).Parse(inlineMediaTemplateMarkup)
 		check(err)
 		inlineMediaTemplate = tmplt
-		templateCacheMutex.Lock()
 		templateCache[mediaTemplateFileName] = tmplt
-		templateCacheMutex.Unlock()
 	}
 	return inlineMediaTemplate
 }
@@ -184,9 +176,7 @@ func processDirectives(templateMarkup string, resLoader resourceLoader) string {
 
 	for _, ti := range templateIncludes {
 		ticKey := ti.includeType.String() + "/" + ti.fileName
-		templateCacheMutex.RLock()
 		includeMarkup, ok := templateIncludeCache[ticKey]
-		templateCacheMutex.RUnlock()
 		if !ok {
 			switch ti.includeType {
 			case Template:
@@ -208,9 +198,7 @@ func processDirectives(templateMarkup string, resLoader resourceLoader) string {
 					includeMarkup += string(ic)
 				}
 			}
-			templateCacheMutex.Lock()
 			templateIncludeCache[ticKey] = includeMarkup
-			templateCacheMutex.Unlock()
 		}
 		templateMarkup = strings.Replace(templateMarkup, ti.placeholder, includeMarkup, 1)
 

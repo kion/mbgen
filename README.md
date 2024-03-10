@@ -3,6 +3,14 @@
 An easy-to-use, intuitive and fast static **m**icro-**b**log site **gen**erator,
 embracing the convention-over-configuration philosophy.
 
+## Features
+
+* Built-in search engine
+* Archive generation
+* Thumbnail generation
+* Simple and intuitive to use image and video embedding
+* Customizable configuration (pagination, thumbnails, etc.)
+
 ## Demo
 
 My personal website - [kion.name](https://kion.name/) - 
@@ -232,6 +240,15 @@ or can even be completely omitted from the config):
   - the generated archive index page is available under `/archive/` URI, e.g.:
     - `<a href="/archive/">Archive</a>`
   - set this setting to `no` to disable archive generation
+* [optional] `enableSearch` - the built-in search functionality is enabled by default,
+  unless this setting is set to `no`
+  * `generate` command generates:
+    * a search index file (`/search.json`), 
+      containing searchable text content for all the page and post content (`.md`) files 
+      (including the content body, as well as the `title` and the `tags` property values)
+    * a search UI page, which is available under `/search.html` URI, e.g.:
+      - `<a href="/search.html">Search</a>`)
+  * _note: the search functionality requires JavaScript to be enabled in the browser_
 * [optional] `pageSize` - controls the maximum number of posts 
   on any page that renders a list of posts
   - if not specified, the default value of `10` is used

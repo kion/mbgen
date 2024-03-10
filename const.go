@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	appVersion                                  = "1.0.1"
+	appVersion                                  = "1.1.0"
 	defaultGitHubRepoUrl                        = "github.com/kion/mbgen"
 	defaultGitHubRepoThemesUrl                  = defaultGitHubRepoUrl + "/themes"
 	defaultGitHubRepoPageContentSamplesUrl      = defaultGitHubRepoUrl + "/content-samples/pages"
@@ -21,10 +21,13 @@ const (
 	postTemplateFileName                        = "post" + templateFileExtension
 	mediaTemplateFileName                       = "media" + templateFileExtension
 	archiveTemplateFileName                     = "archive" + templateFileExtension
+	searchTemplateFileName                      = "search" + templateFileExtension
 	pagerTemplateFileName                       = "pager" + templateFileExtension
 	contentDirectiveTemplateFileNameFormat      = "content-%s" + templateFileExtension
 	contentFileExtension                        = ".html"
 	indexPageFileName                           = "index" + contentFileExtension
+	searchPageFileName                          = "search" + contentFileExtension
+	searchIndexFileName                         = "index.json"
 	directivePlaceholderReplacementFormat       = ":@@@:%s:@@@:"
 	hashTagMarkdownReplacementFormat            = "[#%s](/" + deployTagDirName + "/%s/)"
 	stylesFileName                              = "styles.css"
@@ -44,6 +47,7 @@ const (
 	metaDataKeyTags                             = "tags"
 	configFileName                              = "config.yml"
 	defaultGenerateArchive                      = true
+	defaultEnableSearch                         = true
 	defaultPageSize                             = 10
 	minAllowedThumbWidth                        = 320
 	minAllowedThumbThreshold                    = 0.3
@@ -67,6 +71,9 @@ var (
 	imageFileExtensions                  = /* const */ []string{".jpg", ".jpeg", ".png", ".gif"}
 	thumbImageFileExtensions             = /* const */ []string{".jpg", ".jpeg", ".png"}
 	videoFileExtensions                  = /* const */ []string{".mp4", ".mkv", ".mov"}
+	metaDataPlaceholderRegexp            = /* const */ regexp.MustCompile(`---[\s\w-:"]*---`)
+	contentDirectivePlaceholderRegexp    = /* const */ regexp.MustCompile(`{.*}`)
+	whitespacePlaceholderRegexp          = /* const */ regexp.MustCompile(`\s+`)
 	includeTemplateFilePlaceholderRegexp = /* const */ regexp.MustCompile(`{{@\s*([\w-_]+\.html)\s*@}}`)
 	includeContentFilePlaceholderRegexp  = /* const */ regexp.MustCompile(`{{#\s*([\w-_]+\.html)\s*#}}`)
 	contentLinkPlaceholderRegexp         = /* const */ regexp.MustCompile(`{%\s*([\w-_]+):([\w-_]+)\s*%}`)
