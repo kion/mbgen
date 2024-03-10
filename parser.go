@@ -175,15 +175,7 @@ func parsePost(postId string, content string, config appConfig, resLoader resour
 }
 
 func handleBodyContent(content string) string {
-	content = strings.TrimSpace(content)
-	if strings.HasPrefix(content, "<p>") && strings.HasSuffix(content, "</p>") {
-		content = strings.Replace(content, "<p>", "", 1)
-		idx := strings.LastIndex(content, "</p>")
-		if idx != -1 {
-			content = content[:idx]
-		}
-	}
-	return content
+	return strings.TrimSpace(content)
 }
 
 func handleThumbnails(mediaDirPath string, config appConfig, thumbHandler imageThumbnailHandler) {

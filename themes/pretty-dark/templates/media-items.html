@@ -35,25 +35,5 @@
         {{ end }}
         </div>
     {{ end }}
-    <!--
-    {{ range $it := iter $cnt }}
-        {{ range $idx, $m := $media }}
-            {{ if eq (mod $idx $cc) $it }}
-                {{ if $m.Type.Image }}
-                    <div class="image">
-                        <a target="_blank" href="{{ $m.Uri }}" aria-label="Image">
-                            <img src="{{ $m.ThumbUri 1 }}" srcset="{{ $m.SrcSet }}" alt="Image" />
-                        </a>
-                    </div>
-                {{ end }}
-                {{ if $m.Type.Video }}
-                    <div class="video">
-                        <video controls="controls" src="{{ $m.Uri }}"></video>
-                    </div>
-                {{ end }}
-            {{ end }}
-        {{ end }}
-    {{ end }}
-    -->
 </section>
 {{ end }}
