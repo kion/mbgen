@@ -33,13 +33,10 @@ func processPages(pages []page, channel chan int,
 		title := resLoader.config.siteName
 		homePage := resLoader.config.homePage
 
-		var homePageFileName string
-
 		if homePage != "" {
-			homePageFileName = homePage + contentFileExtension
 			found := false
 			for _, page := range pages {
-				if homePageFileName == page.id+contentFileExtension {
+				if homePage == page.id {
 					found = true
 					break
 				}
@@ -53,7 +50,7 @@ func processPages(pages []page, channel chan int,
 			pageTemplate := compilePageTemplate(page, resLoader)
 			outputFileName := page.id + contentFileExtension
 			var outputFilePath string
-			if homePageFileName == page.id+contentFileExtension {
+			if homePage == page.id {
 				outputFilePath = fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, indexPageFileName)
 			} else {
 				outputFilePath = fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployPageDirName, os.PathSeparator, outputFileName)
@@ -160,10 +157,9 @@ func processPosts(posts []post, channel chan tuple2[int, int],
 					if homePage == "" {
 						outputFilePath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, indexPageFileName)
 						processContent(indexPageFileName, Post, config.siteName, postPageContent, outputFilePath, resLoader, handleOutput)
-					} else {
-						outputFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployPostsDirName, os.PathSeparator, indexPageFileName)
-						processContent(deployPostsDirName+"/"+indexPageFileName, Post, config.siteName, postPageContent, outputFilePath, resLoader, handleOutput)
 					}
+					outputFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployPostsDirName, os.PathSeparator, indexPageFileName)
+					processContent(deployPostsDirName+"/"+indexPageFileName, Post, config.siteName, postPageContent, outputFilePath, resLoader, handleOutput)
 				} else {
 					fileName := strconv.Itoa(ppd.CurrPageNum) + contentFileExtension
 					outputFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployPostsDirName, os.PathSeparator, fileName)
@@ -220,22 +216,22 @@ func processPosts(posts []post, channel chan tuple2[int, int],
 		}
 
 		if pagePostCnt > 0 {
-			var fileName, outputFilePath string
 			if ppd.CurrPageNum == 1 {
 				if homePage == "" {
-					outputFilePath = fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, indexPageFileName)
-				} else {
-					outputFilePath = fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployPostsDirName, os.PathSeparator, indexPageFileName)
+					outputFilePath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, indexPageFileName)
+					processContent(indexPageFileName, Post, config.siteName, postPageContent, outputFilePath, resLoader, handleOutput)
 				}
+				outputFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployPostsDirName, os.PathSeparator, indexPageFileName)
+				processContent(deployPostsDirName+"/"+indexPageFileName, Post, config.siteName, postPageContent, outputFilePath, resLoader, handleOutput)
 			} else {
-				fileName = strconv.Itoa(ppd.CurrPageNum) + contentFileExtension
-				outputFilePath = fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployPostsDirName, os.PathSeparator, fileName)
+				fileName := strconv.Itoa(ppd.CurrPageNum) + contentFileExtension
+				outputFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployPostsDirName, os.PathSeparator, fileName)
 				var pagerBuffer bytes.Buffer
 				err := pagerTemplate.Execute(&pagerBuffer, ppd)
 				check(err)
 				postPageContent += pagerBuffer.String()
+				processContent(fileName, Post, config.siteName, postPageContent, outputFilePath, resLoader, handleOutput)
 			}
-			processContent(fileName, Post, config.siteName, postPageContent, outputFilePath, resLoader, handleOutput)
 		}
 
 		if config.generateArchive && len(archivePostCnt) > 0 {
