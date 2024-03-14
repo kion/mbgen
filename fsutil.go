@@ -111,11 +111,13 @@ func deleteFile(filePath string) {
 	check(err)
 }
 
-func deleteIfExists(path string) {
+func deleteIfExists(path string) bool {
 	if pathExists(path) {
 		err := os.RemoveAll(path)
 		check(err)
+		return true
 	}
+	return false
 }
 
 func copySymLink(source, dest string) {

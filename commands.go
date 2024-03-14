@@ -16,8 +16,8 @@ var (
 	commandHelp = /* const */ appCommandDescriptor{
 		command:     "help",
 		description: "print out help/usage information",
-		usage: "mbgen help [command]\n\n" +
-			"where [command] is one of the following supported commands to print out help/usage information for:\n\n" +
+		usage: "mbgen help <command>\n\n" +
+			"where <command> is one of the following supported commands to print out help/usage information for:\n\n" +
 			"init, generate, stats, serve, theme",
 		reqConfig: false,
 		optArgCnt: 1,
@@ -34,11 +34,17 @@ var (
 	commandCleanup = /* const */ appCommandDescriptor{
 		command:     "cleanup",
 		description: "perform a cleanup",
-		reqArgCnt:   1,
 		usage: "mbgen cleanup <target>\n\n" +
-			" - <target> is one of the following:\n\n" +
-			"   - thumbs: deletes all previously generated thumbnail files",
+			" - <target> (optional) is one of the following:\n\n" +
+			"   - thumbs: deletes all previously generated thumbnail files\n" +
+			"   - archive: deletes the previously generated archive files\n" +
+			"   - search: deletes all previously generated search files\n\n" +
+			" - if no <target> is specified, each target is performed based on the corresponding configuration setting:\n" +
+			"   - thumbs: if `useThumbs` config option is disabled\n" +
+			"   - archive: if `generateArchive` config option is disabled\n" +
+			"   - search: if `enableSearch` config option is disabled\n\n",
 		reqConfig: true,
+		optArgCnt: 1,
 	}
 	commandGenerate = /* const */ appCommandDescriptor{
 		command:     "generate",
@@ -159,20 +165,48 @@ func _init(config appConfig, commandArgs ...string) {
 }
 
 func _cleanup(config appConfig, commandArgs ...string) {
-	target := commandArgs[0]
-	switch target {
-	case "thumbs":
+	cleanupThumbs := false
+	cleanupArchive := false
+	cleanupSearch := false
+	if commandArgs == nil || len(commandArgs) == 0 {
+		cleanupThumbs = !config.useThumbs
+		cleanupArchive = !config.generateArchive
+		cleanupSearch = !config.enableSearch
+	} else {
+		target := commandArgs[0]
+		switch target {
+		case "thumbs":
+			cleanupThumbs = true
+		case "archive":
+			cleanupArchive = true
+		case "search":
+			cleanupSearch = true
+		default:
+			sprintln("error: invalid cleanup command target: " + target)
+			usageHelp := "usage:\n\n" + commandCleanup.usage
+			usage(usageHelp)
+		}
+	}
+	if cleanupThumbs {
 		resLoader := getResourceLoader(config)
 		parsePages(config, resLoader, deleteImgThumbnails)
 		parsePosts(config, resLoader, deleteImgThumbnails)
-	case "archive":
+	}
+	if cleanupArchive {
 		deployArchivePath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, deployArchiveDirName)
-		deleteIfExists(deployArchivePath)
-		println(" - deleted archive dir: " + deployArchivePath)
-	default:
-		sprintln("error: invalid cleanup command target: " + target)
-		usageHelp := "usage:\n\n" + commandCleanup.usage
-		usage(usageHelp)
+		if deleteIfExists(deployArchivePath) {
+			sprintln(" - deleted archive dir: " + deployArchivePath)
+		}
+	}
+	if cleanupSearch {
+		deploySearchIndexPath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, searchIndexFileName)
+		if deleteIfExists(deploySearchIndexPath) {
+			sprintln(" - deleted search index file: " + deploySearchIndexPath)
+		}
+		deploySearchPath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, searchPageFileName)
+		if deleteIfExists(deploySearchPath) {
+			sprintln(" - deleted search page file: " + deploySearchPath)
+		}
 	}
 }
 
@@ -184,10 +218,10 @@ func _generate(config appConfig, commandArgs ...string) {
 	deployResDirPath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, resourcesDirName)
 	recreateDir(deployResDirPath)
 
+	sprintln(" - copying theme resources ...")
 	themeResourcesDirPath := fmt.Sprintf("%s%c%s", config.theme, os.PathSeparator, resourcesDirName)
 	deployResourcesDirPath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, resourcesDirName)
 	copyDir(themeResourcesDirPath, deployResourcesDirPath)
-	sprintln(" - copied theme resources")
 
 	for _, level := range templateIncludeLevels {
 		stylesIncludeFilePath := getIncludeFilePath(stylesFileName, level, resLoader.config)

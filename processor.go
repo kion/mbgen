@@ -16,10 +16,22 @@ func process(pages []page, posts []post,
 	var searchIndex = mapSlice{}
 	pageCnt := processPages(pages, &searchIndex, resLoader, handleOutput)
 	postCnt, tagCnt := processPosts(posts, &searchIndex, resLoader, handleOutput)
-	searchIndexJson, err := json.Marshal(searchIndex)
-	check(err)
-	searchIndexOutputFilePath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, searchIndexFileName)
-	writeDataToFileIfChanged(searchIndexOutputFilePath, searchIndexJson)
+	config := resLoader.config
+	if config.enableSearch {
+		sprintln(" - generating search files ...")
+		searchIndexJson, err := json.Marshal(searchIndex)
+		check(err)
+		searchIndexOutputFilePath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, searchIndexFileName)
+		writeDataToFileIfChanged(searchIndexOutputFilePath, searchIndexJson)
+		searchTemplate := compileSearchTemplate(resLoader)
+		outputFilePath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, searchPageFileName)
+		var searchContentBuffer bytes.Buffer
+		err = searchTemplate.Execute(&searchContentBuffer, templateContent{EntityType: Page, Title: config.siteName + " - Search", Config: map[string]any{"PageSize": config.pageSize}})
+		check(err)
+		if handleOutput != nil {
+			handleOutput(outputFilePath, searchContentBuffer.Bytes())
+		}
+	}
 	return stats{
 		pageCnt: pageCnt,
 		postCnt: postCnt,
@@ -240,6 +252,7 @@ func processPosts(posts []post, searchIndex *mapSlice,
 		}
 
 		if config.generateArchive && len(archivePostCnt) > 0 {
+			sprintln(" - generating archive ...")
 			archiveTemplate := compileArchiveTemplate(resLoader)
 			outputFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployArchiveDirName, os.PathSeparator, indexPageFileName)
 			var archiveContentBuffer bytes.Buffer
@@ -249,17 +262,6 @@ func processPosts(posts []post, searchIndex *mapSlice,
 				handleOutput(outputFilePath, archiveContentBuffer.Bytes())
 			}
 			processPaginatedPostContent(archivePostCnt, archiveContent, pageSize, deployArchiveDirName, pagerTemplate, resLoader, handleOutput)
-		}
-
-		if config.enableSearch {
-			searchTemplate := compileSearchTemplate(resLoader)
-			outputFilePath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, searchPageFileName)
-			var searchContentBuffer bytes.Buffer
-			err := searchTemplate.Execute(&searchContentBuffer, templateContent{EntityType: Page, Title: config.siteName + " - Search", Config: map[string]any{"PageSize": config.pageSize}})
-			check(err)
-			if handleOutput != nil {
-				handleOutput(outputFilePath, searchContentBuffer.Bytes())
-			}
 		}
 
 		tagPostCntLen := len(tagPostCnt)

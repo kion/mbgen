@@ -187,11 +187,8 @@ func parsePost(postId string, content string, config appConfig, resLoader resour
 }
 
 func handleThumbnails(mediaDirPath string, config appConfig, thumbHandler imageThumbnailHandler) {
-	if dirExists(mediaDirPath) {
-		useThumbs := thumbHandler != nil && config.useThumbs
-		if useThumbs {
-			thumbHandler(mediaDirPath, config)
-		}
+	if thumbHandler != nil {
+		thumbHandler(mediaDirPath, config)
 	}
 }
 

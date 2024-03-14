@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	appVersion                                  = "1.1.0"
+	appVersion                                  = "1.1.1"
 	defaultGitHubRepoUrl                        = "github.com/kion/mbgen"
 	defaultGitHubRepoThemesUrl                  = defaultGitHubRepoUrl + "/themes"
 	defaultGitHubRepoPageContentSamplesUrl      = defaultGitHubRepoUrl + "/content-samples/pages"
@@ -27,7 +27,7 @@ const (
 	contentFileExtension                        = ".html"
 	indexPageFileName                           = "index" + contentFileExtension
 	searchPageFileName                          = "search" + contentFileExtension
-	searchIndexFileName                         = "index.json"
+	searchIndexFileName                         = "search.json"
 	directivePlaceholderReplacementFormat       = ":@@@:%s:@@@:"
 	hashTagMarkdownReplacementFormat            = "[#%s](/" + deployTagDirName + "/%s/)"
 	stylesFileName                              = "styles.css"
