@@ -25,7 +25,7 @@
     function search(query) {
         if (query) {
             const xhr = new XMLHttpRequest();
-            xhr.open('GET', '/index.json', false);
+            xhr.open('GET', '/search.json', false);
             xhr.send();
             if (xhr.readyState === XMLHttpRequest.DONE) {
                 if (xhr.status === 200) {
