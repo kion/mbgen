@@ -84,6 +84,7 @@ func basicTest(t *testing.T, customHomePage bool) {
 	}
 
 	config := defaultConfig()
+	config.enableSearch = false
 	config.siteName = testSiteName
 
 	if customHomePage {
@@ -222,6 +223,7 @@ func testPagination(t *testing.T, postCnt int) {
 	}
 
 	config := defaultConfig()
+	config.enableSearch = false
 	config.siteName = testSiteName
 
 	output := processOutput(pages, posts, globalIncludes, themeIncludes, config)
