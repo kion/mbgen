@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"github.com/fsnotify/fsnotify"
 	"io"
 	"os"
 	"path/filepath"
@@ -163,4 +164,39 @@ func getFileSizeInMb(filePath string) (float64, error) {
 	}
 	fileSizeInMb := float64(imgFileInfo.Size()) / 1000 / 1000
 	return fileSizeInMb, nil
+}
+
+func watchDirForChanges(dir string, fileExt string, handler dirChangeHandler) {
+	watcher, err := fsnotify.NewWatcher()
+	check(err)
+
+	defer func(watcher *fsnotify.Watcher) {
+		err := watcher.Close()
+		check(err)
+	}(watcher)
+
+	go func() {
+		println(" - watching dir for changes: " + dir + "\n")
+		for {
+			select {
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				if filepath.Ext(event.Name) == fileExt {
+					handler(event.Name, event.Has(fsnotify.Remove))
+				}
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+				println(" - error while watching dir for changes:", err)
+			}
+		}
+	}()
+
+	err = watcher.Add(dir)
+	check(err)
+
+	<-make(chan bool)
 }

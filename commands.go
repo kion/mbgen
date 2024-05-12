@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -18,7 +19,7 @@ var (
 		description: "print out help/usage information",
 		usage: "mbgen help <command>\n\n" +
 			"where <command> is one of the following supported commands to print out help/usage information for:\n\n" +
-			"init, generate, stats, serve, theme",
+			"init, generate, stats, serve, theme, cleanup, version",
 		reqConfig: false,
 		optArgCnt: 1,
 	}
@@ -36,13 +37,16 @@ var (
 		description: "perform a cleanup",
 		usage: "mbgen cleanup <target>\n\n" +
 			" - <target> (optional) is one of the following:\n\n" +
-			"   - thumbs: deletes all previously generated thumbnail files\n" +
-			"   - archive: deletes the previously generated archive files\n" +
-			"   - search: deletes all previously generated search files\n\n" +
-			" - if no <target> is specified, each target is performed based on the corresponding configuration setting:\n" +
-			"   - thumbs: if `useThumbs` config option is disabled\n" +
-			"   - archive: if `generateArchive` config option is disabled\n" +
-			"   - search: if `enableSearch` config option is disabled\n\n",
+			"   - " + commandCleanupTargetContent + ": deletes all previously generated content (" + contentFileExtension + ") files\n" +
+			"     for which markdown (" + markdownFileExtension + ") content files no longer exist\n\n" +
+			"   - " + commandCleanupTargetThumbs + ": deletes all previously generated thumbnail files\n\n" +
+			"   - " + commandCleanupTargetArchive + ": deletes the previously generated archive files\n\n" +
+			"   - " + commandCleanupTargetSearch + ": deletes all previously generated search files\n\n" +
+			" - if no <target> is specified, each target is performed based on the following conditions:\n\n" +
+			"   - " + commandCleanupTargetContent + ": always\n\n" +
+			"   - " + commandCleanupTargetThumbs + ": if `useThumbs` config option is disabled\n\n" +
+			"   - " + commandCleanupTargetArchive + ": if `generateArchive` config option is disabled\n\n" +
+			"   - " + commandCleanupTargetSearch + ": if `enableSearch` config option is disabled\n\n",
 		reqConfig: true,
 		optArgCnt: 1,
 	}
@@ -63,9 +67,11 @@ var (
 	commandServe = /* const */ appCommandDescriptor{
 		command:     "serve",
 		description: "start a web server to serve the site",
-		usage: "mbgen serve\n\n" +
-			"must be run from a working dir containing " + configFileName + " file and " + deployDirName + " directory with generated assets",
+		usage: "mbgen serve [" + commandServeOptionWatchReload + "]\n\n" +
+			"must be run from a working dir containing " + configFileName + " file and " + deployDirName + " directory with generated assets\n\n" +
+			" - the optional " + commandServeOptionWatchReload + " flag can be used to automatically regenerate the site and see the changes being reflected in the browser in real-time when you change any of the markdown content (.md) files in the " + markdownPagesDirName + " or " + markdownPostsDirName + " dirs\n",
 		reqConfig: true,
+		optArgCnt: 1,
 	}
 	commandTheme = /* const */ appCommandDescriptor{
 		command:     "theme",
@@ -73,14 +79,14 @@ var (
 		reqArgCnt:   2,
 		usage: "mbgen theme <action> <theme-name>\n\n" +
 			" - <action> is one of the following:\n\n" +
-			"   - activate: checks if the specified theme is installed,\n" +
+			"   - " + commandThemeActionActivate + ": checks if the specified theme is installed,\n" +
 			"     and modifies the " + configFileName + " file to make it active\n\n" +
-			"   - install: downloads and installs the specified theme if it's not yet installed,\n" +
+			"   - " + commandThemeActionInstall + ": downloads and installs the specified theme if it's not yet installed,\n" +
 			"     and copies all the relevant/missing theme include files into the " + includeDirName + "dir inside the working dir\n\n" +
-			"   - update: downloads and installs the required updates for the specified theme (must be already installed),\n" +
+			"   - " + commandThemeActionUpdate + ": downloads and installs the required updates for the specified theme (must be already installed),\n" +
 			"     and copies all the relevant/missing theme include files into the " + includeDirName + "dir inside the working dir\n\n" +
-			"   - refresh: copies all the relevant/missing theme include files into the " + includeDirName + "dir inside the working dir\n\n" +
-			"   - delete: deletes all the assets of the specified theme, if it's not being currently in use\n\n" +
+			"   - " + commandThemeActionRefresh + ": copies all the relevant/missing theme include files into the " + includeDirName + "dir inside the working dir\n\n" +
+			"   - " + commandThemeActionDelete + ": deletes all the assets of the specified theme, if it's not being currently in use\n\n" +
 			" - <theme-name> is the name of a theme to perform the specified action on,\n\n" +
 			"   - the default theme name is: \"" + defaultThemeName + "\", but you can also use the \"" + defaultThemeAlias + "\" alias instead",
 		reqConfig: true,
@@ -106,11 +112,18 @@ func _version(config appConfig, commandArgs ...string) {
 
 func _help(config appConfig, commandArgs ...string) {
 	if commandArgs != nil && len(commandArgs) > 0 {
-		cmdDescr := getSupportedCommands()[commandArgs[0]].V2
-		usageHelp := cmdDescr.description + "\n\nusage:\n\n" + cmdDescr.usage
-		usage(usageHelp)
+		arg := commandArgs[0]
+		var cmdDescr appCommandDescriptor
+		if cmd, ok := getSupportedCommands()[arg]; ok {
+			cmdDescr = cmd.V2
+			usageHelp := cmdDescr.description + "\n\nusage:\n\n" + cmdDescr.usage
+			usage(usageHelp, 0)
+		} else {
+			sprintln("error: unknown help <command> argument: " + arg)
+			usage("", 1)
+		}
 	} else {
-		usage("")
+		usage("", 0)
 	}
 }
 
@@ -165,26 +178,72 @@ func _init(config appConfig, commandArgs ...string) {
 }
 
 func _cleanup(config appConfig, commandArgs ...string) {
+	cleanupContent := false
 	cleanupThumbs := false
 	cleanupArchive := false
 	cleanupSearch := false
 	if commandArgs == nil || len(commandArgs) == 0 {
+		cleanupContent = true
 		cleanupThumbs = !config.useThumbs
 		cleanupArchive = !config.generateArchive
 		cleanupSearch = !config.enableSearch
 	} else {
 		target := commandArgs[0]
 		switch target {
-		case "thumbs":
+		case commandCleanupTargetContent:
+			cleanupContent = true
+		case commandCleanupTargetThumbs:
 			cleanupThumbs = true
-		case "archive":
+		case commandCleanupTargetArchive:
 			cleanupArchive = true
-		case "search":
+		case commandCleanupTargetSearch:
 			cleanupSearch = true
 		default:
-			sprintln("error: invalid cleanup command target: " + target)
+			sprintln("error: invalid cleanup command <target> argument: " + target)
 			usageHelp := "usage:\n\n" + commandCleanup.usage
-			usage(usageHelp)
+			usage(usageHelp, 1)
+		}
+	}
+	if cleanupContent {
+		deployPageDirPath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, deployPageDirName)
+		deployPageDirEntries, err := os.ReadDir(deployPageDirPath)
+		check(err)
+		if len(deployPageDirEntries) > 0 {
+			for _, deployPageEntry := range deployPageDirEntries {
+				deployPageEntryInfo, err := deployPageEntry.Info()
+				check(err)
+				if !deployPageEntryInfo.IsDir() {
+					deployPageEntryFileName := deployPageEntryInfo.Name()
+					pageId := deployPageEntryFileName[:len(deployPageEntryFileName)-len(filepath.Ext(deployPageEntryFileName))]
+					markdownPageFilePath := fmt.Sprintf("%s%c%s", markdownPagesDirName, os.PathSeparator, pageId+markdownFileExtension)
+					if !fileExists(markdownPageFilePath) {
+						sprintln(" - page markdown file no longer exists: " + markdownPageFilePath)
+						deployPageFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployPageDirName, os.PathSeparator, deployPageEntryFileName)
+						deleteFile(deployPageFilePath)
+						sprintln(" - deleted page content file: " + deployPageFilePath)
+					}
+				}
+			}
+		}
+		deployPostDirPath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, deployPostDirName)
+		deployPostDirEntries, err := os.ReadDir(deployPostDirPath)
+		check(err)
+		if len(deployPostDirEntries) > 0 {
+			for _, deployPostEntry := range deployPostDirEntries {
+				deployPostEntryInfo, err := deployPostEntry.Info()
+				check(err)
+				if !deployPostEntryInfo.IsDir() {
+					deployPostEntryFileName := deployPostEntryInfo.Name()
+					postId := deployPostEntryFileName[:len(deployPostEntryFileName)-len(filepath.Ext(deployPostEntryFileName))]
+					markdownPostFilePath := fmt.Sprintf("%s%c%s", markdownPostsDirName, os.PathSeparator, postId+markdownFileExtension)
+					if !fileExists(markdownPostFilePath) {
+						sprintln(" - post markdown file no longer exists: " + markdownPostFilePath)
+						deployPostFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployPostDirName, os.PathSeparator, deployPostEntryFileName)
+						deleteFile(deployPostFilePath)
+						sprintln(" - deleted post content file: " + deployPostFilePath)
+					}
+				}
+			}
 		}
 	}
 	if cleanupThumbs {
@@ -230,25 +289,7 @@ func _generate(config appConfig, commandArgs ...string) {
 		}
 	}
 
-	generatedCnt := 0
-	stats := process(parsePages(config, resLoader, processImgThumbnails),
-		parsePosts(config, resLoader, processImgThumbnails),
-		resLoader,
-		func(outputFilePath string, data []byte) bool {
-			idx := strings.LastIndex(outputFilePath, string(os.PathSeparator))
-			if idx != -1 {
-				outputDir := outputFilePath[:idx]
-				createDirIfNotExists(outputDir)
-			}
-			generated := writeDataToFileIfChanged(outputFilePath, data)
-			if generated {
-				println(" - generated file: " + outputFilePath)
-				generatedCnt++
-			}
-			return generated
-		})
-	stats.genCnt = generatedCnt
-	handleStats(stats)
+	processAndHandleStats(config, resLoader)
 }
 
 func _stats(config appConfig, commandArgs ...string) {
@@ -259,7 +300,62 @@ func _stats(config appConfig, commandArgs ...string) {
 }
 
 func _serve(config appConfig, commandArgs ...string) {
-	listenAndServe(fmt.Sprintf("%s:%d", config.serveHost, config.servePort))
+	var wChan chan watchReloadData
+	if commandArgs != nil && len(commandArgs) > 0 {
+		if commandArgs[0] != commandServeOptionWatchReload {
+			sprintln("error: invalid serve command argument: " + commandArgs[0])
+			usageHelp := "usage:\n\n" + commandServe.usage
+			usage(usageHelp, 1)
+		} else {
+			wChan = make(chan watchReloadData)
+			resLoader := getResourceLoader(config)
+			go watchDirForChanges(markdownPagesDirName, markdownFileExtension, func(changedFilePath string, deleted bool) {
+				filePath := strings.Split(changedFilePath, string(os.PathSeparator))
+				fileName := filePath[len(filePath)-1]
+				pageId := fileName[:len(fileName)-len(filepath.Ext(fileName))]
+				pageDeleted := deleted || !fileExists(changedFilePath)
+				if !pageDeleted {
+					println(" - [watch] page markdown file added/updated: " + changedFilePath)
+					processAndHandleStats(config, resLoader)
+				} else {
+					println(" - [watch] page markdown file deleted: " + changedFilePath)
+					deployPageFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployPageDirName, os.PathSeparator, pageId+contentFileExtension)
+					if deleteIfExists(deployPageFilePath) {
+						sprintln(" - deleted page content file: " + deployPageFilePath)
+					}
+					processAndHandleStats(config, resLoader)
+				}
+				wChan <- watchReloadData{
+					Type:    Page,
+					Id:      pageId,
+					Deleted: pageDeleted,
+				}
+			})
+			go watchDirForChanges(markdownPostsDirName, markdownFileExtension, func(changedFilePath string, deleted bool) {
+				filePath := strings.Split(changedFilePath, string(os.PathSeparator))
+				fileName := filePath[len(filePath)-1]
+				postId := fileName[:len(fileName)-len(filepath.Ext(fileName))]
+				postDeleted := deleted || !fileExists(changedFilePath)
+				if !postDeleted {
+					println(" - [watch] post markdown file added/updated: " + changedFilePath)
+					processAndHandleStats(config, resLoader)
+				} else {
+					println(" - [watch] post markdown file deleted: " + changedFilePath)
+					deployPostFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployPostDirName, os.PathSeparator, postId+contentFileExtension)
+					if deleteIfExists(deployPostFilePath) {
+						sprintln(" - deleted post content file: " + deployPostFilePath)
+					}
+					processAndHandleStats(config, resLoader)
+				}
+				wChan <- watchReloadData{
+					Type:    Post,
+					Id:      postId,
+					Deleted: postDeleted,
+				}
+			})
+		}
+	}
+	listenAndServe(fmt.Sprintf("%s:%d", config.serveHost, config.servePort), wChan)
 }
 
 func _theme(config appConfig, commandArgs ...string) {
@@ -272,7 +368,7 @@ func _theme(config appConfig, commandArgs ...string) {
 	var themeDir = fmt.Sprintf("%s%c%s", themesDirName, os.PathSeparator, theme)
 	themeInstalled = dirExists(themeDir)
 	switch action {
-	case "activate":
+	case commandThemeActionActivate:
 		if !themeInstalled {
 			sprintln("theme is not installed: " + theme)
 		} else {
@@ -280,7 +376,7 @@ func _theme(config appConfig, commandArgs ...string) {
 			writeConfig(config)
 			sprintln(" - " + configFileName + " updated to activate new theme: " + theme)
 		}
-	case "install":
+	case commandThemeActionInstall:
 		if themeInstalled {
 			sprintln("theme is already installed: " + theme)
 		} else {
@@ -293,7 +389,7 @@ func _theme(config appConfig, commandArgs ...string) {
 				copyThemeIncludes(theme)
 			}
 		}
-	case "update":
+	case commandThemeActionUpdate:
 		if !themeInstalled {
 			sprintln("theme is not installed: " + theme)
 		} else {
@@ -311,14 +407,14 @@ func _theme(config appConfig, commandArgs ...string) {
 				copyThemeIncludes(theme)
 			}
 		}
-	case "refresh":
+	case commandThemeActionRefresh:
 		if !themeInstalled {
 			sprintln("theme is not installed: " + theme)
 		} else {
 			println(" - refreshing theme: " + theme)
 			copyThemeIncludes(theme)
 		}
-	case "delete":
+	case commandThemeActionDelete:
 		if !themeInstalled {
 			sprintln("theme is not installed: " + theme)
 		} else {
@@ -332,9 +428,9 @@ func _theme(config appConfig, commandArgs ...string) {
 			}
 		}
 	default:
-		sprintln("error: invalid theme command action: " + action)
+		sprintln("error: invalid theme command <action> argument: " + action)
 		usageHelp := "usage:\n\n" + commandTheme.usage
-		usage(usageHelp)
+		usage(usageHelp, 1)
 	}
 }
 

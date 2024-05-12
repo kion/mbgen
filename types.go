@@ -246,7 +246,7 @@ type searchData struct {
 }
 
 type page struct {
-	id         string
+	Id         string
 	Title      string
 	Body       string
 	Media      []media
@@ -254,7 +254,7 @@ type page struct {
 }
 
 type post struct {
-	id         string
+	Id         string
 	Date       civil.Date
 	Time       civil.Time
 	Title      string
@@ -341,6 +341,14 @@ type stats struct {
 	genCnt  int
 }
 
+type watchReloadData struct {
+	Type    contentEntityType
+	Id      string
+	Deleted bool
+}
+
 type processorOutputHandler func(outputFilePath string, data []byte) bool
 
 type imageThumbnailHandler func(imgDirPath string, config appConfig)
+
+type dirChangeHandler func(changedFilePath string, deleted bool)

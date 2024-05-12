@@ -1,5 +1,5 @@
 {{ $post := .Content }}
-<article class="post">
+<article class="post" id="{{$post.Id}}">
     <header>
         {{ if or (not $post.Date.IsZero) (not $post.Time.IsZero) }}
             <span class="date-time">

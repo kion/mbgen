@@ -3,8 +3,11 @@ module github.com/kion/mbgen
 go 1.21
 
 require (
+	cloud.google.com/go v0.110.8
 	github.com/disintegration/imaging v1.6.2
+	github.com/fsnotify/fsnotify v1.7.0
 	github.com/google/uuid v1.3.1
+	github.com/gorilla/websocket v1.5.1
 	github.com/hashicorp/go-getter v1.7.3
 	github.com/yuin/goldmark v1.5.6
 	github.com/yuin/goldmark-meta v1.1.0
@@ -12,7 +15,6 @@ require (
 )
 
 require (
-	cloud.google.com/go v0.110.8 // indirect
 	cloud.google.com/go/compute v1.23.1 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	cloud.google.com/go/iam v1.1.3 // indirect

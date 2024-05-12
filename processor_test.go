@@ -33,14 +33,14 @@ func basicTest(t *testing.T, customHomePage bool) {
 
 	page1Id := "test-page-1"
 	page1 := page{
-		id:    page1Id,
+		Id:    page1Id,
 		Title: "Test Page 1 Title",
 		Body:  "Test Page 1 Body",
 	}
 
 	page2Id := "test-page-2"
 	page2 := page{
-		id:    page2Id,
+		Id:    page2Id,
 		Title: "Test Page 2 Title",
 		Body:  "Test Page 2 Body",
 	}
@@ -55,7 +55,7 @@ func basicTest(t *testing.T, customHomePage bool) {
 
 	post1Id := "post-1"
 	post1 := post{
-		id:    post1Id,
+		Id:    post1Id,
 		Title: "Test Post 1 Title",
 		Body:  "Test Post 1 Body",
 		Tags:  []string{tag1, tag2},
@@ -65,7 +65,7 @@ func basicTest(t *testing.T, customHomePage bool) {
 
 	post2Id := "post-2"
 	post2 := post{
-		id:    post2Id,
+		Id:    post2Id,
 		Title: "Test Post 2 Title",
 		Body:  "Test Post 2 Body",
 		Tags:  []string{tag1, tag3},
@@ -94,10 +94,10 @@ func basicTest(t *testing.T, customHomePage bool) {
 	output := processOutput(pages, posts, globalIncludes, themeIncludes, config)
 
 	expectedIndexFile := deployDirName + "/" + indexPageFileName
-	expectedPost1File := deployDirName + "/" + deployPostDirName + "/" + post1.id + contentFileExtension
-	expectedPost2File := deployDirName + "/" + deployPostDirName + "/" + post2.id + contentFileExtension
-	expectedPage1File := deployDirName + "/" + deployPageDirName + "/" + page1.id + contentFileExtension
-	expectedPage2File := deployDirName + "/" + deployPageDirName + "/" + page2.id + contentFileExtension
+	expectedPost1File := deployDirName + "/" + deployPostDirName + "/" + post1.Id + contentFileExtension
+	expectedPost2File := deployDirName + "/" + deployPostDirName + "/" + post2.Id + contentFileExtension
+	expectedPage1File := deployDirName + "/" + deployPageDirName + "/" + page1.Id + contentFileExtension
+	expectedPage2File := deployDirName + "/" + deployPageDirName + "/" + page2.Id + contentFileExtension
 	expectedFiles := []string{
 		expectedIndexFile,
 		expectedPost1File,
@@ -126,7 +126,7 @@ func basicTest(t *testing.T, customHomePage bool) {
 		expectedIndexFileContent = append(expectedIndexFileContent,
 			"<title>"+testSiteName+"</title>")
 		for _, post := range posts {
-			expectedIndexFileContent = append(expectedIndexFileContent, "<a href=\"/"+deployPostDirName+"/"+post.id+contentFileExtension+"\"")
+			expectedIndexFileContent = append(expectedIndexFileContent, "<a href=\"/"+deployPostDirName+"/"+post.Id+contentFileExtension+"\"")
 			for _, epc := range getExpectedPostFileContent(post) {
 				expectedIndexFileContent = append(expectedIndexFileContent, epc)
 			}
@@ -151,12 +151,12 @@ func basicTest(t *testing.T, customHomePage bool) {
 				}
 			} else {
 				for _, page := range pages {
-					if strings.Contains(ef, page.id+contentFileExtension) {
+					if strings.Contains(ef, page.Id+contentFileExtension) {
 						verifyExpectedNonIndexOutputFileContentContainsPageContent(ef, outputFileContent, page, t)
 					}
 				}
 				for _, post := range posts {
-					if strings.Contains(ef, post.id+contentFileExtension) {
+					if strings.Contains(ef, post.Id+contentFileExtension) {
 						verifyExpectedNonIndexOutputFileContentContainsPostContent(ef, outputFileContent, post, t)
 					}
 				}
@@ -209,7 +209,7 @@ func testPagination(t *testing.T, postCnt int) {
 	for i := 1; i <= postCnt; i++ {
 		pn := strconv.Itoa(i)
 		p := post{
-			id:    "post-" + pn,
+			Id:    "post-" + pn,
 			Title: "Test Post " + pn + " Title",
 			Body:  "Test Post " + pn + " Body",
 			Tags:  []string{tag1},

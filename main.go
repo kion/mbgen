@@ -51,7 +51,7 @@ func main() {
 		if err != "" {
 			sprintln(err)
 		}
-		usage(usageHelp)
+		usage(usageHelp, 1)
 	}
 }
 
@@ -62,7 +62,7 @@ func initializeAndRunCommand(cmdFn appCommand, cmdDescr appCommandDescriptor, co
 	}
 }
 
-func usage(usageHelp string) {
+func usage(usageHelp string, exitCode int) {
 	if usageHelp != "" {
 		sprintln(usageHelp)
 	} else {
@@ -79,9 +79,10 @@ func usage(usageHelp string) {
 		sort.Strings(commands)
 		sprintln(
 			"where <command> is one of the following:",
-			" - "+strings.Join(commands, "\n - "),
-			"use the following to get help on a specific command:",
+			" - "+strings.Join(commands, "\n - ")+"\n",
+			"use the following to get help on a specific command:\n",
 			"mbgen help <command>\n",
 		)
 	}
+	os.Exit(exitCode)
 }

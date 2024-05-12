@@ -50,7 +50,7 @@ func compilePageTemplate(p page, resLoader resourceLoader) *template.Template {
 	pageTemplate := compileFullTemplate(pageTemplateFileName, pageTemplateMarkup,
 		func(mainTemplateMarkup string) string {
 			return strings.Replace(mainTemplateMarkup, pageHeadTemplatePlaceholder,
-				"{{# "+pageHeadIncludePrefix+p.id+contentFileExtension+" #}}", 1)
+				"{{# "+pageHeadIncludePrefix+p.Id+contentFileExtension+" #}}", 1)
 		}, resLoader)
 	return pageTemplate
 }

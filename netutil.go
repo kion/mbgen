@@ -2,15 +2,62 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"errors"
 	"fmt"
+	"github.com/gorilla/websocket"
 	"github.com/hashicorp/go-getter"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
 
-func listenAndServe(addr string) {
+//go:embed ws-watch-reload.html
+var wsHtml string
+
+func listenAndServe(addr string, watch chan watchReloadData) {
+	if watch != nil {
+		var wsUpgrader = websocket.Upgrader{
+			ReadBufferSize:  1024,
+			WriteBufferSize: 1024,
+		}
+		wsHtml = strings.Replace(wsHtml, websocketProtocol, websocketProtocol+addr+websocketPath, 1) + contentClosingTag
+		http.HandleFunc(websocketPath, func(writer http.ResponseWriter, request *http.Request) {
+			conn, err := wsUpgrader.Upgrade(writer, request, nil)
+			check(err)
+			defer func(conn *websocket.Conn) {
+				err := conn.Close()
+				check(err)
+			}(conn)
+			err = conn.SetReadDeadline(time.Now().Add(120 * time.Second))
+			check(err)
+			for {
+				_, _, err := conn.ReadMessage()
+				if err != nil {
+					break
+				}
+				select {
+				case wrd, ok := <-watch:
+					if ok {
+						var msg string
+						if wrd.Deleted {
+							msg = `{ "type": "{{type}}", "id": "{{id}}", "deleted": true }`
+						} else {
+							msg = `{ "type": "{{type}}", "id": "{{id}}" }`
+						}
+						msg = strings.ReplaceAll(msg, "{{type}}", strings.ToLower(wrd.Type.String()))
+						msg = strings.ReplaceAll(msg, "{{id}}", wrd.Id)
+						if err := conn.WriteMessage(websocket.TextMessage, []byte(msg)); err != nil {
+							sprintln(" - [reload] error while sending websocket message: ", err)
+						} else {
+							sprintln(" - [reload] websocket message sent: " + msg + "\n")
+						}
+					}
+				}
+			}
+		})
+	}
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		path := request.URL.Path
 		println(" - request received: " + path)
@@ -25,6 +72,13 @@ func listenAndServe(addr string) {
 			}
 			data, err := os.ReadFile(filePath)
 			check(err)
+			if watch != nil && strings.HasSuffix(filePath, contentFileExtension) {
+				html := strings.Replace(string(data),
+					contentClosingTag,
+					wsHtml,
+					1)
+				data = []byte(html)
+			}
 			_, err = writer.Write(data)
 			check(err)
 		}
@@ -34,9 +88,9 @@ func listenAndServe(addr string) {
 	}
 	url := addr
 	if strings.Contains(url, "localhost") {
-		url = "http://" + url
+		url = httpProtocol + url
 	} else {
-		url = "https://" + url
+		url = httpsProtocol + url
 	}
 	sprintln(
 		"[ ----- serving ------ ]\n",

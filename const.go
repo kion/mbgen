@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	appVersion                                  = "1.1.1"
+	appVersion                                  = "1.2.0"
 	defaultGitHubRepoUrl                        = "github.com/kion/mbgen"
 	defaultGitHubRepoThemesUrl                  = defaultGitHubRepoUrl + "/themes"
 	defaultGitHubRepoPageContentSamplesUrl      = defaultGitHubRepoUrl + "/content-samples/pages"
@@ -34,6 +34,7 @@ const (
 	stylesIncludeFileNameFormat                 = "styles-include-%s.css"
 	markdownPagesDirName                        = "pages"
 	markdownPostsDirName                        = "posts"
+	markdownFileExtension                       = ".md"
 	mediaDirName                                = "media"
 	deployDirName                               = "deploy"
 	deployPostDirName                           = "post"
@@ -54,7 +55,7 @@ const (
 	defaultThumbThreshold                       = 0.5
 	defaultUseThumbs                            = true
 	defaultServeHost                            = "localhost"
-	defaultServePort                            = 8080
+	defaultServePort                            = 8888
 	thumbImgFileSuffix                          = "_thumb"
 	pageHeadIncludePrefix                       = "page-head--"
 	defaultThemeName                            = "pretty-dark"
@@ -63,6 +64,21 @@ const (
 	stylesTemplatePlaceholder                   = "{{@ styles @}}"
 	pageHeadTemplatePlaceholder                 = "{{@ page-head @}}"
 	subTemplatePlaceholder                      = "{{@ sub-template @}}"
+	commandCleanupTargetContent                 = "content"
+	commandCleanupTargetThumbs                  = "thumbs"
+	commandCleanupTargetArchive                 = "archive"
+	commandCleanupTargetSearch                  = "search"
+	commandServeOptionWatchReload               = "--watch-reload"
+	commandThemeActionActivate                  = "activate"
+	commandThemeActionInstall                   = "install"
+	commandThemeActionUpdate                    = "update"
+	commandThemeActionRefresh                   = "refresh"
+	commandThemeActionDelete                    = "delete"
+	httpProtocol                                = "http://"
+	httpsProtocol                               = "https://"
+	websocketProtocol                           = "ws://"
+	websocketPath                               = "/--ws--"
+	contentClosingTag                           = "</body>"
 )
 
 var (

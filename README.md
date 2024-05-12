@@ -8,6 +8,7 @@ embracing the convention-over-configuration philosophy.
 * Built-in search engine
 * Archive generation
 * Thumbnail generation
+* Watch & Hot Reload mode to preview changes in browser in real-time
 * Simple and intuitive to use image and video embedding
 * Customizable configuration (pagination, thumbnails, etc.)
 
@@ -78,9 +79,17 @@ $ mbgen serve
 
 Then open the following address in a browser to preview your site:
 
-[http://localhost:8080/](http://localhost:8080/)
+[http://localhost:8888/](http://localhost:8080/)
 
 _(the default host and port values can be modified in the `config.yml`)_
+
+You can also use the `--watch-reload` flag to automatically regenerate the site 
+and see the changes being reflected in the browser in real-time 
+when you change any of the `.md` files in the `pages` or `posts` dirs:
+
+```shell
+$ mbgen serve --watch-reload
+```
 
 Other supported commands:
 

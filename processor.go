@@ -50,7 +50,7 @@ func processPages(pages []page, searchIndex *mapSlice,
 		if homePage != "" {
 			found := false
 			for _, page := range pages {
-				if homePage == page.id {
+				if homePage == page.Id {
 					found = true
 					break
 				}
@@ -62,9 +62,9 @@ func processPages(pages []page, searchIndex *mapSlice,
 
 		for _, page := range pages {
 			pageTemplate := compilePageTemplate(page, resLoader)
-			outputFileName := page.id + contentFileExtension
+			outputFileName := page.Id + contentFileExtension
 			var outputFilePath string
-			if homePage == page.id {
+			if homePage == page.Id {
 				outputFilePath = fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, indexPageFileName)
 			} else {
 				outputFilePath = fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployPageDirName, os.PathSeparator, outputFileName)
@@ -138,7 +138,7 @@ func processPosts(posts []post, searchIndex *mapSlice,
 			if post.Title != "" {
 				pTitle = title + " - " + post.Title
 			}
-			outputFileName := post.id + contentFileExtension
+			outputFileName := post.Id + contentFileExtension
 
 			var singlePostContentBuffer bytes.Buffer
 			err := postContentTemplate.Execute(&singlePostContentBuffer, templateContent{EntityType: Post, Title: pTitle, Content: post})
@@ -340,4 +340,27 @@ func processContent(templateName string, ceType contentEntityType, title string,
 	if handleOutput != nil {
 		handleOutput(outputFilePath, contentBuffer.Bytes())
 	}
+}
+
+func processAndHandleStats(config appConfig, resLoader resourceLoader) {
+	generatedCnt := 0
+	stats := process(
+		parsePages(config, resLoader, processImgThumbnails),
+		parsePosts(config, resLoader, processImgThumbnails),
+		resLoader,
+		func(outputFilePath string, data []byte) bool {
+			idx := strings.LastIndex(outputFilePath, string(os.PathSeparator))
+			if idx != -1 {
+				outputDir := outputFilePath[:idx]
+				createDirIfNotExists(outputDir)
+			}
+			generated := writeDataToFileIfChanged(outputFilePath, data)
+			if generated {
+				println(" - generated file: " + outputFilePath)
+				generatedCnt++
+			}
+			return generated
+		})
+	stats.genCnt = generatedCnt
+	handleStats(stats)
 }

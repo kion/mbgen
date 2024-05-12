@@ -1,0 +1,39 @@
+<script type='text/javascript'>
+    const WS_MSG = "ping";
+    const WS_PING_INTERVAL = 90000;
+    let wsInterval;
+    (function() {
+        const ws = new WebSocket('ws://');
+        function wsPing() {
+            ws.send(WS_MSG);
+        }
+        ws.onopen = function() {
+            console.log('websocket connection established');
+            wsPing();
+            wsInterval = setInterval(() => {
+                wsPing();
+            }, WS_PING_INTERVAL);
+        }
+        ws.onclose = function() {
+            console.log('websocket connection closed');
+            clearInterval(wsInterval);
+        }
+        ws.onerror = function(err) {
+            console.error('websocket error', err);
+        }
+        ws.onmessage = function(evt) {
+            const msg = JSON.parse(evt.data);
+            const uri = location.pathname;
+            const home = uri === '/';
+            const archive = !home && uri.startsWith('/archive/');
+            const reload = home || archive || (uri.startsWith('/' + msg.type + '/') && !!document.getElementById(msg.id));
+            if (reload) {
+                if (!home && !archive && msg.deleted) {
+                    location.href = '/';
+                } else {
+                    location.reload();
+                }
+            }
+        }
+    })();
+</script>

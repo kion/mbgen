@@ -107,7 +107,7 @@ func parsePosts(config appConfig, resLoader resourceLoader, thumbHandler imageTh
 }
 
 func parsePage(pageId string, content string, config appConfig, resLoader resourceLoader) page {
-	page := page{id: pageId}
+	page := page{Id: pageId}
 	content, rawBodyContent, cdPhReps, _ := parseContentDirectives(pageId, content, config, resLoader)
 	var buf bytes.Buffer
 	context := parser.NewContext()
@@ -125,14 +125,14 @@ func parsePage(pageId string, content string, config appConfig, resLoader resour
 		page.Title = title
 	}
 	page.SearchData = searchData{
-		TypeId:  "page/" + page.id,
+		TypeId:  "page/" + page.Id,
 		Content: rawTitle + " " + rawBodyContent,
 	}
 	return page
 }
 
 func parsePost(postId string, content string, config appConfig, resLoader resourceLoader) post {
-	post := post{id: postId}
+	post := post{Id: postId}
 	content, rawBodyContent, cdPhReps, hashTags := parseContentDirectives(postId, content, config, resLoader)
 	var buf bytes.Buffer
 	context := parser.NewContext()
@@ -180,7 +180,7 @@ func parsePost(postId string, content string, config appConfig, resLoader resour
 		}
 	}
 	post.SearchData = searchData{
-		TypeId:  "post/" + post.id,
+		TypeId:  "post/" + post.Id,
 		Content: rawTitle + " " + rawBodyContent + " " + strings.ToLower(strings.Join(post.Tags[:], " ")),
 	}
 	return post
