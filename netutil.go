@@ -16,6 +16,10 @@ import (
 //go:embed ws-watch-reload.html
 var wsHtml string
 
+const (
+	pingPeriod = 60 * time.Second
+)
+
 func listenAndServe(addr string, watch chan watchReloadData) {
 	if watch != nil {
 		var wsUpgrader = websocket.Upgrader{
@@ -26,20 +30,31 @@ func listenAndServe(addr string, watch chan watchReloadData) {
 		http.HandleFunc(websocketPath, func(writer http.ResponseWriter, request *http.Request) {
 			conn, err := wsUpgrader.Upgrade(writer, request, nil)
 			check(err)
-			defer func(conn *websocket.Conn) {
-				err := conn.Close()
-				check(err)
-			}(conn)
-			err = conn.SetReadDeadline(time.Now().Add(120 * time.Second))
-			check(err)
+			sprintln(" - [reload] websocket connection established")
+			pingTicker := time.NewTicker(pingPeriod)
+			closed := false
+			go func() {
+				for {
+					_, _, err = conn.ReadMessage()
+					if err != nil {
+						if websocket.IsCloseError(err, websocket.CloseGoingAway) {
+							sprintln(" - [reload] websocket connection closed by client")
+						} else {
+							sprintln(" - [reload] error while reading websocket message: ", err)
+						}
+						closed = true
+						pingTicker.Stop()
+						break
+					}
+				}
+			}()
 			for {
-				_, _, err := conn.ReadMessage()
-				if err != nil {
+				if closed {
 					break
 				}
 				select {
 				case wrd, ok := <-watch:
-					if ok {
+					if ok && !closed {
 						var msg string
 						if wrd.Deleted {
 							msg = `{ "type": "{{type}}", "id": "{{id}}", "deleted": true }`
@@ -48,11 +63,23 @@ func listenAndServe(addr string, watch chan watchReloadData) {
 						}
 						msg = strings.ReplaceAll(msg, "{{type}}", strings.ToLower(wrd.Type.String()))
 						msg = strings.ReplaceAll(msg, "{{id}}", wrd.Id)
-						if err := conn.WriteMessage(websocket.TextMessage, []byte(msg)); err != nil {
+						if err = conn.WriteMessage(websocket.TextMessage, []byte(msg)); err != nil {
 							sprintln(" - [reload] error while sending websocket message: ", err)
 						} else {
 							sprintln(" - [reload] websocket message sent: " + msg + "\n")
 						}
+					} else {
+						break
+					}
+				case <-pingTicker.C:
+					if !closed {
+						if err = conn.WriteMessage(websocket.TextMessage, []byte{}); err != nil {
+							sprintln(" - [ping] error while sending websocket message: ", err)
+						} else {
+							sprintln(" - [ping] websocket message sent")
+						}
+					} else {
+						break
 					}
 				}
 			}

@@ -1,39 +1,69 @@
 <script type='text/javascript'>
-    const WS_MSG = "ping";
-    const WS_PING_INTERVAL = 90000;
-    let wsInterval;
+
+    const WS_URL = 'ws://';
+    let ws;
+
     (function() {
-        const ws = new WebSocket('ws://');
-        function wsPing() {
-            ws.send(WS_MSG);
-        }
+        ws = new WebSocket(WS_URL);
         ws.onopen = function() {
             console.log('websocket connection established');
-            wsPing();
-            wsInterval = setInterval(() => {
-                wsPing();
-            }, WS_PING_INTERVAL);
         }
         ws.onclose = function() {
             console.log('websocket connection closed');
-            clearInterval(wsInterval);
         }
         ws.onerror = function(err) {
             console.error('websocket error', err);
         }
         ws.onmessage = function(evt) {
+            if (!evt.data) {
+                console.log(' - [ping] websocket message received');
+                return;
+            }
+            console.log(' - [reload] websocket message received: ' + evt.data);
             const msg = JSON.parse(evt.data);
             const uri = location.pathname;
             const home = uri === '/';
             const archive = !home && uri.startsWith('/archive/');
-            const reload = home || archive || (uri.startsWith('/' + msg.type + '/') && !!document.getElementById(msg.id));
+            const single = !home && !archive && uri.startsWith('/' + msg.type + '/');
+            const entryEl = document.getElementById(msg.id);
+            const reload = home || archive || (single && !!entryEl);
             if (reload) {
                 if (!home && !archive && msg.deleted) {
                     location.href = '/';
                 } else {
-                    location.reload();
+                    reloadEntry(msg.type, msg.id, msg.deleted, single, entryEl);
                 }
             }
         }
     })();
+
+    function reloadEntry(type, id, deleted, single, entryEl) {
+        if (entryEl) {
+            if (deleted) {
+                entryEl.remove();
+            } else {
+                const xhr = new XMLHttpRequest();
+                const typeId = type + '/' + id;
+                xhr.open('GET', '/' + typeId + '.html', false);
+                xhr.send();
+                if (xhr.readyState === XMLHttpRequest.DONE) {
+                    if (xhr.status === 200) {
+                        const lDoc = document.implementation.createHTMLDocument();
+                        lDoc.documentElement.innerHTML = xhr.responseText;
+                        const lMainEl = lDoc.getElementsByTagName('main')[0];
+                        if (!single) {
+                            const lHeaderEl = lMainEl.getElementsByTagName('header')[0];
+                            lHeaderEl.innerHTML += '<a href="/' + typeId + '.html" class="permalink"><i class="fa-solid fa-link"></i></a>';
+                        }
+                        entryEl.outerHTML = lMainEl.innerHTML;
+                    } else {
+                        console.error('failed to reload content for: ' + typeId);
+                    }
+                }
+            }
+        } else {
+            location.reload();
+        }
+    }
+
 </script>
