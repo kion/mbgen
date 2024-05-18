@@ -2,10 +2,11 @@ package main
 
 import (
 	"regexp"
+	"time"
 )
 
 const (
-	appVersion                                  = "1.2.1"
+	appVersion                                  = "1.2.2"
 	defaultGitHubRepoUrl                        = "github.com/kion/mbgen"
 	defaultGitHubRepoThemesUrl                  = defaultGitHubRepoUrl + "/themes"
 	defaultGitHubRepoPageContentSamplesUrl      = defaultGitHubRepoUrl + "/content-samples/pages"
@@ -78,6 +79,7 @@ const (
 	httpsProtocol                               = "https://"
 	websocketProtocol                           = "ws://"
 	websocketPath                               = "/--ws--"
+	websocketPingPeriod                         = 60 * time.Second
 	contentClosingTag                           = "</body>"
 )
 

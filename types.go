@@ -87,6 +87,10 @@ const (
 	Post
 )
 
+func (c contentEntityType) MarshalJSON() ([]byte, error) {
+	return json.Marshal(strings.ToLower(c.String()))
+}
+
 func (c contentEntityType) Page() bool {
 	return c == Page
 }
@@ -342,9 +346,9 @@ type stats struct {
 }
 
 type watchReloadData struct {
-	Type    contentEntityType
-	Id      string
-	Deleted bool
+	Type    contentEntityType `json:"type"`
+	Id      string            `json:"id"`
+	Deleted bool              `json:"deleted"`
 }
 
 type processorOutputHandler func(outputFilePath string, data []byte) bool

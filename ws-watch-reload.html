@@ -1,18 +1,35 @@
 <script type='text/javascript'>
 
     const WS_URL = 'ws://';
+    const WS_RECONNECT_INTERVAL = 5000;
+
+    let wsInterval;
     let ws;
 
     (function() {
+        initWebSocket();
+    })();
+
+    function initWebSocket() {
         ws = new WebSocket(WS_URL);
         ws.onopen = function() {
             console.log('websocket connection established');
+            clearInterval(wsInterval);
+            wsInterval = undefined;
         }
         ws.onclose = function() {
             console.log('websocket connection closed');
+            if (!wsInterval) {
+                wsInterval = setInterval(function() {
+                    console.log('attempting to reestablish websocket connection');
+                    initWebSocket();
+                }, WS_RECONNECT_INTERVAL);
+            }
         }
         ws.onerror = function(err) {
-            console.error('websocket error', err);
+            if (ws.readyState !== WebSocket.CLOSED) {
+                console.error('websocket error', err);
+            }
         }
         ws.onmessage = function(evt) {
             if (!evt.data) {
@@ -35,7 +52,7 @@
                 }
             }
         }
-    })();
+    }
 
     function reloadEntry(type, id, deleted, single, entryEl) {
         if (entryEl) {
