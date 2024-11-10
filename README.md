@@ -173,8 +173,8 @@ $ mbgen help [command]
       * _there's no need to add hashtags to the metadata `tags` section, 
         i.e. hashtags are automatically included in the post's tag list_ 
     * `{%<entry-type>:<entry-id>%}` - renders a URI to the given `<entry-id>` of the given `<entry-type>`, e.g.:
-      * `<a href="{%page:sample-page%}">Sample Page</a>` - would render a link to the page defined in the `pages/sample-project.md`
-      * `<a href="{%post:sample-post-1%}">Sample Post 1</a>` - would render a link to the post defined in the `posts/sample-post-1.md`
+      * `[Sample Page]({%page:sample-page%})` - would render a link with title `Sample Page` to the page defined in the `pages/sample-project.md`
+      * `[Sample Post 1]({%post:sample-post-1%})` - would render a link with title `Sample Post 1` to the post defined in the `posts/sample-post-1.md`
     * `{media(<properties>):<file(s)>}` - renders images/videos from the corresponding `deploy/media/<entry-id>` dir
       * to render specific media files, list them explicitly, e.g.: 
         * `{media:1.jpg}`

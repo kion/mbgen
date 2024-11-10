@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	appVersion                                  = "1.2.2"
+	appVersion                                  = "1.2.3"
 	defaultGitHubRepoUrl                        = "github.com/kion/mbgen"
 	defaultGitHubRepoThemesUrl                  = defaultGitHubRepoUrl + "/themes"
 	defaultGitHubRepoPageContentSamplesUrl      = defaultGitHubRepoUrl + "/content-samples/pages"

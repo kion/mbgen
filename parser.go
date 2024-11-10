@@ -209,6 +209,26 @@ func parseContentDirectives(entryId string, content string, config appConfig, re
 			tags = append(tags, tag)
 		}
 	}
+	contentLinkPlaceholders := contentLinkPlaceholderRegexp.FindAllStringSubmatch(content, -1)
+	if contentLinkPlaceholders != nil {
+		for _, clp := range contentLinkPlaceholders {
+			placeholder := clp[0]
+			entityType := strings.ToLower(clp[1])
+			entryId := clp[2]
+			var ceType contentEntityType
+			switch entityType {
+			case "page":
+				ceType = Page
+			case "post":
+				ceType = Post
+			}
+			var link string
+			if ceType != UndefinedContentEntityType {
+				link = "/" + strings.ToLower(ceType.String()) + "/" + entryId + contentFileExtension
+			}
+			content = strings.Replace(content, placeholder, link, 1)
+		}
+	}
 	var expListMedia []string
 	wrapPlaceholders := wrapPlaceholderRegexp.FindAllStringSubmatch(content, -1)
 	if wrapPlaceholders != nil {
