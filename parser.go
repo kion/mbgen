@@ -34,7 +34,7 @@ var markdown = /* const */ goldmark.New(
 	),
 )
 
-func parsePages(config appConfig, resLoader resourceLoader, thumbHandler imageThumbnailHandler) []page {
+func parsePages(config appConfig, resLoader resourceLoader, thumbHandler imageThumbnailHandler, useCache bool) []page {
 	if !dirExists(markdownPagesDirName) {
 		return nil
 	}
@@ -54,6 +54,16 @@ func parsePages(config appConfig, resLoader resourceLoader, thumbHandler imageTh
 		check(err)
 		if !pageEntryInfo.IsDir() {
 			pageEntryFileName := pageEntryInfo.Name()
+			pageEntryModTime := pageEntryInfo.ModTime()
+			if useCache {
+				ce := getCachedContentEntity(Page, pageEntryFileName, pageEntryModTime)
+				if ce != nil {
+					page := ce.(page)
+					page.skipProcessing = true
+					pages = append(pages, page)
+					continue
+				}
+			}
 			pageEntryPath := fmt.Sprintf("%s%c%s", markdownPagesDirName, os.PathSeparator, pageEntryFileName)
 			content, err := os.ReadFile(pageEntryPath)
 			check(err)
@@ -61,6 +71,9 @@ func parsePages(config appConfig, resLoader resourceLoader, thumbHandler imageTh
 			pageMediaDirPath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, pageId)
 			handleThumbnails(pageMediaDirPath, config, thumbHandler)
 			page := parsePage(pageId, string(content), config, resLoader)
+			if useCache {
+				cacheContentEntity(pageEntryFileName, pageEntryModTime, page)
+			}
 			pages = append(pages, page)
 		}
 	}
@@ -68,7 +81,7 @@ func parsePages(config appConfig, resLoader resourceLoader, thumbHandler imageTh
 	return pages
 }
 
-func parsePosts(config appConfig, resLoader resourceLoader, thumbHandler imageThumbnailHandler) []post {
+func parsePosts(config appConfig, resLoader resourceLoader, thumbHandler imageThumbnailHandler, useCache bool) []post {
 	if !dirExists(markdownPostsDirName) {
 		return nil
 	}
@@ -92,6 +105,16 @@ func parsePosts(config appConfig, resLoader resourceLoader, thumbHandler imageTh
 		check(err)
 		if !postEntryInfo.IsDir() {
 			postEntryFileName := postEntryInfo.Name()
+			postEntryModTime := postEntryInfo.ModTime()
+			if useCache {
+				ce := getCachedContentEntity(Post, postEntryFileName, postEntryModTime)
+				if ce != nil {
+					post := ce.(post)
+					post.skipProcessing = true
+					posts = append(posts, post)
+					continue
+				}
+			}
 			postEntryPath := fmt.Sprintf("%s%c%s", markdownPostsDirName, os.PathSeparator, postEntryFileName)
 			content, err := os.ReadFile(postEntryPath)
 			check(err)
@@ -99,6 +122,9 @@ func parsePosts(config appConfig, resLoader resourceLoader, thumbHandler imageTh
 			postMediaDirPath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, postId)
 			handleThumbnails(postMediaDirPath, config, thumbHandler)
 			post := parsePost(postId, string(content), config, resLoader)
+			if useCache {
+				cacheContentEntity(postEntryFileName, postEntryModTime, post)
+			}
 			posts = append(posts, post)
 		}
 	}

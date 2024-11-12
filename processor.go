@@ -61,28 +61,29 @@ func processPages(pages []page, searchIndex *mapSlice,
 		}
 
 		for _, page := range pages {
-			pageTemplate := compilePageTemplate(page, resLoader)
-			outputFileName := page.Id + contentFileExtension
-			var outputFilePath string
-			if homePage == page.Id {
-				outputFilePath = fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, indexPageFileName)
-			} else {
-				outputFilePath = fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployPageDirName, os.PathSeparator, outputFileName)
+			if !page.skipProcessing {
+				pageTemplate := compilePageTemplate(page, resLoader)
+				outputFileName := page.Id + contentFileExtension
+				var outputFilePath string
+				if homePage == page.Id {
+					outputFilePath = fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, indexPageFileName)
+				} else {
+					outputFilePath = fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployPageDirName, os.PathSeparator, outputFileName)
+				}
+
+				pTitle := title
+				if page.Title != "" {
+					pTitle = title + " - " + page.Title
+				}
+
+				var pageContentBuffer bytes.Buffer
+				err := pageTemplate.Execute(&pageContentBuffer, templateContent{EntityType: Page, Title: pTitle, FileName: outputFileName, Content: page})
+				check(err)
+
+				if handleOutput != nil {
+					handleOutput(outputFilePath, pageContentBuffer.Bytes())
+				}
 			}
-
-			pTitle := title
-			if page.Title != "" {
-				pTitle = title + " - " + page.Title
-			}
-
-			var pageContentBuffer bytes.Buffer
-			err := pageTemplate.Execute(&pageContentBuffer, templateContent{EntityType: Page, Title: pTitle, FileName: outputFileName, Content: page})
-			check(err)
-
-			if handleOutput != nil {
-				handleOutput(outputFilePath, pageContentBuffer.Bytes())
-			}
-
 			*searchIndex = append(*searchIndex, mapItem{Key: page.SearchData.TypeId, Value: page.SearchData.Content})
 		}
 	}
@@ -140,27 +141,29 @@ func processPosts(posts []post, searchIndex *mapSlice,
 			}
 			outputFileName := post.Id + contentFileExtension
 
-			var singlePostContentBuffer bytes.Buffer
-			err := postContentTemplate.Execute(&singlePostContentBuffer, templateContent{EntityType: Post, Title: pTitle, Content: post})
-			check(err)
-
 			var postContentBuffer bytes.Buffer
-			err = postContentTemplate.Execute(&postContentBuffer, templateContent{EntityType: Post, Title: pTitle, Content: post, FileName: outputFileName})
+			err := postContentTemplate.Execute(&postContentBuffer, templateContent{EntityType: Post, Title: pTitle, Content: post, FileName: outputFileName})
 			check(err)
 
 			postContent := strings.TrimSpace(postContentBuffer.String())
 
 			postPageContent += postContent
 
-			fullTemplate := compileFullTemplate(outputFileName, singlePostContentBuffer.String(), nil, resLoader)
+			if !post.skipProcessing {
+				var singlePostContentBuffer bytes.Buffer
+				err = postContentTemplate.Execute(&singlePostContentBuffer, templateContent{EntityType: Post, Title: pTitle, Content: post})
+				check(err)
 
-			var singlePostFullContentBuffer bytes.Buffer
-			err = fullTemplate.Execute(&singlePostFullContentBuffer, templateContent{EntityType: Post, Title: pTitle, Content: post})
-			check(err)
+				fullTemplate := compileFullTemplate(outputFileName, singlePostContentBuffer.String(), nil, resLoader)
 
-			outputFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployPostDirName, os.PathSeparator, outputFileName)
-			if handleOutput != nil {
-				handleOutput(outputFilePath, singlePostFullContentBuffer.Bytes())
+				var singlePostFullContentBuffer bytes.Buffer
+				err = fullTemplate.Execute(&singlePostFullContentBuffer, templateContent{EntityType: Post, Title: pTitle, Content: post})
+				check(err)
+
+				outputFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployPostDirName, os.PathSeparator, outputFileName)
+				if handleOutput != nil {
+					handleOutput(outputFilePath, singlePostFullContentBuffer.Bytes())
+				}
 			}
 
 			if pagePostCnt == pageSize {
@@ -342,11 +345,11 @@ func processContent(templateName string, ceType contentEntityType, title string,
 	}
 }
 
-func processAndHandleStats(config appConfig, resLoader resourceLoader) {
+func processAndHandleStats(config appConfig, resLoader resourceLoader, useCache bool) {
 	generatedCnt := 0
 	stats := process(
-		parsePages(config, resLoader, processImgThumbnails),
-		parsePosts(config, resLoader, processImgThumbnails),
+		parsePages(config, resLoader, processImgThumbnails, useCache),
+		parsePosts(config, resLoader, processImgThumbnails, useCache),
 		resLoader,
 		func(outputFilePath string, data []byte) bool {
 			idx := strings.LastIndex(outputFilePath, string(os.PathSeparator))

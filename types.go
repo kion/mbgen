@@ -249,22 +249,45 @@ type searchData struct {
 	Content string
 }
 
+type contentEntity interface {
+	ContentEntityType() contentEntityType
+	EntityId() string
+}
+
 type page struct {
-	Id         string
-	Title      string
-	Body       string
-	Media      []media
-	SearchData searchData
+	Id             string
+	Title          string
+	Body           string
+	Media          []media
+	SearchData     searchData
+	skipProcessing bool
+}
+
+func (p page) ContentEntityType() contentEntityType {
+	return Page
+}
+
+func (p page) EntityId() string {
+	return p.Id
 }
 
 type post struct {
-	Id         string
-	Date       civil.Date
-	Time       civil.Time
-	Title      string
-	Body       string
-	Tags       []string
-	SearchData searchData
+	Id             string
+	Date           civil.Date
+	Time           civil.Time
+	Title          string
+	Body           string
+	Tags           []string
+	SearchData     searchData
+	skipProcessing bool
+}
+
+func (p post) ContentEntityType() contentEntityType {
+	return Post
+}
+
+func (p post) EntityId() string {
+	return p.Id
 }
 
 func (p post) HasDateOrTime() bool {
@@ -280,11 +303,11 @@ func (p post) FmtDate() string {
 
 func (p post) FmtTime() string {
 	if !p.Time.IsZero() {
-		time := p.Time.String()
-		if strings.HasSuffix(time, ":00") {
-			time, _ = strings.CutSuffix(time, ":00")
+		t := p.Time.String()
+		if strings.HasSuffix(t, ":00") {
+			t, _ = strings.CutSuffix(t, ":00")
 		}
-		return time
+		return t
 	}
 	return ""
 }

@@ -21,6 +21,10 @@ const testEmbed3Code = "A_bCdEfGhIj-X"
 const testEmbed1 = "http://vimeo.com/" + testEmbed1Code
 const testEmbed2 = "http://youtu.be/" + testEmbed2Code
 const testEmbed3 = "http://www.youtube.com/watch?v=" + testEmbed3Code
+const testPageLinkPlaceholder = "{%page:sample-page-1%}"
+const testPageLinkURI = "/page/sample-page-1" + contentFileExtension
+const testPostLinkPlaceholder = "{%post:sample-post-1%}"
+const testPostLinkURI = "/post/sample-post-1" + contentFileExtension
 const tag1 = "tag1"
 const tag2 = "Tag2"
 const tag3 = "TAG3"
@@ -34,6 +38,9 @@ title: %s
 {embed:%s}
 {embed:%s}
 {embed:%s}
+
+[Page Link](%s)
+[Post Link](%s)
 `
 const postContentTemplate = `---
 title: %s
@@ -48,6 +55,9 @@ tags:
 {embed:%s}
 {embed:%s}
 {embed:%s}
+
+[Page Link](%s)
+[Post Link](%s)
 `
 
 var testPageContent = fmt.Sprintf(pageContentTemplate,
@@ -56,6 +66,8 @@ var testPageContent = fmt.Sprintf(pageContentTemplate,
 	testEmbed1,
 	testEmbed2,
 	testEmbed3,
+	testPageLinkPlaceholder,
+	testPostLinkPlaceholder,
 )
 
 var testPostContent = fmt.Sprintf(postContentTemplate,
@@ -67,6 +79,8 @@ var testPostContent = fmt.Sprintf(postContentTemplate,
 	testEmbed1,
 	testEmbed2,
 	testEmbed3,
+	testPageLinkPlaceholder,
+	testPostLinkPlaceholder,
 )
 
 func TestParser(t *testing.T) {
@@ -105,11 +119,15 @@ func TestParser(t *testing.T) {
 	verifyStringsEqual(page.Title, testPageTitle, t)
 	verifyStringContains(page.Body, testPageBody, t)
 	verifyEmbeddedMedia(page.Body, expectedEmbeddedMedia, t)
+	verifyStringContains(page.Body, testPageLinkURI, t)
+	verifyStringContains(page.Body, testPostLinkURI, t)
 
 	post := parsePost("post", testPostContent, config, resLoader)
 	verifyStringsEqual(post.Title, testPostTitle, t)
 	verifyStringContains(post.Body, testPostBody, t)
 	verifyEmbeddedMedia(post.Body, expectedEmbeddedMedia, t)
+	verifyStringContains(post.Body, testPageLinkURI, t)
+	verifyStringContains(post.Body, testPostLinkURI, t)
 	verifyStringSlicesEqual(post.Tags, expectedTags, t)
 }
 

@@ -248,8 +248,8 @@ func _cleanup(config appConfig, commandArgs ...string) {
 	}
 	if cleanupThumbs {
 		resLoader := getResourceLoader(config)
-		parsePages(config, resLoader, deleteImgThumbnails)
-		parsePosts(config, resLoader, deleteImgThumbnails)
+		parsePages(config, resLoader, deleteImgThumbnails, false)
+		parsePosts(config, resLoader, deleteImgThumbnails, false)
 	}
 	if cleanupArchive {
 		deployArchivePath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, deployArchiveDirName)
@@ -289,13 +289,13 @@ func _generate(config appConfig, commandArgs ...string) {
 		}
 	}
 
-	processAndHandleStats(config, resLoader)
+	processAndHandleStats(config, resLoader, false)
 }
 
 func _stats(config appConfig, commandArgs ...string) {
 	resLoader := getResourceLoader(config)
-	handleStats(process(parsePages(config, resLoader, nil),
-		parsePosts(config, resLoader, nil),
+	handleStats(process(parsePages(config, resLoader, nil, false),
+		parsePosts(config, resLoader, nil, false),
 		resLoader, nil))
 }
 
@@ -316,14 +316,14 @@ func _serve(config appConfig, commandArgs ...string) {
 				pageDeleted := deleted || !fileExists(changedFilePath)
 				if !pageDeleted {
 					println(" - [watch] page markdown file added/updated: " + changedFilePath)
-					processAndHandleStats(config, resLoader)
+					processAndHandleStats(config, resLoader, true)
 				} else {
 					println(" - [watch] page markdown file deleted: " + changedFilePath)
 					deployPageFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployPageDirName, os.PathSeparator, pageId+contentFileExtension)
 					if deleteIfExists(deployPageFilePath) {
 						sprintln(" - deleted page content file: " + deployPageFilePath)
 					}
-					processAndHandleStats(config, resLoader)
+					processAndHandleStats(config, resLoader, true)
 				}
 				wChan <- watchReloadData{
 					Type:    Page,
@@ -338,14 +338,14 @@ func _serve(config appConfig, commandArgs ...string) {
 				postDeleted := deleted || !fileExists(changedFilePath)
 				if !postDeleted {
 					println(" - [watch] post markdown file added/updated: " + changedFilePath)
-					processAndHandleStats(config, resLoader)
+					processAndHandleStats(config, resLoader, true)
 				} else {
 					println(" - [watch] post markdown file deleted: " + changedFilePath)
 					deployPostFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployPostDirName, os.PathSeparator, postId+contentFileExtension)
 					if deleteIfExists(deployPostFilePath) {
 						sprintln(" - deleted post content file: " + deployPostFilePath)
 					}
-					processAndHandleStats(config, resLoader)
+					processAndHandleStats(config, resLoader, true)
 				}
 				wChan <- watchReloadData{
 					Type:    Post,
