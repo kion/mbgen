@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	appVersion                                  = "1.2.4"
+	appVersion                                  = "1.2.5"
 	defaultGitHubRepoUrl                        = "github.com/kion/mbgen"
 	defaultGitHubRepoThemesUrl                  = defaultGitHubRepoUrl + "/themes"
 	defaultGitHubRepoPageContentSamplesUrl      = defaultGitHubRepoUrl + "/content-samples/pages"
@@ -22,6 +22,7 @@ const (
 	postTemplateFileName                        = "post" + templateFileExtension
 	mediaTemplateFileName                       = "media" + templateFileExtension
 	archiveTemplateFileName                     = "archive" + templateFileExtension
+	tagIndexTemplateFileName                    = "tag-index" + templateFileExtension
 	searchTemplateFileName                      = "search" + templateFileExtension
 	pagerTemplateFileName                       = "pager" + templateFileExtension
 	contentDirectiveTemplateFileNameFormat      = "content-%s" + templateFileExtension
@@ -30,7 +31,7 @@ const (
 	searchPageFileName                          = "search" + contentFileExtension
 	searchIndexFileName                         = "search.json"
 	directivePlaceholderReplacementFormat       = ":@@@:%s:@@@:"
-	hashTagMarkdownReplacementFormat            = "[#%s](/" + deployTagDirName + "/%s/)"
+	hashTagMarkdownReplacementFormat            = "[#%s](/" + deployTagsDirName + "/%s/)"
 	stylesFileName                              = "styles.css"
 	stylesIncludeFileNameFormat                 = "styles-include-%s.css"
 	markdownPagesDirName                        = "pages"
@@ -42,13 +43,14 @@ const (
 	deployPostsDirName                          = "posts"
 	deployPageDirName                           = "page"
 	deployArchiveDirName                        = "archive"
-	deployTagDirName                            = "tag"
+	deployTagsDirName                           = "tags"
 	metaDataKeyDate                             = "date"
 	metaDataKeyTime                             = "time"
 	metaDataKeyTitle                            = "title"
 	metaDataKeyTags                             = "tags"
 	configFileName                              = "config.yml"
 	defaultGenerateArchive                      = true
+	defaultGenerateTagIndex                     = true
 	defaultEnableSearch                         = true
 	defaultPageSize                             = 10
 	minAllowedThumbWidth                        = 320
@@ -68,6 +70,7 @@ const (
 	commandCleanupTargetContent                 = "content"
 	commandCleanupTargetThumbs                  = "thumbs"
 	commandCleanupTargetArchive                 = "archive"
+	commandCleanupTargetTagIndex                = "tag-index"
 	commandCleanupTargetSearch                  = "search"
 	commandServeOptionWatchReload               = "--watch-reload"
 	commandThemeActionActivate                  = "activate"

@@ -245,9 +245,19 @@ or can even be completely omitted from the config):
   - `generate` command generates an archive index page, 
     as well as pages with posts for all the relevant year/month combinations 
     (retrieved from the `date` property of each corresponding post content `.md` file) - 
-    the generated index page lists all the year/month combinations with links to the corresponding content pages
+    the generated index page lists all the year/month combinations (along with the corresponding post counts) 
+    with links to the corresponding content pages
   - the generated archive index page is available under `/archive/` URI, e.g.:
     - `<a href="/archive/">Archive</a>`
+  - set this setting to `no` to disable archive generation
+* [optional] `generateTagIndex` - the tag index generation is enabled by default,
+  unless this setting is set to `no`
+  - `generate` command generates a tag index page
+    (note, that the pages with posts for each tag are generated always, even if tag index is not) - 
+    the generated tag index page lists all the tags (along with the corresponding post counts) 
+    with links to the corresponding content pages
+  - the generated archive index page is available under `/tags/` URI, e.g.:
+    - `<a href="/tags/">Tags</a>`
   - set this setting to `no` to disable archive generation
 * [optional] `enableSearch` - the built-in search functionality is enabled by default,
   unless this setting is set to `no`

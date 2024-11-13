@@ -11,17 +11,18 @@ import (
 )
 
 type appConfig struct {
-	siteName        string
-	theme           string
-	homePage        string
-	generateArchive bool
-	enableSearch    bool
-	pageSize        int
-	useThumbs       bool
-	thumbSizes      []int
-	thumbThreshold  float64
-	serveHost       string
-	servePort       int
+	siteName         string
+	theme            string
+	homePage         string
+	generateArchive  bool
+	generateTagIndex bool
+	enableSearch     bool
+	pageSize         int
+	useThumbs        bool
+	thumbSizes       []int
+	thumbThreshold   float64
+	serveHost        string
+	servePort        int
 }
 
 type appCommandDescriptor struct {
@@ -359,6 +360,12 @@ type resourceLoader struct {
 	config       appConfig
 	loadTemplate func(templateFileName string) ([]byte, error)
 	loadInclude  func(includeFileName string, level templateIncludeLevel) ([]byte, error)
+}
+
+type tagData struct {
+	Title string
+	Count int
+	Ratio float64
 }
 
 type stats struct {

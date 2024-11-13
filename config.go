@@ -12,17 +12,18 @@ import (
 
 func defaultConfig() appConfig {
 	return appConfig{
-		siteName:        "",
-		theme:           "",
-		homePage:        "",
-		generateArchive: defaultGenerateArchive,
-		enableSearch:    defaultEnableSearch,
-		pageSize:        defaultPageSize,
-		useThumbs:       defaultUseThumbs,
-		thumbSizes:      defaultThumbSizes,
-		thumbThreshold:  defaultThumbThreshold,
-		serveHost:       defaultServeHost,
-		servePort:       defaultServePort,
+		siteName:         "",
+		theme:            "",
+		homePage:         "",
+		generateArchive:  defaultGenerateArchive,
+		generateTagIndex: defaultGenerateTagIndex,
+		enableSearch:     defaultEnableSearch,
+		pageSize:         defaultPageSize,
+		useThumbs:        defaultUseThumbs,
+		thumbSizes:       defaultThumbSizes,
+		thumbThreshold:   defaultThumbThreshold,
+		serveHost:        defaultServeHost,
+		servePort:        defaultServePort,
 	}
 }
 
@@ -52,6 +53,12 @@ func readConfig() appConfig {
 	if generateArchive != "" {
 		v := strings.ToLower(generateArchive)
 		config.generateArchive = v != "no" && v != "false"
+	}
+
+	generateTagIndex := cm["generateTagIndex"]
+	if generateTagIndex != "" {
+		v := strings.ToLower(generateTagIndex)
+		config.generateTagIndex = v != "no" && v != "false"
 	}
 
 	enableSearch := cm["enableSearch"]
@@ -173,6 +180,21 @@ func writeConfig(config appConfig) {
 		yml += "generateArchive: "
 	}
 	if generateArchive {
+		yml += "yes"
+	} else {
+		yml += "no"
+	}
+
+	yml += "\n"
+	var generateTagIndex bool
+	if defaultGenerateTagIndex == config.generateTagIndex {
+		generateTagIndex = defaultGenerateTagIndex
+		yml += "#generateTagIndex: "
+	} else {
+		generateTagIndex = config.generateTagIndex
+		yml += "generateTagIndex: "
+	}
+	if generateTagIndex {
 		yml += "yes"
 	} else {
 		yml += "no"

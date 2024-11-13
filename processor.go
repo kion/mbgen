@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"text/template"
@@ -131,6 +132,7 @@ func processPosts(posts []post, searchIndex *mapSlice,
 		archiveContent := make(map[string][]string)
 
 		tagPostCnt := make(map[string]int)
+		tagTitleCnt := make(map[string]int)
 		tagContent := make(map[string][]string)
 
 		for _, post := range posts {
@@ -226,6 +228,7 @@ func processPosts(posts []post, searchIndex *mapSlice,
 
 			if len(post.Tags) > 0 {
 				for _, tag := range post.Tags {
+					tagTitleCnt[tag]++
 					t := strings.ToLower(tag)
 					tagPostCnt[t]++
 					tagContent[t] = append(tagContent[t], postContent)
@@ -269,8 +272,43 @@ func processPosts(posts []post, searchIndex *mapSlice,
 
 		tagPostCntLen := len(tagPostCnt)
 		if tagPostCntLen > 0 {
+			if config.generateTagIndex {
+				minTagPostCnt := -1
+				maxTagPostCnt := 0
+				for _, v := range tagPostCnt {
+					if minTagPostCnt == -1 || v < minTagPostCnt {
+						minTagPostCnt = v
+					}
+					if v > maxTagPostCnt {
+						maxTagPostCnt = v
+					}
+				}
+				// ======================================================================
+				// sort the tags by post count
+				// ======================================================================
+				var sortedTags []tagData
+				for tt, tc := range tagTitleCnt {
+					tr := float64(tc-minTagPostCnt) / float64(maxTagPostCnt-minTagPostCnt)
+					tr = float64(int(tr*100))/100 + 1
+					sortedTags = append(sortedTags, tagData{Title: tt, Count: tc, Ratio: tr})
+				}
+				sort.Slice(sortedTags, func(i, j int) bool {
+					return sortedTags[i].Count > sortedTags[j].Count
+				})
+				// ======================================================================
+				sprintln(" - generating tag index ...")
+				tagIndexTemplate := compileTagIndexTemplate(resLoader)
+				outputFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployTagsDirName, os.PathSeparator, indexPageFileName)
+				var tagIndexContentBuffer bytes.Buffer
+				err := tagIndexTemplate.Execute(&tagIndexContentBuffer, templateContent{EntityType: Page, Title: config.siteName + " - Tag Index", Content: sortedTags})
+				check(err)
+				if handleOutput != nil {
+					handleOutput(outputFilePath, tagIndexContentBuffer.Bytes())
+				}
+			}
+			sprintln(" - generating tag pages ...")
 			tagCnt = tagPostCntLen
-			processPaginatedPostContent(tagPostCnt, tagContent, pageSize, deployTagDirName, pagerTemplate, resLoader, handleOutput)
+			processPaginatedPostContent(tagPostCnt, tagContent, pageSize, deployTagsDirName, pagerTemplate, resLoader, handleOutput)
 		}
 	}
 	return len(posts), tagCnt

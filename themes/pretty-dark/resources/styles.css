@@ -61,7 +61,8 @@ body > main .post:last-of-type {
 
 .page,
 .post,
-.archive {
+.archive,
+.tag-index {
     margin-top: 1em;
     border: 2px solid #555;
     border-radius: 4px;
@@ -124,33 +125,57 @@ header a.permalink {
     border-top: 2px dashed #555;
 }
 
-.post footer .tags {
+.post footer .tags,
+.tag-index .tags {
     display: flex;
     align-items: center;
-    justify-content: flex-start;
     column-gap: 0.5em;
     row-gap: 0.5em;
     flex-wrap: wrap;
     font-size: 0.8em;
 }
 
-.post footer .tags .tag {
+.post footer .tags {
+    justify-content: flex-start;
+}
+
+.tag-index .tags {
+    justify-content: center;
+}
+
+.post footer .tags .tag,
+.tag-index .tags .tag {
     font-size: 0.8em;
     text-decoration: none;
     padding: 4px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+    &:hover {
+        text-shadow: none;
+        cursor: pointer;
+    }
+}
+
+.post footer .tags .tag {
     color: #777;
     background-color: #333;
     border: 1px solid #555;
-    border-radius: 4px;
-    white-space: nowrap;
-    &:before {
-        content: '#';
-    }
     &:hover {
         color: #333;
         background-color: #777;
-        text-shadow: none;
-        cursor: pointer;
+    }
+    &:before {
+        content: '#';
+    }
+}
+
+.tag-index .tags .tag {
+    color: #FF9C57;
+    background-color: #333;
+    border: 1px solid #111;
+    &:hover {
+        font-weight: bold;
+        background-color: #222;
     }
 }
 
@@ -161,7 +186,8 @@ header a.permalink {
 
 .page .content a,
 .post .content a,
-.archive a {
+.archive a,
+.tag-index a {
     color: #FF9C57;
 }
 
@@ -307,6 +333,10 @@ header a.permalink {
 .archive .archive-breakdown .year-breakdown .months .month-post-cnt .month-post-cnt-link {
     display: flex;
     justify-content: space-between;
+}
+
+.tag-index {
+    padding: 1em;
 }
 
 .pager {

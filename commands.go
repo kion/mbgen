@@ -181,11 +181,13 @@ func _cleanup(config appConfig, commandArgs ...string) {
 	cleanupContent := false
 	cleanupThumbs := false
 	cleanupArchive := false
+	cleanupTagIndex := false
 	cleanupSearch := false
 	if commandArgs == nil || len(commandArgs) == 0 {
 		cleanupContent = true
 		cleanupThumbs = !config.useThumbs
 		cleanupArchive = !config.generateArchive
+		cleanupTagIndex = !config.generateTagIndex
 		cleanupSearch = !config.enableSearch
 	} else {
 		target := commandArgs[0]
@@ -196,6 +198,8 @@ func _cleanup(config appConfig, commandArgs ...string) {
 			cleanupThumbs = true
 		case commandCleanupTargetArchive:
 			cleanupArchive = true
+		case commandCleanupTargetTagIndex:
+			cleanupTagIndex = true
 		case commandCleanupTargetSearch:
 			cleanupSearch = true
 		default:
@@ -255,6 +259,12 @@ func _cleanup(config appConfig, commandArgs ...string) {
 		deployArchivePath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, deployArchiveDirName)
 		if deleteIfExists(deployArchivePath) {
 			sprintln(" - deleted archive dir: " + deployArchivePath)
+		}
+	}
+	if cleanupTagIndex {
+		deployTagIndexPath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployTagsDirName, os.PathSeparator, indexPageFileName)
+		if deleteIfExists(deployTagIndexPath) {
+			sprintln(" - deleted tag index file: " + deployTagIndexPath)
 		}
 	}
 	if cleanupSearch {

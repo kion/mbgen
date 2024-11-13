@@ -56,19 +56,23 @@ func compilePageTemplate(p page, resLoader resourceLoader) *template.Template {
 }
 
 func compileArchiveTemplate(resLoader resourceLoader) *template.Template {
-	archiveTemplateMarkup, err := readTemplateFile(archiveTemplateFileName, resLoader)
-	check(err)
-	archiveTemplateMarkup = strings.Replace(archiveTemplateMarkup, pageHeadTemplatePlaceholder, "", 1)
-	archiveTemplate := compileFullTemplate(archiveTemplateFileName, archiveTemplateMarkup, nil, resLoader)
-	return archiveTemplate
+	return compileStandalonePageTemplate(archiveTemplateFileName, resLoader)
+}
+
+func compileTagIndexTemplate(resLoader resourceLoader) *template.Template {
+	return compileStandalonePageTemplate(tagIndexTemplateFileName, resLoader)
 }
 
 func compileSearchTemplate(resLoader resourceLoader) *template.Template {
-	searchTemplateMarkup, err := readTemplateFile(searchTemplateFileName, resLoader)
+	return compileStandalonePageTemplate(searchTemplateFileName, resLoader)
+}
+
+func compileStandalonePageTemplate(singlePageTemplateFileName string, resLoader resourceLoader) *template.Template {
+	singlePageTemplateMarkup, err := readTemplateFile(singlePageTemplateFileName, resLoader)
 	check(err)
-	searchTemplateMarkup = strings.Replace(searchTemplateMarkup, pageHeadTemplatePlaceholder, "", 1)
-	searchTemplate := compileFullTemplate(searchTemplateFileName, searchTemplateMarkup, nil, resLoader)
-	return searchTemplate
+	singlePageTemplateMarkup = strings.Replace(singlePageTemplateMarkup, pageHeadTemplatePlaceholder, "", 1)
+	singlePageTemplate := compileFullTemplate(singlePageTemplateFileName, singlePageTemplateMarkup, nil, resLoader)
+	return singlePageTemplate
 }
 
 func compilePagerTemplate(resLoader resourceLoader) *template.Template {
