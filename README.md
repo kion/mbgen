@@ -7,6 +7,7 @@ embracing the convention-over-configuration philosophy.
 
 * Built-in search engine
 * Archive generation
+* Tag Index (aka Tag Cloud) generation
 * Thumbnail generation
 * Watch & Hot Reload mode to preview changes in browser in real-time
 * Simple and intuitive to use image and video embedding
