@@ -41,11 +41,13 @@ var (
 			"     for which markdown (" + markdownFileExtension + ") content files no longer exist\n\n" +
 			"   - " + commandCleanupTargetThumbs + ": deletes all previously generated thumbnail files\n\n" +
 			"   - " + commandCleanupTargetArchive + ": deletes the previously generated archive files\n\n" +
+			"   - " + commandCleanupTargetTagIndex + ": deletes the previously generated tag index file\n\n" +
 			"   - " + commandCleanupTargetSearch + ": deletes all previously generated search files\n\n" +
 			" - if no <target> is specified, each target is performed based on the following conditions:\n\n" +
 			"   - " + commandCleanupTargetContent + ": always\n\n" +
 			"   - " + commandCleanupTargetThumbs + ": if `useThumbs` config option is disabled\n\n" +
 			"   - " + commandCleanupTargetArchive + ": if `generateArchive` config option is disabled\n\n" +
+			"   - " + commandCleanupTargetTagIndex + ": if `generateTagIndex` config option is disabled\n\n" +
 			"   - " + commandCleanupTargetSearch + ": if `enableSearch` config option is disabled\n\n",
 		reqConfig: true,
 		optArgCnt: 1,
