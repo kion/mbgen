@@ -5,11 +5,14 @@ embracing the convention-over-configuration philosophy.
 
 ## Features
 
+* Built-in content management (admin) interface
+  * As an alternative: watch & hot reload mode to monitor content source file (`.md`) changes, 
+    generate corresponding output (`.html`) files on the fly, 
+    and dynamically update the corresponding view in browser
 * Built-in search engine
 * Archive generation
 * Tag Index (aka Tag Cloud) generation
 * Thumbnail generation
-* Watch & Hot Reload mode to preview changes in browser in real-time
 * Simple and intuitive to use image and video embedding
 * Customizable configuration (pagination, thumbnails, etc.)
 
@@ -84,9 +87,15 @@ Then open the following address in a browser to preview your site:
 
 _(the default host and port values can be modified in the `config.yml`)_
 
-You can also use the `--watch-reload` flag to automatically regenerate the site 
-and see the changes being reflected in the browser in real-time 
-when you change any of the `.md` files in the `pages` or `posts` dirs:
+Use the `--admin` flag to render content management UI components to create/edit/delete pages and posts:
+
+```shell
+$ mbgen serve --admin
+```
+
+Alternatively, you can use the `--watch-reload` flag 
+to monitor any changes to the source content (`.md`) files in the `pages` and `posts` dirs, 
+automatically regenerate the site on the fly, and see the changes dynamically reflected in browser.
 
 ```shell
 $ mbgen serve --watch-reload

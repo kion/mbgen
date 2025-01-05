@@ -1,7 +1,7 @@
 {{ $page := .Content }}
-<section class="page" id="{{$page.Id}}">
+<section class="content-entry page" id="{{$page.Id}}" data-type="page">
     <header class="title">
-        {{ $page.Title }}
+        <span class="title">{{ $page.Title }}</span>
     </header>
     <section class="content">
         {{ $page.Body }}

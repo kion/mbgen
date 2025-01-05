@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	appVersion                                  = "1.3.0"
+	appVersion                                  = "1.5.0"
 	defaultGitHubRepoUrl                        = "github.com/kion/mbgen"
 	defaultGitHubRepoThemesUrl                  = defaultGitHubRepoUrl + "/themes"
 	defaultGitHubRepoPageContentSamplesUrl      = defaultGitHubRepoUrl + "/content-samples/pages"
@@ -69,9 +69,11 @@ const (
 	subTemplatePlaceholder                      = "{{@ sub-template @}}"
 	commandCleanupTargetContent                 = "content"
 	commandCleanupTargetThumbs                  = "thumbs"
-	commandCleanupTargetArchive                 = "archive"
+	commandCleanupTargetTags                    = "tags"
 	commandCleanupTargetTagIndex                = "tag-index"
+	commandCleanupTargetArchive                 = "archive"
 	commandCleanupTargetSearch                  = "search"
+	commandServeOptionAdmin                     = "--admin"
 	commandServeOptionWatchReload               = "--watch-reload"
 	commandThemeActionActivate                  = "activate"
 	commandThemeActionInstall                   = "install"
@@ -83,7 +85,14 @@ const (
 	websocketProtocol                           = "ws://"
 	websocketPath                               = "/--ws--"
 	websocketPingPeriod                         = 60 * time.Second
-	contentClosingTag                           = "</body>"
+	jsOpeningTag                                = "<script type='text/javascript'>"
+	jsClosingTag                                = "</script>"
+	styleOpeningTag                             = "<style>"
+	styleClosingTag                             = "</style>"
+	headClosingTag                              = "</head>"
+	bodyClosingTag                              = "</body>"
+	mainOpeningTag                              = "<main>"
+	mainClosingTag                              = "</main>"
 )
 
 var (

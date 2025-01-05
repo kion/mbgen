@@ -159,6 +159,15 @@ func parsePage(pageId string, content string, config appConfig, resLoader resour
 
 func parsePost(postId string, content string, config appConfig, resLoader resourceLoader) post {
 	post := post{Id: postId}
+	// ================================================================================
+	// replace metadata tabs with two spaces to avoid markdown parsing issues
+	// ================================================================================
+	metadataContent := metaDataPlaceholderRegexp.FindString(content)
+	if metadataContent != "" {
+		metadataContent = strings.Replace(metadataContent, "\t", "  ", -1)
+		content = metaDataPlaceholderRegexp.ReplaceAllString(content, metadataContent)
+	}
+	// ================================================================================
 	content, rawBodyContent, cdPhReps, hashTags := parseContentDirectives(postId, content, config, resLoader)
 	var buf bytes.Buffer
 	context := parser.NewContext()

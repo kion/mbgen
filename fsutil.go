@@ -133,6 +133,12 @@ func closeFile(file *os.File) {
 	check(err)
 }
 
+func readDataFromFile(filePath string) []byte {
+	content, err := os.ReadFile(filePath)
+	check(err)
+	return content
+}
+
 func writeDataToFile(outputFilePath string, data []byte) {
 	outputFile, err := os.Create(outputFilePath)
 	check(err)

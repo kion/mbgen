@@ -57,6 +57,9 @@
             searchSummaryEl.innerHTML = '<label>No results found</label>';
         }
         searchSummaryEl.style.display = 'block';
+        if (renderAdmin) {
+            renderAdmin();
+        }
     }
 
     function renderNextSearchResultsPage() {
@@ -83,7 +86,7 @@
                 lDoc.documentElement.innerHTML = xhr.responseText;
                 const lMainEl = lDoc.getElementsByTagName('main')[0];
                 const lHeaderEl = lMainEl.getElementsByTagName('header')[0];
-                lHeaderEl.innerHTML += '<a href="/' + typeId + '.html" class="permalink"><i class="fa-solid fa-link"></i></a>';
+                lHeaderEl.innerHTML += '<span class="links"><a href="/' + typeId + '.html" class="permalink"><i class="fa-solid fa-link"></i></a></span>';
                 searchResultsEl.innerHTML += lMainEl.innerHTML;
             } else {
                 console.error("Failed to load content for: " + typeId);

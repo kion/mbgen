@@ -376,7 +376,7 @@ func verifyExpectedOutputFileContentContainsPostContent(outputFile string, outpu
 
 func getExpectedPageFileContent(p page) []string {
 	expectedContent := []string{
-		fmt.Sprintf("<header class=\"title\">%s</header>", p.Title),
+		fmt.Sprintf("<header class=\"title\"><span class=\"title\">%s</span></header>", p.Title),
 		fmt.Sprintf("<section class=\"content\">%s</section>", p.Body),
 	}
 	return expectedContent

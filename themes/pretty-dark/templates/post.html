@@ -1,5 +1,5 @@
 {{ $post := .Content }}
-<article class="post" id="{{$post.Id}}">
+<article class="content-entry post" id="{{$post.Id}}" data-type="post">
     <header>
         {{ if or (not $post.Date.IsZero) (not $post.Time.IsZero) }}
             <span class="date-time">
@@ -15,7 +15,7 @@
             <span class="title">{{ $post.Title }}</span>
         {{ end }}
         {{ if .FileName }}
-            <a href="/post/{{ .FileName }}" class="permalink"><i class="fa-solid fa-link"></i></a>
+            <span class="links"><a href="/post/{{ .FileName }}" class="permalink"><i class="fa-solid fa-link"></i></a></span>
         {{ end }}
     </header>
     <section class="content">

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -40,14 +42,17 @@ var (
 			"   - " + commandCleanupTargetContent + ": deletes all previously generated content (" + contentFileExtension + ") files\n" +
 			"     for which markdown (" + markdownFileExtension + ") content files no longer exist\n\n" +
 			"   - " + commandCleanupTargetThumbs + ": deletes all previously generated thumbnail files\n\n" +
-			"   - " + commandCleanupTargetArchive + ": deletes the previously generated archive files\n\n" +
+			"   - " + commandCleanupTargetTags + ": deletes all previously generated tag files\n" +
+			"     that are no longer referenced by any markdown (" + markdownFileExtension + ") content files\n\n" +
 			"   - " + commandCleanupTargetTagIndex + ": deletes the previously generated tag index file\n\n" +
+			"   - " + commandCleanupTargetArchive + ": deletes the previously generated archive files\n\n" +
 			"   - " + commandCleanupTargetSearch + ": deletes all previously generated search files\n\n" +
 			" - if no <target> is specified, each target is performed based on the following conditions:\n\n" +
 			"   - " + commandCleanupTargetContent + ": always\n\n" +
+			"   - " + commandCleanupTargetTags + ": always\n\n" +
 			"   - " + commandCleanupTargetThumbs + ": if `useThumbs` config option is disabled\n\n" +
-			"   - " + commandCleanupTargetArchive + ": if `generateArchive` config option is disabled\n\n" +
 			"   - " + commandCleanupTargetTagIndex + ": if `generateTagIndex` config option is disabled\n\n" +
+			"   - " + commandCleanupTargetArchive + ": if `generateArchive` config option is disabled\n\n" +
 			"   - " + commandCleanupTargetSearch + ": if `enableSearch` config option is disabled\n\n",
 		reqConfig: true,
 		optArgCnt: 1,
@@ -71,7 +76,9 @@ var (
 		description: "start a web server to serve the site",
 		usage: "mbgen serve [" + commandServeOptionWatchReload + "]\n\n" +
 			"must be run from a working dir containing " + configFileName + " file and " + deployDirName + " directory with generated assets\n\n" +
-			" - the optional " + commandServeOptionWatchReload + " flag can be used to automatically regenerate the site and see the changes being reflected in the browser in real-time when you change any of the markdown content (.md) files in the " + markdownPagesDirName + " or " + markdownPostsDirName + " dirs\n",
+			" ONE of the following flags can be specified:\n" +
+			" " + commandServeOptionAdmin + " - to render content admin links\n" +
+			" " + commandServeOptionWatchReload + " - to automatically regenerate the site and see the changes being reflected in the browser in real-time when you change any of the markdown content (.md) files in the " + markdownPagesDirName + " or " + markdownPostsDirName + " dirs\n",
 		reqConfig: true,
 		optArgCnt: 1,
 	}
@@ -182,11 +189,13 @@ func _init(config appConfig, commandArgs ...string) {
 func _cleanup(config appConfig, commandArgs ...string) {
 	cleanupContent := false
 	cleanupThumbs := false
-	cleanupArchive := false
+	cleanupTags := false
 	cleanupTagIndex := false
+	cleanupArchive := false
 	cleanupSearch := false
 	if commandArgs == nil || len(commandArgs) == 0 {
 		cleanupContent = true
+		cleanupTags = true
 		cleanupThumbs = !config.useThumbs
 		cleanupArchive = !config.generateArchive
 		cleanupTagIndex = !config.generateTagIndex
@@ -198,10 +207,12 @@ func _cleanup(config appConfig, commandArgs ...string) {
 			cleanupContent = true
 		case commandCleanupTargetThumbs:
 			cleanupThumbs = true
-		case commandCleanupTargetArchive:
-			cleanupArchive = true
+		case commandCleanupTargetTags:
+			cleanupTags = true
 		case commandCleanupTargetTagIndex:
 			cleanupTagIndex = true
+		case commandCleanupTargetArchive:
+			cleanupArchive = true
 		case commandCleanupTargetSearch:
 			cleanupSearch = true
 		default:
@@ -257,16 +268,46 @@ func _cleanup(config appConfig, commandArgs ...string) {
 		parsePages(config, resLoader, deleteImgThumbnails, false)
 		parsePosts(config, resLoader, deleteImgThumbnails, false)
 	}
-	if cleanupArchive {
-		deployArchivePath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, deployArchiveDirName)
-		if deleteIfExists(deployArchivePath) {
-			sprintln(" - deleted archive dir: " + deployArchivePath)
+	if cleanupTags {
+		deployTagsDirPath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, deployTagsDirName)
+		deployTagsDirEntries, err := os.ReadDir(deployTagsDirPath)
+		check(err)
+		if len(deployTagsDirEntries) > 0 {
+			posts := parsePosts(config, getResourceLoader(config), nil, false)
+			var tags []string
+			for _, post := range posts {
+				for _, tag := range post.Tags {
+					t := strings.ToLower(tag)
+					if !slices.Contains(tags, t) {
+						tags = append(tags, t)
+					}
+				}
+			}
+			for _, deployTagDirEntry := range deployTagsDirEntries {
+				deployTagDirEntryInfo, err := deployTagDirEntry.Info()
+				check(err)
+				if deployTagDirEntryInfo.IsDir() {
+					deployTagDirName := deployTagDirEntryInfo.Name()
+					if !slices.Contains(tags, deployTagDirName) {
+						sprintln(" - tag no longer referenced: " + deployTagDirName)
+						deployTagDirPath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployTagsDirName, os.PathSeparator, deployTagDirName)
+						deleteIfExists(deployTagDirPath)
+						sprintln(" - deleted tag dir: " + deployTagDirPath)
+					}
+				}
+			}
 		}
 	}
 	if cleanupTagIndex {
 		deployTagIndexPath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployTagsDirName, os.PathSeparator, indexPageFileName)
 		if deleteIfExists(deployTagIndexPath) {
 			sprintln(" - deleted tag index file: " + deployTagIndexPath)
+		}
+	}
+	if cleanupArchive {
+		deployArchivePath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, deployArchiveDirName)
+		if deleteIfExists(deployArchivePath) {
+			sprintln(" - deleted archive dir: " + deployArchivePath)
 		}
 	}
 	if cleanupSearch {
@@ -312,62 +353,72 @@ func _stats(config appConfig, commandArgs ...string) {
 }
 
 func _serve(config appConfig, commandArgs ...string) {
+	resLoader := getResourceLoader(config)
 	var wChan chan watchReloadData
+	var admin bool
 	if commandArgs != nil && len(commandArgs) > 0 {
-		if commandArgs[0] != commandServeOptionWatchReload {
-			sprintln("error: invalid serve command argument: " + commandArgs[0])
+		if len(commandArgs) == 1 {
+			arg := commandArgs[0]
+			if arg == commandServeOptionAdmin {
+				admin = true
+			} else if arg == commandServeOptionWatchReload {
+				wChan = make(chan watchReloadData)
+				go watchDirForChanges(markdownPagesDirName, markdownFileExtension, func(changedFilePath string, deleted bool) {
+					filePath := strings.Split(changedFilePath, string(os.PathSeparator))
+					fileName := filePath[len(filePath)-1]
+					pageId := fileName[:len(fileName)-len(filepath.Ext(fileName))]
+					pageDeleted := deleted || !fileExists(changedFilePath)
+					if !pageDeleted {
+						println(" - [watch] page markdown file added/updated: " + changedFilePath)
+						processAndHandleStats(config, resLoader, true)
+					} else {
+						println(" - [watch] page markdown file deleted: " + changedFilePath)
+						deployPageFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployPageDirName, os.PathSeparator, pageId+contentFileExtension)
+						if deleteIfExists(deployPageFilePath) {
+							sprintln(" - deleted page content file: " + deployPageFilePath)
+						}
+						processAndHandleStats(config, resLoader, true)
+					}
+					wChan <- watchReloadData{
+						Type:    Page,
+						Id:      pageId,
+						Deleted: pageDeleted,
+					}
+				})
+				go watchDirForChanges(markdownPostsDirName, markdownFileExtension, func(changedFilePath string, deleted bool) {
+					filePath := strings.Split(changedFilePath, string(os.PathSeparator))
+					fileName := filePath[len(filePath)-1]
+					postId := fileName[:len(fileName)-len(filepath.Ext(fileName))]
+					postDeleted := deleted || !fileExists(changedFilePath)
+					if !postDeleted {
+						println(" - [watch] post markdown file added/updated: " + changedFilePath)
+						processAndHandleStats(config, resLoader, true)
+					} else {
+						println(" - [watch] post markdown file deleted: " + changedFilePath)
+						deployPostFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployPostDirName, os.PathSeparator, postId+contentFileExtension)
+						if deleteIfExists(deployPostFilePath) {
+							sprintln(" - deleted post content file: " + deployPostFilePath)
+						}
+						processAndHandleStats(config, resLoader, true)
+					}
+					wChan <- watchReloadData{
+						Type:    Post,
+						Id:      postId,
+						Deleted: postDeleted,
+					}
+				})
+			} else {
+				sprintln("error: invalid serve command argument: " + commandArgs[0])
+				usageHelp := "usage:\n\n" + commandServe.usage
+				usage(usageHelp, 1)
+			}
+		} else {
+			sprintln("error: invalid number of serve command arguments (max allowed: " + strconv.Itoa(commandServe.optArgCnt) + ")")
 			usageHelp := "usage:\n\n" + commandServe.usage
 			usage(usageHelp, 1)
-		} else {
-			wChan = make(chan watchReloadData)
-			resLoader := getResourceLoader(config)
-			go watchDirForChanges(markdownPagesDirName, markdownFileExtension, func(changedFilePath string, deleted bool) {
-				filePath := strings.Split(changedFilePath, string(os.PathSeparator))
-				fileName := filePath[len(filePath)-1]
-				pageId := fileName[:len(fileName)-len(filepath.Ext(fileName))]
-				pageDeleted := deleted || !fileExists(changedFilePath)
-				if !pageDeleted {
-					println(" - [watch] page markdown file added/updated: " + changedFilePath)
-					processAndHandleStats(config, resLoader, true)
-				} else {
-					println(" - [watch] page markdown file deleted: " + changedFilePath)
-					deployPageFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployPageDirName, os.PathSeparator, pageId+contentFileExtension)
-					if deleteIfExists(deployPageFilePath) {
-						sprintln(" - deleted page content file: " + deployPageFilePath)
-					}
-					processAndHandleStats(config, resLoader, true)
-				}
-				wChan <- watchReloadData{
-					Type:    Page,
-					Id:      pageId,
-					Deleted: pageDeleted,
-				}
-			})
-			go watchDirForChanges(markdownPostsDirName, markdownFileExtension, func(changedFilePath string, deleted bool) {
-				filePath := strings.Split(changedFilePath, string(os.PathSeparator))
-				fileName := filePath[len(filePath)-1]
-				postId := fileName[:len(fileName)-len(filepath.Ext(fileName))]
-				postDeleted := deleted || !fileExists(changedFilePath)
-				if !postDeleted {
-					println(" - [watch] post markdown file added/updated: " + changedFilePath)
-					processAndHandleStats(config, resLoader, true)
-				} else {
-					println(" - [watch] post markdown file deleted: " + changedFilePath)
-					deployPostFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployPostDirName, os.PathSeparator, postId+contentFileExtension)
-					if deleteIfExists(deployPostFilePath) {
-						sprintln(" - deleted post content file: " + deployPostFilePath)
-					}
-					processAndHandleStats(config, resLoader, true)
-				}
-				wChan <- watchReloadData{
-					Type:    Post,
-					Id:      postId,
-					Deleted: postDeleted,
-				}
-			})
 		}
 	}
-	listenAndServe(fmt.Sprintf("%s:%d", config.serveHost, config.servePort), wChan)
+	listenAndServe(fmt.Sprintf("%s:%d", config.serveHost, config.servePort), admin, wChan, config, resLoader)
 }
 
 func _theme(config appConfig, commandArgs ...string) {

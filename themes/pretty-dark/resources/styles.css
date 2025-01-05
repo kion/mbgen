@@ -72,7 +72,7 @@ body > main .post:last-of-type {
 header a.permalink {
     color: #555;
     &:hover {
-        color: #777777;
+        color: #777;
     }
 }
 
@@ -116,8 +116,24 @@ header a.permalink {
     border-left: 2px solid #555;
 }
 
-.page header.title {
+.page header .title {
+    flex: 1;
     color: #999;
+}
+
+.post header .links,
+.page header .links {
+    display: flex;
+    column-gap: 0.2em;
+}
+
+.post header .links a,
+.page header .links a {
+    cursor: pointer;
+    color: #555;
+    &:hover {
+        color: #777;
+    }
 }
 
 .post footer {
@@ -431,4 +447,70 @@ button {
 
 #search-pager button {
     width: 100%;
+}
+
+/*
+==============================
+    Admin Edit Styles
+==============================
+*/
+
+body section.admin-create {
+    display: flex;
+    column-gap: 1em;
+    margin-top: 1em;
+}
+
+body section.admin-create button.admin-btn {
+    flex-grow: 1;
+    border-color: #cc0000;
+}
+
+body section.admin-create button.admin-btn i {
+    margin-right: 0.5em;
+}
+
+.content .admin-edit {
+    display: flex;
+    flex-direction: column;
+    row-gap: 1em;
+}
+
+body section.admin-create button.admin-btn,
+header .links a.admin-link {
+    color: #cc0000;
+    &:hover {
+        color: #ff0000;
+    }
+}
+
+/* markdown editor dark mode */
+
+.EasyMDEContainer .CodeMirror {
+    color: #ccc !important;
+    border-color: #555 !important;
+    background-color: #2b2b2b !important;
+}
+.EasyMDEContainer .cm-s-easymde .CodeMirror-cursor {
+    border-color: #ccc !important;
+}
+
+.EasyMDEContainer .editor-toolbar > * {
+    color: #cc0000 !important;
+}
+
+.EasyMDEContainer .editor-toolbar > .active, .editor-toolbar > button:hover, .editor-preview pre, .cm-s-easymde .cm-comment {
+    color: #ff0000 !important;
+    background-color: transparent !important;
+    border: none !important;
+}
+
+.editor-toolbar {
+    border-top: 1px solid #555 !important;
+    border-left: 1px solid #555 !important;
+    border-right: 1px solid #555 !important;
+}
+
+.EasyMDEContainer .CodeMirror .cm-link {
+    color: #FF9C57;
 }

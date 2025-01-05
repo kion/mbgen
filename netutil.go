@@ -8,22 +8,35 @@ import (
 	"fmt"
 	"github.com/gorilla/websocket"
 	"github.com/hashicorp/go-getter"
+	"io"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 )
 
-//go:embed ws-watch-reload.html
-var wsHtml string
+//go:embed inject-js/admin.js
+var adminJS string
 
-func listenAndServe(addr string, watch chan watchReloadData) {
+//go:embed inject-js/easymde.min.js
+var easyMdeJS string
+
+//go:embed inject-js/watch-reload.js
+var watchReloadJS string
+
+//go:embed inject-css/easymde.min.css
+var easyMdeCSS string
+
+func listenAndServe(addr string, admin bool, watch chan watchReloadData, config appConfig, resLoader resourceLoader) {
+	if !dirExists(deployDirName) {
+		exitWithError(deployDirName + " directory not found")
+	}
 	if watch != nil {
 		var wsUpgrader = websocket.Upgrader{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
 		}
-		wsHtml = strings.Replace(wsHtml, websocketProtocol, websocketProtocol+addr+websocketPath, 1) + contentClosingTag
+		watchReloadJS = strings.Replace(watchReloadJS, websocketProtocol, websocketProtocol+addr+websocketPath, 1)
 		http.HandleFunc(websocketPath, func(writer http.ResponseWriter, request *http.Request) {
 			conn, err := wsUpgrader.Upgrade(writer, request, nil)
 			check(err)
@@ -95,19 +108,114 @@ func listenAndServe(addr string, watch chan watchReloadData) {
 			}
 			data, err := os.ReadFile(filePath)
 			check(err)
-			if watch != nil && strings.HasSuffix(filePath, contentFileExtension) {
-				html := strings.Replace(string(data),
-					contentClosingTag,
-					wsHtml,
-					1)
-				data = []byte(html)
+			html := string(data)
+			if strings.HasSuffix(filePath, contentFileExtension) {
+				if admin {
+					html = strings.Replace(html,
+						bodyClosingTag,
+						jsOpeningTag+adminJS+jsClosingTag+bodyClosingTag,
+						1)
+					html = strings.Replace(html,
+						bodyClosingTag,
+						jsOpeningTag+easyMdeJS+jsClosingTag+bodyClosingTag,
+						1)
+					html = strings.Replace(html,
+						headClosingTag,
+						styleOpeningTag+easyMdeCSS+styleClosingTag+bodyClosingTag,
+						1)
+				}
+				if watch != nil {
+					html = strings.Replace(html,
+						bodyClosingTag,
+						jsOpeningTag+watchReloadJS+jsClosingTag+bodyClosingTag,
+						1)
+				}
 			}
-			_, err = writer.Write(data)
+			_, err = writer.Write([]byte(html))
 			check(err)
 		}
 	})
-	if !dirExists(deployDirName) {
-		exitWithError(deployDirName + " directory not found")
+	if admin {
+		http.HandleFunc("/admin-create", func(writer http.ResponseWriter, request *http.Request) {
+			if request.Method == http.MethodPost {
+				entryType := request.URL.Query().Get("type")
+				entryId := request.URL.Query().Get("id")
+				if entryId == "" {
+					http.Error(writer, "ID is required", http.StatusBadRequest)
+				} else {
+					mdEntryPath := fmt.Sprintf("%s%c%s", entryType+"s", os.PathSeparator, entryId+markdownFileExtension)
+					if fileExists(mdEntryPath) {
+						http.Error(writer, "already exists", http.StatusConflict)
+					} else {
+						content := "---\n"
+						if entryType == "post" {
+							content += fmt.Sprintf("date: %s\n", time.Now().Format(time.DateOnly))
+							content += fmt.Sprintf("time: %s\n", time.Now().Format(time.TimeOnly))
+						}
+						content += "title: New " + entryType + "\n"
+						content += "\n---\n\n"
+						writeDataToFile(mdEntryPath, []byte(content))
+						processAndHandleStats(config, resLoader, true)
+						contentEntryRedirectURI := fmt.Sprintf("/%s/%s%s", entryType, entryId, contentFileExtension)
+						writer.Header().Set("Location", contentEntryRedirectURI)
+						writer.WriteHeader(http.StatusCreated)
+					}
+				}
+			}
+		})
+		http.HandleFunc("/admin-edit", func(writer http.ResponseWriter, request *http.Request) {
+			entryType := request.URL.Query().Get("type")
+			entryId := request.URL.Query().Get("id")
+			mdEntryPath := fmt.Sprintf("%s%c%s", entryType+"s", os.PathSeparator, entryId+markdownFileExtension)
+			if request.Method == http.MethodGet {
+				mdContent := readDataFromFile(mdEntryPath)
+				_, err := writer.Write(mdContent)
+				check(err)
+			} else if request.Method == http.MethodPost {
+				body, err := io.ReadAll(request.Body)
+				if err != nil {
+					http.Error(writer, "Failed to read request body", http.StatusInternalServerError)
+					return
+				}
+				writeDataToFile(mdEntryPath, body)
+				processAndHandleStats(config, resLoader, true)
+				contentEntryPath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, entryType, os.PathSeparator, entryId+contentFileExtension)
+				content := readDataFromFile(contentEntryPath)
+				content = content[strings.Index(string(content), mainOpeningTag)+len(mainOpeningTag):]
+				content = content[:strings.Index(string(content), mainClosingTag)]
+				_, err = writer.Write(content)
+			}
+		})
+		http.HandleFunc("/admin-delete", func(writer http.ResponseWriter, request *http.Request) {
+			entryType := request.URL.Query().Get("type")
+			entryId := request.URL.Query().Get("id")
+			mdEntryPath := fmt.Sprintf("%s%c%s", entryType+"s", os.PathSeparator, entryId+markdownFileExtension)
+			if fileExists(mdEntryPath) {
+				// ==================================================
+				// delete the markdown file
+				// ==================================================
+				deleteFile(mdEntryPath)
+				processAndHandleStats(config, resLoader, true)
+				// ==================================================
+				// delete the content file
+				// ==================================================
+				contentEntryPath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, entryType, os.PathSeparator, entryId+contentFileExtension)
+				deleteIfExists(contentEntryPath)
+				// ==================================================
+				// delete the media directory
+				// ==================================================
+				mediaDir := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, entryId)
+				deleteIfExists(mediaDir)
+				// ==================================================
+				// delete tag files for the no longer referenced tags
+				// ==================================================
+				_cleanup(config, commandCleanupTargetTags)
+				// ==================================================
+				writer.WriteHeader(http.StatusNoContent)
+			} else {
+				http.Error(writer, "Not found: "+entryType+"/"+entryId, http.StatusNotFound)
+			}
+		})
 	}
 	url := addr
 	if strings.Contains(url, "localhost") {
