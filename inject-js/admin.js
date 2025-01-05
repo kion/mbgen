@@ -154,7 +154,7 @@ function adminDelete(entryType, entryId, contentEntryEl) {
         if (xhr.readyState === XMLHttpRequest.DONE) {
             if (xhr.status === 204) {
                 contentEntryEl.remove();
-                if (location.pathname.startsWith('/' + entryType + '/')) {
+                if (location.pathname === '/' + entryType + '/' + entryId + '.html') {
                     location.href = '/';
                 }
             } else {
