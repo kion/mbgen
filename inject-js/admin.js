@@ -153,9 +153,10 @@ function adminDelete(entryType, entryId, contentEntryEl) {
         xhr.send();
         if (xhr.readyState === XMLHttpRequest.DONE) {
             if (xhr.status === 204) {
-                contentEntryEl.remove();
                 if (location.pathname === '/' + entryType + '/' + entryId + '.html') {
                     location.href = '/';
+                } else {
+                    contentEntryEl.remove();
                 }
             } else {
                 console.error('Failed to delete ' + entryType + '/' + entryId + ': ' + xhr.responseText);
