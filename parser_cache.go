@@ -18,7 +18,7 @@ var pageCacheData = make(map[string]pageEntityCacheData)
 
 var postCacheData = make(map[string]postEntityCacheData)
 
-func cacheContentEntity(fileName string, modTime time.Time, ce contentEntity) {
+func addContentEntityToCache(fileName string, modTime time.Time, ce contentEntity) {
 	switch ce.ContentEntityType() {
 	case Page:
 		pageCacheData[fileName] = pageEntityCacheData{
@@ -33,7 +33,7 @@ func cacheContentEntity(fileName string, modTime time.Time, ce contentEntity) {
 	}
 }
 
-func getCachedContentEntity(ceType contentEntityType, fileName string, modTime time.Time) contentEntity {
+func getContentEntityFromCache(ceType contentEntityType, fileName string, modTime time.Time) contentEntity {
 	switch ceType {
 	case Page:
 		if data, ok := pageCacheData[fileName]; ok {
@@ -49,4 +49,13 @@ func getCachedContentEntity(ceType contentEntityType, fileName string, modTime t
 		}
 	}
 	return nil
+}
+
+func removeContentEntityFromCache(ceType contentEntityType, fileName string) {
+	switch ceType {
+	case Page:
+		delete(pageCacheData, fileName)
+	case Post:
+		delete(postCacheData, fileName)
+	}
 }

@@ -56,7 +56,7 @@ func parsePages(config appConfig, resLoader resourceLoader, thumbHandler imageTh
 			pageEntryFileName := pageEntryInfo.Name()
 			pageEntryModTime := pageEntryInfo.ModTime()
 			if useCache {
-				ce := getCachedContentEntity(Page, pageEntryFileName, pageEntryModTime)
+				ce := getContentEntityFromCache(Page, pageEntryFileName, pageEntryModTime)
 				if ce != nil {
 					page := ce.(page)
 					page.skipProcessing = true
@@ -72,7 +72,7 @@ func parsePages(config appConfig, resLoader resourceLoader, thumbHandler imageTh
 			handleThumbnails(pageMediaDirPath, config, thumbHandler)
 			page := parsePage(pageId, string(content), config, resLoader)
 			if useCache {
-				cacheContentEntity(pageEntryFileName, pageEntryModTime, page)
+				addContentEntityToCache(pageEntryFileName, pageEntryModTime, page)
 			}
 			pages = append(pages, page)
 		}
@@ -107,7 +107,7 @@ func parsePosts(config appConfig, resLoader resourceLoader, thumbHandler imageTh
 			postEntryFileName := postEntryInfo.Name()
 			postEntryModTime := postEntryInfo.ModTime()
 			if useCache {
-				ce := getCachedContentEntity(Post, postEntryFileName, postEntryModTime)
+				ce := getContentEntityFromCache(Post, postEntryFileName, postEntryModTime)
 				if ce != nil {
 					post := ce.(post)
 					post.skipProcessing = true
@@ -123,7 +123,7 @@ func parsePosts(config appConfig, resLoader resourceLoader, thumbHandler imageTh
 			handleThumbnails(postMediaDirPath, config, thumbHandler)
 			post := parsePost(postId, string(content), config, resLoader)
 			if useCache {
-				cacheContentEntity(postEntryFileName, postEntryModTime, post)
+				addContentEntityToCache(postEntryFileName, postEntryModTime, post)
 			}
 			posts = append(posts, post)
 		}
@@ -378,6 +378,8 @@ func parseContentDirectives(entryId string, content string, config appConfig, re
 				}
 				phReps[ph] = strings.TrimSpace(inlineMediaMarkupBuffer.String())
 				content = strings.Replace(content, placeholder, ph, 1)
+			} else {
+				content = strings.Replace(content, placeholder, "", 1)
 			}
 		}
 	}
@@ -410,6 +412,8 @@ func parseContentDirectives(entryId string, content string, config appConfig, re
 				}
 				phReps[ph] = strings.TrimSpace(inlineMediaMarkupBuffer.String())
 				content = strings.Replace(content, placeholder, ph, 1)
+			} else {
+				content = strings.Replace(content, placeholder, "", 1)
 			}
 		}
 	}
@@ -443,13 +447,15 @@ func listAllMedia(entryId string, skipFiles []string) []string {
 	var allMedia []string
 	mediaDirPath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, entryId)
 	if dirExists(mediaDirPath) {
-		videoFiles := listFilesByExt(mediaDirPath, videoFileExtensions...)
+		videoFiles, err := listFilesByExt(mediaDirPath, videoFileExtensions...)
+		check(err)
 		for _, video := range videoFiles {
 			if !slices.Contains(skipFiles, video) {
 				allMedia = append(allMedia, video)
 			}
 		}
-		imageFiles := listFilesByExt(mediaDirPath, imageFileExtensions...)
+		imageFiles, err := listFilesByExt(mediaDirPath, imageFileExtensions...)
+		check(err)
 		for _, image := range imageFiles {
 			if !slices.Contains(skipFiles, image) && !strings.Contains(image, thumbImgFileSuffix) {
 				allMedia = append(allMedia, image)

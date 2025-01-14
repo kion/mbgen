@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 )
 
-func listFilesByExt(dir string, extensions ...string) []string {
+func listFilesByExt(dir string, extensions ...string) ([]string, error) {
 	var files []string
 	extSet := make(map[string]bool)
 	for _, v := range extensions {
@@ -21,8 +21,7 @@ func listFilesByExt(dir string, extensions ...string) []string {
 		}
 		return nil
 	})
-	check(err)
-	return files
+	return files, err
 }
 
 func copyDir(scrDir, dst string) {
@@ -128,7 +127,7 @@ func copySymLink(source, dest string) {
 	check(err)
 }
 
-func closeFile(file *os.File) {
+func closeFile(file io.Closer) {
 	err := file.Close()
 	check(err)
 }

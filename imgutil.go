@@ -15,7 +15,8 @@ func processImgThumbnails(imgDirPath string, config appConfig) {
 		// ==================================================
 		// delete any old / no longer needed thumbnails
 		// ==================================================
-		imgFiles := listFilesByExt(imgDirPath, thumbImageFileExtensions...)
+		imgFiles, err := listFilesByExt(imgDirPath, thumbImageFileExtensions...)
+		check(err)
 		if len(imgFiles) > 0 {
 			for _, imgFile := range imgFiles {
 				thm := thumbImgFileNameRegexp.FindStringSubmatch(imgFile)
@@ -33,7 +34,8 @@ func processImgThumbnails(imgDirPath string, config appConfig) {
 		// ==================================================
 		// generate thumbnails
 		// ==================================================
-		imgFiles = listFilesByExt(imgDirPath, thumbImageFileExtensions...)
+		imgFiles, err = listFilesByExt(imgDirPath, thumbImageFileExtensions...)
+		check(err)
 		for _, imgFile := range imgFiles {
 			if strings.Contains(imgFile, thumbImgFileSuffix) {
 				continue
@@ -99,7 +101,8 @@ func processImgThumbnails(imgDirPath string, config appConfig) {
 
 func deleteImgThumbnails(imgDirPath string, config appConfig) {
 	if dirExists(imgDirPath) && !config.useThumbs {
-		imgFiles := listFilesByExt(imgDirPath, thumbImageFileExtensions...)
+		imgFiles, err := listFilesByExt(imgDirPath, thumbImageFileExtensions...)
+		check(err)
 		if len(imgFiles) > 0 {
 			for _, imgFile := range imgFiles {
 				thm := thumbImgFileNameRegexp.FindStringSubmatch(imgFile)

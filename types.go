@@ -110,6 +110,16 @@ func (c contentEntityType) String() string {
 	panic("Undefined Content Entity Type")
 }
 
+func contentEntityTypeFromString(typeName string) contentEntityType {
+	switch strings.ToLower(typeName) {
+	case strings.ToLower(Page.String()):
+		return Page
+	case strings.ToLower(Post.String()):
+		return Post
+	}
+	return UndefinedContentEntityType
+}
+
 type templateContent struct {
 	EntityType contentEntityType
 	Title      string

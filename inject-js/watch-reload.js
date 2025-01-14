@@ -59,8 +59,8 @@ function reloadEntry(type, id, deleted, single, entryEl) {
             entryEl.remove();
         } else {
             const xhr = new XMLHttpRequest();
-            const typeId = type + '/' + id;
-            xhr.open('GET', '/' + typeId + '.html', false);
+            const typeIdPath = type + '/' + id;
+            xhr.open('GET', '/' + typeIdPath + '.html', false);
             xhr.send();
             if (xhr.readyState === XMLHttpRequest.DONE) {
                 if (xhr.status === 200) {
@@ -69,11 +69,11 @@ function reloadEntry(type, id, deleted, single, entryEl) {
                     const lMainEl = lDoc.getElementsByTagName('main')[0];
                     if (!single) {
                         const lHeaderEl = lMainEl.getElementsByTagName('header')[0];
-                        lHeaderEl.innerHTML += '<span class="links"><a href="/' + typeId + '.html" class="permalink"><i class="fa-solid fa-link"></i></a></span>';
+                        lHeaderEl.innerHTML += '<span class="links"><a href="/' + typeIdPath + '.html" class="permalink"><i class="fa-solid fa-link"></i></a></span>';
                     }
                     entryEl.outerHTML = lMainEl.innerHTML;
                 } else {
-                    console.error('failed to reload content for: ' + typeId);
+                    console.error('failed to reload content for: ' + typeIdPath);
                 }
             }
         }

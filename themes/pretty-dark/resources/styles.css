@@ -272,7 +272,6 @@ header a.permalink {
 }
 
 .content .media .image {
-    display: flex;
     width: calc(100% - 0.5em);
     height: auto;
     padding: 4px;
@@ -455,19 +454,42 @@ button {
 ==============================
 */
 
-body section.admin-create {
+.admin-controls {
     display: flex;
     column-gap: 1em;
     margin-top: 1em;
 }
 
-body section.admin-create button.admin-btn {
+.admin-controls .admin-btn {
     flex-grow: 1;
     border-color: #cc0000;
 }
 
-body section.admin-create button.admin-btn i {
-    margin-right: 0.5em;
+.admin-media-controls {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    column-gap: 0.5em;
+    font-size: 0.8em;
+    margin-top: 4px;
+}
+
+.admin-media-controls .admin-media-file-name {
+    overflow-wrap: anywhere;
+}
+
+.admin-media-controls .admin-media-delete {
+    cursor: pointer;
+    color: #cc0000;
+    &:hover {
+        color: #ff0000;
+    }
+}
+
+body .admin-create .admin-btn i,
+.admin-controls .admin-btn i {
+    margin: 0 0.5em;
 }
 
 .content .admin-edit {
@@ -476,12 +498,16 @@ body section.admin-create button.admin-btn i {
     row-gap: 1em;
 }
 
-body section.admin-create button.admin-btn,
+.admin-controls .admin-btn,
 header .links a.admin-link {
     color: #cc0000;
     &:hover {
         color: #ff0000;
     }
+}
+
+.admin-controls .admin-btn {
+    font-size: 1.2rem;
 }
 
 /* markdown editor dark mode */
