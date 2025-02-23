@@ -154,7 +154,7 @@ func _init(config appConfig, commandArgs ...string) {
 		createDir(markdownPagesDirName)
 		err := download(defaultGitHubRepoPageContentSamplesUrl, markdownPagesDirName)
 		if err != nil {
-			println(fmt.Sprintf("error downloading page content samples:\n\n" + err.Error()))
+			println(fmt.Sprintf("error downloading page content samples:\n\n%s", err.Error()))
 		} else {
 			println(" - downloaded page content samples")
 		}
@@ -165,7 +165,7 @@ func _init(config appConfig, commandArgs ...string) {
 		createDir(markdownPostsDirName)
 		err := download(defaultGitHubRepoPostContentSamplesUrl, markdownPostsDirName)
 		if err != nil {
-			println(fmt.Sprintf("error downloading post content samples:\n\n" + err.Error()))
+			println(fmt.Sprintf("error downloading post content samples:\n\n%s", err.Error()))
 		} else {
 			println(" - downloaded post content samples")
 		}
@@ -176,7 +176,7 @@ func _init(config appConfig, commandArgs ...string) {
 		createDir(deployDirName)
 		err := download(defaultGitHubRepoDeployDirContentSamplesUrl, deployDirName)
 		if err != nil {
-			println(fmt.Sprintf("error downloading deploy dir content samples:\n\n" + err.Error()))
+			println(fmt.Sprintf("error downloading deploy dir content samples:\n\n%s", err.Error()))
 		} else {
 			println(" - downloaded deploy dir content samples")
 		}
@@ -458,7 +458,7 @@ func _theme(config appConfig, commandArgs ...string) {
 			themeUrl := fmt.Sprintf("%s/%s", defaultGitHubRepoThemesUrl, theme)
 			err := download(themeUrl, themeDir)
 			if err != nil {
-				println(fmt.Sprintf("error installing theme:\n\n" + err.Error()))
+				println(fmt.Sprintf("error installing theme:\n\n%s", err.Error()))
 			} else {
 				copyThemeIncludes(theme)
 			}
@@ -473,7 +473,7 @@ func _theme(config appConfig, commandArgs ...string) {
 			deleteIfExists(themeDlDir)
 			err := download(themeUrl, themeDlDir)
 			if err != nil {
-				println(fmt.Sprintf("error updating theme:\n\n" + err.Error()))
+				println(fmt.Sprintf("error updating theme:\n\n%s", err.Error()))
 			} else {
 				recreateDir(themeDir)
 				copyDir(themeDlDir, themeDir)
