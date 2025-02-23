@@ -1,12 +1,13 @@
 package main
 
 import (
+	_ "embed"
 	"regexp"
 	"time"
 )
 
 const (
-	appVersion                                  = "1.5.5"
+	appVersion                                  = "1.5.7"
 	defaultGitHubRepoUrl                        = "github.com/kion/mbgen"
 	defaultGitHubRepoThemesUrl                  = defaultGitHubRepoUrl + "/themes"
 	defaultGitHubRepoPageContentSamplesUrl      = defaultGitHubRepoUrl + "/content-samples/pages"
@@ -30,6 +31,7 @@ const (
 	indexPageFileName                           = "index" + contentFileExtension
 	searchPageFileName                          = "search" + contentFileExtension
 	searchIndexFileName                         = "search.json"
+	searchJSFileName                            = "search.js"
 	directivePlaceholderReplacementFormat       = ":@@@:%s:@@@:"
 	hashTagMarkdownReplacementFormat            = "[#%s](/" + deployTagsDirName + "/%s/)"
 	stylesFileName                              = "styles.css"
@@ -112,3 +114,18 @@ var (
 	wrapPlaceholderRegexp                = /* const */ regexp.MustCompile(`\{([\w-_.]+)(\([\s\w=,]+\))?(:\s*([\w\s-_.,*]+))?}([^{}]*){/}`)
 	hashTagRegex                         = /* const */ regexp.MustCompile(`#(\p{L}+[_-]*\p{L}*)`)
 )
+
+//go:embed inject-js/admin.js
+var adminJS string
+
+//go:embed inject-js/watch-reload.js
+var watchReloadJS string
+
+//go:embed inject-js/search.js
+var searchJS string
+
+//go:embed inject-js/easymde.min.js
+var mdEditorJS string
+
+//go:embed inject-css/easymde.min.css
+var mdEditorCSS string

@@ -13,4 +13,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor i
 
 Ultrices neque ornare aenean euismod elementum. Sed lectus vestibulum mattis ullamcorper. Malesuada fames ac turpis egestas integer eget aliquet nibh. Lectus arcu bibendum at varius vel pharetra vel turpis nunc. Placerat vestibulum lectus mauris ultrices eros in cursus turpis massa.
 
+* [Link to another post]({%post:sample-post-3%})
+* [Link to another page]({%page:sample-page%})
+
 {/}

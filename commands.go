@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -319,6 +320,11 @@ func _cleanup(config appConfig, commandArgs ...string) {
 		if deleteIfExists(deploySearchPath) {
 			sprintln(" - deleted search page file: " + deploySearchPath)
 		}
+		deployResourcesDirPath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, resourcesDirName)
+		searchJSFilePath := fmt.Sprintf("%s%c%s", deployResourcesDirPath, os.PathSeparator, searchJSFileName)
+		if deleteIfExists(searchJSFilePath) {
+			sprintln(" - deleted search JS file: " + searchJSFilePath)
+		}
 	}
 }
 
@@ -334,6 +340,11 @@ func _generate(config appConfig, commandArgs ...string) {
 	themeResourcesDirPath := fmt.Sprintf("%s%c%s", config.theme, os.PathSeparator, resourcesDirName)
 	deployResourcesDirPath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, resourcesDirName)
 	copyDir(themeResourcesDirPath, deployResourcesDirPath)
+
+	if config.enableSearch {
+		searchJSFilePath := fmt.Sprintf("%s%c%s", deployResourcesDirPath, os.PathSeparator, searchJSFileName)
+		writeDataToFileIfChanged(searchJSFilePath, []byte(searchJS))
+	}
 
 	for _, level := range templateIncludeLevels {
 		stylesIncludeFilePath := getIncludeFilePath(stylesFileName, level, resLoader.config)

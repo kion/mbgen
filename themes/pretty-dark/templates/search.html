@@ -1,106 +1,18 @@
+<script src="/resources/search.js"></script>
 <section id="search">
+    <section id="search-help-content" style="display:none"></section>
     <section id="search-input">
         <form>
             <input type="text" name="q" id="search-query" autofocus>
-            <button type="submit">Search</button>
+            <button type="button" id="search-submit"></button>
+            <button type="button" id="search-help-toggle"></button>
         </form>
     </section>
-    <section id="search-summary" style="display:none"></section>
-    <section id="search-results"></section>
-    <section id="search-pager" style="display:none">
-        <button type="button" onclick="renderNextSearchResultsPage()">Load more</button>
+    <section id="search-output" style="display:none">
+        <section id="search-summary"></section>
+        <section id="search-results"></section>
+        <section id="search-pager" data-page-size="{{ .Config.PageSize }}">
+            <button type="button" id="search-load-next-page">Load more</button>
+        </section>
     </section>
 </section>
-
-<script>
-
-    const searchSummaryEl = document.getElementById('search-summary');
-    const searchResultsEl = document.getElementById('search-results');
-    const searchPagerEl = document.getElementById('search-pager');
-
-    const pageSize = parseInt('{{ .Config.PageSize }}');
-
-    let searchResults = null;
-
-    function search(query) {
-        if (query) {
-            const xhr = new XMLHttpRequest();
-            xhr.open('GET', '/search.json', false);
-            xhr.send();
-            if (xhr.readyState === XMLHttpRequest.DONE) {
-                if (xhr.status === 200) {
-                    const searchIndex = JSON.parse(xhr.responseText);
-                    processQuery(query, searchIndex);
-                } else {
-                    console.error("Failed to perform search for: " + query);
-                }
-            }
-        }
-    }
-
-    function processQuery(query, searchIndex) {
-        searchSummaryEl.innerHTML = '';
-        searchResultsEl.innerHTML = '';
-        searchResults = [];
-        let foundCnt = 0;
-        for (let typeId in searchIndex) {
-            let content = searchIndex[typeId];
-            if (content.includes(query.toLowerCase())) {
-                foundCnt++;
-                searchResults.push(typeId);
-            }
-        }
-        if (foundCnt > 0) {
-            searchSummaryEl.innerHTML = '<label>' + foundCnt + ' result' + (foundCnt > 1 ? 's' : '') + ' found</label>';
-            renderNextSearchResultsPage();
-        } else {
-            searchSummaryEl.innerHTML = '<label>No results found</label>';
-        }
-        searchSummaryEl.style.display = 'block';
-        if (renderAdmin) {
-            renderAdmin();
-        }
-    }
-
-    function renderNextSearchResultsPage() {
-        for (let i = 0; i < pageSize; i++) {
-            if (searchResults.length > 0) {
-                const typeId = searchResults.shift();
-                processContent(typeId, searchResultsEl);
-            }
-        }
-        if (searchResults.length > 0) {
-            searchPagerEl.style.display = 'block';
-        } else {
-            searchPagerEl.style.display = 'none';
-        }
-    }
-
-    function processContent(typeId) {
-        const xhr = new XMLHttpRequest();
-        xhr.open('GET', '/' + typeId + '.html', false);
-        xhr.send();
-        if (xhr.readyState === XMLHttpRequest.DONE) {
-            if (xhr.status === 200) {
-                const lDoc = document.implementation.createHTMLDocument();
-                lDoc.documentElement.innerHTML = xhr.responseText;
-                const lMainEl = lDoc.getElementsByTagName('main')[0];
-                const lHeaderEl = lMainEl.getElementsByTagName('header')[0];
-                lHeaderEl.innerHTML += '<span class="links"><a href="/' + typeId + '.html" class="permalink"><i class="fa-solid fa-link"></i></a></span>';
-                searchResultsEl.innerHTML += lMainEl.innerHTML;
-            } else {
-                console.error("Failed to load content for: " + typeId);
-            }
-        }
-    }
-
-    window.onload = function() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const query = urlParams.get('q');
-        if (query) {
-            document.getElementById('search-query').value = query;
-            search(query);
-        }
-    }
-
-</script>

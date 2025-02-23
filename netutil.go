@@ -16,18 +16,6 @@ import (
 	"time"
 )
 
-//go:embed inject-js/admin.js
-var adminJS string
-
-//go:embed inject-js/easymde.min.js
-var easyMdeJS string
-
-//go:embed inject-js/watch-reload.js
-var watchReloadJS string
-
-//go:embed inject-css/easymde.min.css
-var easyMdeCSS string
-
 func listenAndServe(addr string, admin bool, watch chan watchReloadData, config appConfig, resLoader resourceLoader) {
 	if !dirExists(deployDirName) {
 		exitWithError(deployDirName + " directory not found")
@@ -118,11 +106,11 @@ func listenAndServe(addr string, admin bool, watch chan watchReloadData, config 
 						1)
 					html = strings.Replace(html,
 						bodyClosingTag,
-						jsOpeningTag+easyMdeJS+jsClosingTag+bodyClosingTag,
+						jsOpeningTag+mdEditorJS+jsClosingTag+bodyClosingTag,
 						1)
 					html = strings.Replace(html,
 						headClosingTag,
-						styleOpeningTag+easyMdeCSS+styleClosingTag+bodyClosingTag,
+						styleOpeningTag+mdEditorCSS+styleClosingTag+bodyClosingTag,
 						1)
 				}
 				if watch != nil {
