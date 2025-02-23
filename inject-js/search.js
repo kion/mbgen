@@ -148,7 +148,7 @@ function processQuery(query, searchIndex) {
         searchSummaryEl.innerHTML = '<label>No records found</label>';
     }
     searchSummaryEl.style.display = 'block';
-    if (renderAdmin) {
+    if (typeof renderAdmin === 'function') {
         renderAdmin();
     }
     searchOutputEl.style.display = 'block';
