@@ -216,7 +216,7 @@ function adminMedia(entryType, entryId, contentEntryEl) {
                     '<section class="admin-media">' +
                         '<section id="' + entryMediaElId + '"></section>' +
                         '<form enctype="multipart/form-data" id="' + entryMediaElId + '-upload-form">' +
-                            '<input type="file" name="admin-media-upload-file" id="' + entryMediaElId + '-upload-file" style="display:none">' +
+                            '<input type="file" multiple accept="image/*" name="admin-media-upload-files" id="' + entryMediaElId + '-upload-file" style="display:none">' +
                         '</form>' +
                         '<section class="admin-controls">' +
                             '<button id="' + entryMediaElId + '-add" class="admin-btn"><i class="fa-solid fa-folder-plus"></i>Add Media</button>' +
@@ -225,29 +225,45 @@ function adminMedia(entryType, entryId, contentEntryEl) {
                     '</section>';
                 let mediaEditorEl = document.getElementById(entryMediaElId);
                 mediaEditorEl.outerHTML = xhr.responseText;
-                mediaEditorEl = contentEl.getElementsByClassName('admin-media')[0];
+                const handleMediaFormData = function(entryType, entryId, mediaUploadFormData) {
+                    uploadMediaFormData(entryType, entryId, mediaUploadFormData,
+                        function(responseText){
+                            mediaEditorEl = contentEl.getElementsByClassName('admin-media')[0];
+                            mediaEditorEl.outerHTML = responseText;
+                            adminMedia(entryType, entryId, contentEntryEl);
+                        },
+                        function(responseText){
+                            alert('failed to upload media');
+                            console.error('failed to upload media for ' + typeIdPath + ': ' + responseText);
+                        }
+                    );
+                }
                 const entryMediaUploadFile = document.getElementById(entryMediaElId + '-upload-file');
                 entryMediaUploadFile.onchange = function() {
                     const mediaUploadForm = document.getElementById(entryMediaElId + '-upload-form');
                     const mediaUploadFormData = new FormData(mediaUploadForm);
-                    const xhr = new XMLHttpRequest();
-                    xhr.open('POST', '/admin-media?type='+ entryType + '&id=' + entryId, false);
-                    xhr.send(mediaUploadFormData);
-                    if (xhr.readyState === XMLHttpRequest.DONE) {
-                        if (xhr.status === 201) {
-                            mediaEditorEl.outerHTML = xhr.responseText;
-                            mediaEditorEl = contentEl.getElementsByClassName('admin-media')[0];
-                            adminMedia(entryType, entryId, contentEntryEl);
-                        } else {
-                            alert('failed to upload media');
-                            console.error('failed to upload media for ' + typeIdPath + ': ' + xhr.responseText);
-                        }
-                    }
+                    handleMediaFormData(entryType, entryId, mediaUploadFormData);
                 }
                 const entryMediaAddEl = document.getElementById(entryMediaElId + '-add');
                 entryMediaAddEl.onclick = function() {
                     entryMediaUploadFile.click();
                 }
+                entryMediaAddEl.ondragover = function(ev) {
+                    ev.preventDefault();
+                }
+                entryMediaAddEl.ondrop = function(ev) {
+                    ev.preventDefault();
+                    const dt = ev.dataTransfer;
+                    const files = dt.files;
+                    for (let i = 0; i < files.length; i++) {
+                        const file = files[i];
+                        const mediaUploadForm = document.getElementById(entryMediaElId + '-upload-form');
+                        const mediaUploadFormData = new FormData(mediaUploadForm);
+                        mediaUploadFormData.append('admin-media-upload-files', file);
+                        handleMediaFormData(entryType, entryId, mediaUploadFormData);
+                    }
+                }
+                mediaEditorEl = contentEl.getElementsByClassName('admin-media')[0];
                 const imageEls = mediaEditorEl.getElementsByClassName('image');
                 const videoEls = mediaEditorEl.getElementsByClassName('video');
                 const mediaEls = [...imageEls, ...videoEls];
@@ -272,7 +288,6 @@ function adminMedia(entryType, entryId, contentEntryEl) {
                             if (xhr.readyState === XMLHttpRequest.DONE) {
                                 if (xhr.status === 205) {
                                     mediaEditorEl.outerHTML = xhr.responseText;
-                                    mediaEditorEl = contentEl.getElementsByClassName('admin-media')[0];
                                     adminMedia(entryType, entryId, contentEntryEl);
                                 } else {
                                     alert('failed to delete media');
@@ -306,6 +321,19 @@ function adminMedia(entryType, entryId, contentEntryEl) {
                 alert('failed to load media');
                 console.error('failed to load media for ' + typeIdPath + ': ' + xhr.responseText);
             }
+        }
+    }
+}
+
+function uploadMediaFormData(entryType, entryId, mediaUploadFormData, successCallbackFn, failureCallbackFn) {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/admin-media?type='+ entryType + '&id=' + entryId, false);
+    xhr.send(mediaUploadFormData);
+    if (xhr.readyState === XMLHttpRequest.DONE) {
+        if (xhr.status === 201) {
+            successCallbackFn(xhr.responseText);
+        } else {
+            failureCallbackFn(xhr.responseText);
         }
     }
 }

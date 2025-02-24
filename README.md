@@ -320,7 +320,3 @@ or can even be completely omitted from the config):
 Distributed under the GNU AGPLv3 license.
 
 See [LICENSE](https://github.com/kion/mbgen/blob/main/LICENSE) for more information.
-
-## Open Source Software Credits
-
-* [EasyMDE](https://github.com/Ionaru/easy-markdown-editor) - Markdown Editor (licensed under the [MIT License](https://github.com/Ionaru/easy-markdown-editor/blob/master/LICENSE))

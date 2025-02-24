@@ -221,25 +221,43 @@ func listenAndServe(addr string, admin bool, watch chan watchReloadData, config 
 					listMediaResponse(writer, mediaFileNames, entryId, config, resLoader)
 				}
 			} else if request.Method == http.MethodPost {
-				upMediaFile, upMediaFileHeader, _ := request.FormFile("admin-media-upload-file")
-				closeFile(upMediaFile)
-				mediaDirPath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, entryId)
-				createDirIfNotExists(mediaDirPath)
-				mediaFilePath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, entryId, os.PathSeparator, upMediaFileHeader.Filename)
-				mediaFile, err := os.Create(mediaFilePath)
-				defer closeFile(mediaFile)
-				if err == nil {
-					_, err = io.Copy(mediaFile, upMediaFile)
-				}
+				err := request.ParseMultipartForm(12 << 20) // 12 MB max file size
 				if err != nil {
 					printErr(err)
-					http.Error(writer, "Failed to upload media file: "+err.Error(), http.StatusInternalServerError)
+					http.Error(writer, "Failed to parse form data", http.StatusBadRequest)
 					return
-				} else {
-					writer.WriteHeader(http.StatusCreated)
-					mediaFileNames := listAllMedia(entryId, nil)
-					listMediaResponse(writer, mediaFileNames, entryId, config, resLoader)
-					regenerateEntry = true
+				}
+				upMediaFiles := request.MultipartForm.File["admin-media-upload-files"]
+				if upMediaFiles == nil {
+					http.Error(writer, "No files uploaded", http.StatusBadRequest)
+					return
+				}
+				for _, upMediaFileHeader := range upMediaFiles {
+					upMediaFile, err := upMediaFileHeader.Open()
+					defer closeFile(upMediaFile)
+					if err != nil {
+						printErr(err)
+						http.Error(writer, "Failed to process uploaded media file: "+err.Error(), http.StatusInternalServerError)
+						return
+					}
+					mediaDirPath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, entryId)
+					createDirIfNotExists(mediaDirPath)
+					mediaFilePath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, entryId, os.PathSeparator, upMediaFileHeader.Filename)
+					mediaFile, err := os.Create(mediaFilePath)
+					defer closeFile(mediaFile)
+					if err == nil {
+						_, err = io.Copy(mediaFile, upMediaFile)
+					}
+					if err != nil {
+						printErr(err)
+						http.Error(writer, "Failed to upload media file: "+err.Error(), http.StatusInternalServerError)
+						return
+					} else {
+						writer.WriteHeader(http.StatusCreated)
+						mediaFileNames := listAllMedia(entryId, nil)
+						listMediaResponse(writer, mediaFileNames, entryId, config, resLoader)
+						regenerateEntry = true
+					}
 				}
 			} else if request.Method == http.MethodDelete {
 				fileName := request.URL.Query().Get("fileName")
