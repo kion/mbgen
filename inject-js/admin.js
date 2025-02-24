@@ -1,3 +1,6 @@
+const supportedMediaFileExt = ['.jpg', '.jpeg', '.png', '.gif', '.mp4', '.mkv', '.mov'];
+const supportedMediaFileExtStr = supportedMediaFileExt.join(',');
+
 (function() {
     renderAdmin();
 })();
@@ -216,7 +219,7 @@ function adminMedia(entryType, entryId, contentEntryEl) {
                     '<section class="admin-media">' +
                         '<section id="' + entryMediaElId + '"></section>' +
                         '<form enctype="multipart/form-data" id="' + entryMediaElId + '-upload-form">' +
-                            '<input type="file" multiple accept="image/*" name="admin-media-upload-files" id="' + entryMediaElId + '-upload-file" style="display:none">' +
+                            '<input type="file" multiple accept="' + supportedMediaFileExtStr + '" name="admin-media-upload-files" id="' + entryMediaElId + '-upload-file" style="display:none">' +
                         '</form>' +
                         '<section class="admin-controls">' +
                             '<button id="' + entryMediaElId + '-add" class="admin-btn"><i class="fa-solid fa-folder-plus"></i>Add Media</button>' +
@@ -257,10 +260,12 @@ function adminMedia(entryType, entryId, contentEntryEl) {
                     const files = dt.files;
                     for (let i = 0; i < files.length; i++) {
                         const file = files[i];
-                        const mediaUploadForm = document.getElementById(entryMediaElId + '-upload-form');
-                        const mediaUploadFormData = new FormData(mediaUploadForm);
-                        mediaUploadFormData.append('admin-media-upload-files', file);
-                        handleMediaFormData(entryType, entryId, mediaUploadFormData);
+                        if (supportedMediaFileExt.includes(file.name.substring(file.name.lastIndexOf('.')))) {
+                            const mediaUploadForm = document.getElementById(entryMediaElId + '-upload-form');
+                            const mediaUploadFormData = new FormData(mediaUploadForm);
+                            mediaUploadFormData.append('admin-media-upload-files', file);
+                            handleMediaFormData(entryType, entryId, mediaUploadFormData);
+                        }
                     }
                 }
                 mediaEditorEl = contentEl.getElementsByClassName('admin-media')[0];
