@@ -7,12 +7,13 @@ const supportedMediaFileExtStr = supportedMediaFileExt.join(',');
 
 function renderAdmin() {
     const uri = location.pathname;
-    if (uri === '/' || uri === '/index.html') {
+    const home = uri === '/' || uri === '/index.html';
+    if (home) {
         const headerEl = document.getElementsByTagName('header')[0];
         renderAdminCreateButtons(headerEl);
     }
-    const archive = uri.startsWith('/archive/');
-    const tags = !archive && uri.startsWith('/tags/');
+    const archive = !home && uri === '/archive/';
+    const tags = !home && !archive && uri === '/tags/';
     if (!archive && !tags) {
         const mainEl = document.getElementsByTagName('main')[0];
         const contentEntryEls = mainEl.getElementsByClassName('content-entry');
@@ -128,8 +129,8 @@ function adminEdit(entryType, entryId, contentEntryEl) {
                     '<section class="admin-edit">' +
                         '<textarea id="' + entryEditElId + '"></textarea>' +
                         '<section class="admin-controls">' +
-                            '<button class="admin-btn" id="' + entryEditElId + '-save"><i class="fa-solid fa-save"></i>Save Changes</button>' +
                             '<button class="admin-btn" id="' + entryEditElId + '-close"><i class="fa-solid fa-circle-xmark"></i>Close / Discard Changes</button>' +
+                            '<button class="admin-btn" id="' + entryEditElId + '-save"><i class="fa-solid fa-save"></i>Save Changes</button>' +
                         '</section>' +
                     '</section>';
                 const contentEditor = new EasyMDE({

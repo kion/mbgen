@@ -14,7 +14,7 @@ var (
 	commandVersion = /* const */ appCommandDescriptor{
 		command:     "version",
 		description: "print out version info",
-		usage:       "mbgen version",
+		usage:       "mbgen version\n",
 		reqConfig:   false,
 	}
 	commandHelp = /* const */ appCommandDescriptor{
@@ -22,7 +22,7 @@ var (
 		description: "print out help/usage information",
 		usage: "mbgen help <command>\n\n" +
 			"where <command> is one of the following supported commands to print out help/usage information for:\n\n" +
-			"init, generate, stats, serve, theme, cleanup, version",
+			"init, generate, serve, inspect, cleanup, theme, stats, version\n",
 		reqConfig: false,
 		optArgCnt: 1,
 	}
@@ -61,25 +61,32 @@ var (
 	commandGenerate = /* const */ appCommandDescriptor{
 		command:     "generate",
 		description: "parse content and generate site",
-		usage: "mbgen generate\n\n" +
-			"must be run from a working dir containing " + configFileName + " file",
+		usage:       "mbgen generate\n\n",
+		reqConfig:   true,
+	}
+	commandInspect = /* const */ appCommandDescriptor{
+		command:     "inspect",
+		description: "inspect content and report/fix any issues found",
+		usage: "mbgen inspect [" + commandInspectOptionFix + "]\n\n" +
+			"the following flags can be specified:\n" +
+			" " + commandInspectOptionFix + " - to automatically fix all detected issues; namely:\n" +
+			"   - resize and replace the original images that exceed the `maxImgSize` config option value\n\n",
 		reqConfig: true,
+		optArgCnt: 1,
 	}
 	commandStats = /* consts */ appCommandDescriptor{
 		command:     "stats",
 		description: "parse content and print out stats",
-		usage: "mbgen stats\n\n" +
-			"must be run from a working dir containing " + configFileName + " file",
-		reqConfig: true,
+		usage:       "mbgen stats\n\n",
+		reqConfig:   true,
 	}
 	commandServe = /* const */ appCommandDescriptor{
 		command:     "serve",
 		description: "start a web server to serve the site",
 		usage: "mbgen serve [" + commandServeOptionWatchReload + "]\n\n" +
-			"must be run from a working dir containing " + configFileName + " file and " + deployDirName + " directory with generated assets\n\n" +
-			" ONE of the following flags can be specified:\n" +
+			"ONE of the following flags can be specified:\n" +
 			" " + commandServeOptionAdmin + " - to render content admin links\n" +
-			" " + commandServeOptionWatchReload + " - to automatically regenerate the site and see the changes being reflected in the browser in real-time when you change any of the markdown content (.md) files in the " + markdownPagesDirName + " or " + markdownPostsDirName + " dirs\n",
+			" " + commandServeOptionWatchReload + " - to automatically regenerate the site and see the changes being reflected in the browser in real-time when you change any of the markdown content (.md) files in the " + markdownPagesDirName + " or " + markdownPostsDirName + " dirs\n\n",
 		reqConfig: true,
 		optArgCnt: 1,
 	}
@@ -98,7 +105,7 @@ var (
 			"   - " + commandThemeActionRefresh + ": copies all the relevant/missing theme include files into the " + includeDirName + "dir inside the working dir\n\n" +
 			"   - " + commandThemeActionDelete + ": deletes all the assets of the specified theme, if it's not being currently in use\n\n" +
 			" - <theme-name> is the name of a theme to perform the specified action on,\n\n" +
-			"   - the default theme name is: \"" + defaultThemeName + "\", but you can also use the \"" + defaultThemeAlias + "\" alias instead",
+			"   - the default theme name is: \"" + defaultThemeName + "\", but you can also use the \"" + defaultThemeAlias + "\" alias instead\n\n",
 		reqConfig: true,
 	}
 )
@@ -110,6 +117,7 @@ func getSupportedCommands() map[string]tuple2[appCommand, appCommandDescriptor] 
 		commandInit.command:     {_init, commandInit},
 		commandCleanup.command:  {_cleanup, commandCleanup},
 		commandGenerate.command: {_generate, commandGenerate},
+		commandInspect.command:  {_inspect, commandInspect},
 		commandStats.command:    {_stats, commandStats},
 		commandServe.command:    {_serve, commandServe},
 		commandTheme.command:    {_theme, commandTheme},
@@ -346,14 +354,32 @@ func _generate(config appConfig, commandArgs ...string) {
 		writeDataToFileIfChanged(searchJSFilePath, []byte(searchJS))
 	}
 
-	for _, level := range templateIncludeLevels {
-		stylesIncludeFilePath := getIncludeFilePath(stylesFileName, level, resLoader.config)
-		if stylesIncludeFilePath != "" {
-			copyFile(stylesIncludeFilePath, fmt.Sprintf("%s%c%s", deployResourcesDirPath, os.PathSeparator, fmt.Sprintf(stylesIncludeFileNameFormat, level.String())))
+	processAndHandleStats(config, resLoader, false)
+}
+
+func _inspect(config appConfig, commandArgs ...string) {
+	if commandArgs != nil && len(commandArgs) > 0 {
+		if len(commandArgs) == 1 {
+			if commandArgs[0] == commandInspectOptionFix {
+				processOriginalMediaFiles(config, false)
+			} else {
+				sprintln("error: invalid inspect command argument: " + commandArgs[0])
+				usageHelp := "usage:\n\n" + commandInspect.usage
+				usage(usageHelp, 1)
+			}
+		} else {
+			sprintln("error: invalid number of inspect command arguments (max allowed: " + strconv.Itoa(commandInspect.optArgCnt) + ")")
+			usageHelp := "usage:\n\n" + commandInspect.usage
+			usage(usageHelp, 1)
+		}
+	} else {
+		if processOriginalMediaFiles(config, true) {
+			sprintln(" - run the following command to fix the issues found:\n\n" +
+				"   mbgen inspect " + commandInspectOptionFix)
+		} else {
+			sprintln(" - no issues found")
 		}
 	}
-
-	processAndHandleStats(config, resLoader, false)
 }
 
 func _stats(config appConfig, commandArgs ...string) {
@@ -374,49 +400,25 @@ func _serve(config appConfig, commandArgs ...string) {
 				admin = true
 			} else if arg == commandServeOptionWatchReload {
 				wChan = make(chan watchReloadData)
-				go watchDirForChanges(markdownPagesDirName, markdownFileExtension, func(changedFilePath string, deleted bool) {
-					filePath := strings.Split(changedFilePath, string(os.PathSeparator))
+				mdFileExt := []string{markdownFileExtension}
+				go watchDirForChanges(markdownPagesDirName, mdFileExt, false, func(dwEvent dirWatchEvent) {
+					filePath := strings.Split(dwEvent.filePath, string(os.PathSeparator))
 					fileName := filePath[len(filePath)-1]
 					pageId := fileName[:len(fileName)-len(filepath.Ext(fileName))]
-					pageDeleted := deleted || !fileExists(changedFilePath)
-					if !pageDeleted {
-						println(" - [watch] page markdown file added/updated: " + changedFilePath)
-						processAndHandleStats(config, resLoader, true)
-					} else {
-						println(" - [watch] page markdown file deleted: " + changedFilePath)
-						deployPageFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployPageDirName, os.PathSeparator, pageId+contentFileExtension)
-						if deleteIfExists(deployPageFilePath) {
-							sprintln(" - deleted page content file: " + deployPageFilePath)
-						}
-						processAndHandleStats(config, resLoader, true)
-					}
-					wChan <- watchReloadData{
-						Type:    Page,
-						Id:      pageId,
-						Deleted: pageDeleted,
-					}
+					handleMdContentDirWatchEvent(dwEvent, Page, pageId, config, resLoader, wChan)
 				})
-				go watchDirForChanges(markdownPostsDirName, markdownFileExtension, func(changedFilePath string, deleted bool) {
-					filePath := strings.Split(changedFilePath, string(os.PathSeparator))
+				go watchDirForChanges(markdownPostsDirName, mdFileExt, false, func(dwEvent dirWatchEvent) {
+					filePath := strings.Split(dwEvent.filePath, string(os.PathSeparator))
 					fileName := filePath[len(filePath)-1]
 					postId := fileName[:len(fileName)-len(filepath.Ext(fileName))]
-					postDeleted := deleted || !fileExists(changedFilePath)
-					if !postDeleted {
-						println(" - [watch] post markdown file added/updated: " + changedFilePath)
-						processAndHandleStats(config, resLoader, true)
-					} else {
-						println(" - [watch] post markdown file deleted: " + changedFilePath)
-						deployPostFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployPostDirName, os.PathSeparator, postId+contentFileExtension)
-						if deleteIfExists(deployPostFilePath) {
-							sprintln(" - deleted post content file: " + deployPostFilePath)
-						}
-						processAndHandleStats(config, resLoader, true)
-					}
-					wChan <- watchReloadData{
-						Type:    Post,
-						Id:      postId,
-						Deleted: postDeleted,
-					}
+					handleMdContentDirWatchEvent(dwEvent, Post, postId, config, resLoader, wChan)
+				})
+				mediaDir := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, mediaDirName)
+				go watchDirForChanges(mediaDir, thumbImageFileExtensions, true, func(dwEvent dirWatchEvent) {
+					filePath := strings.Split(dwEvent.filePath, string(os.PathSeparator))
+					ceType := contentEntityTypeFromString(filePath[len(filePath)-3])
+					ceId := filePath[len(filePath)-2]
+					handleMediaDirWatchEvent(dwEvent, ceType, ceId, config, resLoader, wChan)
 				})
 			} else {
 				sprintln("error: invalid serve command argument: " + commandArgs[0])
@@ -430,6 +432,128 @@ func _serve(config appConfig, commandArgs ...string) {
 		}
 	}
 	listenAndServe(fmt.Sprintf("%s:%d", config.serveHost, config.servePort), admin, wChan, config, resLoader)
+}
+
+func handleMdContentDirWatchEvent(dwEvent dirWatchEvent, contentEntityType contentEntityType, contentEntityId string, config appConfig, resLoader resourceLoader, wChan chan watchReloadData) {
+	ceType := strings.ToLower(contentEntityType.String())
+	switch dwEvent.op {
+	case dirWatchOpCreate:
+		sprintln(" - [watch] "+ceType+" markdown file created: ", dwEvent.filePath)
+	case dirWatchOpUpdate:
+		sprintln(" - [watch] "+ceType+" markdown file updated: ", dwEvent.filePath)
+	case dirWatchOpRename:
+		sprintln(" - [watch] "+ceType+" markdown file renamed: ",
+			"   original file: "+*dwEvent.originalFilePath,
+			"   renamed to: "+dwEvent.filePath)
+		originalMdContentFileName := filepath.Base(*dwEvent.originalFilePath)
+		originalContentEntityId := originalMdContentFileName[:len(originalMdContentFileName)-len(filepath.Ext(originalMdContentFileName))]
+		// ==================================================
+		// delete the corresponding old content file
+		// (a new one will be generated)
+		// ==================================================
+		originalContentFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, ceType, os.PathSeparator, originalContentEntityId+contentFileExtension)
+		deleteIfExists(originalContentFilePath)
+		sprintln(" - deleted old content file: " + originalContentFilePath)
+		// ==================================================
+		// rename the corresponding media directory
+		// ==================================================
+		originalMediaDirPath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, ceType, os.PathSeparator, originalContentEntityId)
+		newMediaDirPath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, ceType, os.PathSeparator, contentEntityId)
+		renameFile(originalMediaDirPath, newMediaDirPath)
+		sprintln(" - renamed media dir: " + originalMediaDirPath + " -> " + newMediaDirPath)
+		// ==================================================
+	case dirWatchOpDelete:
+		sprintln(" - [watch] "+ceType+" markdown file deleted: ", dwEvent.filePath)
+		// ==================================================
+		// delete the corresponding content file
+		// ==================================================
+		contentFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, ceType, os.PathSeparator, contentEntityId+contentFileExtension)
+		deleteIfExists(contentFilePath)
+		sprintln(" - deleted content file: " + contentFilePath)
+		// ==================================================
+		// delete the corresponding media directory
+		// ==================================================
+		mediaDirPath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, ceType, os.PathSeparator, contentEntityId)
+		deleteIfExists(mediaDirPath)
+		sprintln(" - deleted media dir: " + mediaDirPath)
+		// ==================================================
+		// delete tag files for the no longer referenced tags
+		// ==================================================
+		_cleanup(config, commandCleanupTargetTags)
+		// ==================================================
+	}
+	removeContentEntityFromCache(contentEntityType, contentEntityId+markdownFileExtension)
+	processAndHandleStats(config, resLoader, true)
+	wChan <- watchReloadData{
+		Type: contentEntityType,
+		Id:   contentEntityId,
+		Op:   dwEvent.op,
+	}
+}
+
+func handleMediaDirWatchEvent(dwEvent dirWatchEvent, contentEntityType contentEntityType, contentEntityId string, config appConfig, resLoader resourceLoader, wChan chan watchReloadData) {
+	ceType := strings.ToLower(contentEntityType.String())
+	var removedImageFileName *string
+	switch dwEvent.op {
+	case dirWatchOpCreate:
+		sprintln(" - [watch] "+ceType+" media file created: ", dwEvent.filePath)
+	case dirWatchOpUpdate:
+		sprintln(" - [watch] "+ceType+" media file updated: ", dwEvent.filePath)
+	case dirWatchOpRename:
+		sprintln(" - [watch] "+ceType+" media file renamed: ",
+			"   original file: "+*dwEvent.originalFilePath,
+			"   renamed to: "+dwEvent.filePath)
+		originalMediaFileName := filepath.Base(*dwEvent.originalFilePath)
+		originalMediaFileNameExt := filepath.Ext(originalMediaFileName)
+		if slices.Contains(thumbImageFileExtensions, originalMediaFileNameExt) {
+			removedImageFileName = &originalMediaFileName
+		}
+	case dirWatchOpDelete:
+		sprintln(" - [watch] "+ceType+" media file deleted: ", dwEvent.filePath)
+		removedMediaFileName := filepath.Base(dwEvent.filePath)
+		removedMediaFileNameExt := filepath.Ext(removedMediaFileName)
+		if slices.Contains(thumbImageFileExtensions, removedMediaFileNameExt) {
+			removedImageFileName = &removedMediaFileName
+		}
+	}
+	if removedImageFileName != nil {
+		mediaDirPath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, ceType, os.PathSeparator, contentEntityId)
+		if dirExists(mediaDirPath) {
+			// ==================================================
+			// remove the original/old image file thumbnails
+			// ==================================================
+			imageFileNames, err := listFilesByExt(mediaDirPath, thumbImageFileExtensions...)
+			if err == nil && len(imageFileNames) > 0 {
+				for _, imageFileName := range imageFileNames {
+					if strings.HasPrefix(imageFileName, *removedImageFileName) {
+						oldThumbFilePath := fmt.Sprintf("%s%c%s", mediaDirPath, os.PathSeparator, imageFileName)
+						err = os.Remove(oldThumbFilePath)
+						if err != nil {
+							sprintln(" - error deleting old thumbnail file: "+oldThumbFilePath, err)
+						} else {
+							sprintln(" - deleted old thumbnail file: " + oldThumbFilePath)
+						}
+					}
+				}
+			}
+			// ==================================================
+		}
+	}
+	mdContentFileName := contentEntityId + markdownFileExtension
+	mdContentFilePath := fmt.Sprintf("%s%c%s", ceType+"s", os.PathSeparator, mdContentFileName)
+	if fileExists(mdContentFilePath) {
+		removeContentEntityFromCache(contentEntityType, mdContentFileName)
+		processAndHandleStats(config, resLoader, true)
+		wChan <- watchReloadData{
+			Type: contentEntityType,
+			Id:   contentEntityId,
+			Op:   dirWatchOpUpdate,
+		}
+	} else {
+		processOriginalMediaFile(dwEvent.filePath, config, false)
+		mediaDirPath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, ceType, os.PathSeparator, contentEntityId)
+		processImgThumbnails(mediaDirPath, config)
+	}
 }
 
 func _theme(config appConfig, commandArgs ...string) {

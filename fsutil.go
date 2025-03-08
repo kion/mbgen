@@ -7,6 +7,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
 )
 
 func listFilesByExt(dir string, extensions ...string) ([]string, error) {
@@ -65,6 +67,11 @@ func copyFile(srcFile, dstFile string) {
 	defer closeFile(in)
 
 	_, err = io.Copy(out, in)
+	check(err)
+}
+
+func renameFile(srcFile, dstFile string) {
+	err := os.Rename(srcFile, dstFile)
 	check(err)
 }
 
@@ -171,7 +178,7 @@ func getFileSizeInMb(filePath string) (float64, error) {
 	return fileSizeInMb, nil
 }
 
-func watchDirForChanges(dir string, fileExt string, handler dirChangeHandler) {
+func watchDirForChanges(dir string, fileExt []string, recursive bool, handler dirWatchHandler) {
 	watcher, err := fsnotify.NewWatcher()
 	check(err)
 
@@ -180,16 +187,73 @@ func watchDirForChanges(dir string, fileExt string, handler dirChangeHandler) {
 		check(err)
 	}(watcher)
 
+	var watchDir func(string)
+	watchDir = func(currentDir string) {
+		err = watcher.Add(currentDir)
+		check(err)
+		if recursive {
+			entries, err := os.ReadDir(currentDir)
+			check(err)
+			for _, entry := range entries {
+				if entry.IsDir() {
+					watchDir(filepath.Join(currentDir, entry.Name()))
+				}
+			}
+		}
+	}
+
 	go func() {
-		println(" - watching dir for changes: " + dir + "\n")
+		if recursive {
+			println(" - watching dir for changes (recursive): " + dir + "\n")
+		} else {
+			println(" - watching dir for changes: " + dir + "\n")
+		}
 		for {
 			select {
 			case event, ok := <-watcher.Events:
 				if !ok {
 					return
 				}
-				if filepath.Ext(event.Name) == fileExt {
-					handler(event.Name, event.Has(fsnotify.Remove))
+				fName := filepath.Base(event.Name)
+				fExt := filepath.Ext(fName)
+				fileMatch := slices.Contains(fileExt, fExt) && thumbImgFileNameRegexp.FindStringSubmatch(fName) == nil
+				if recursive || fileMatch {
+					filePath := event.Name
+					isDir := !fileMatch && dirExists(filePath)
+					if !fileMatch && !isDir {
+						// skip irrelevant files
+						continue
+					}
+					var op dirWatchOp
+					var originalFilePath *string
+					switch {
+					case event.Op&fsnotify.Create == fsnotify.Create:
+						renamedFilePath := reflect.ValueOf(&event).Elem().FieldByName("renamedFrom").String()
+						if renamedFilePath == "" {
+							op = dirWatchOpCreate
+						} else {
+							originalFilePath = &renamedFilePath
+							op = dirWatchOpRename
+						}
+					case event.Op&fsnotify.Write == fsnotify.Write:
+						if slices.Contains(imageFileExtensions, fExt) || slices.Contains(videoFileExtensions, fExt) {
+							continue
+						}
+						op = dirWatchOpUpdate
+					case event.Op&fsnotify.Remove == fsnotify.Remove:
+						op = dirWatchOpDelete
+					case event.Op&fsnotify.Rename == fsnotify.Rename:
+						// skip - a subsequent `create` event with a `renamedFrom` value will be triggered
+						continue
+					default:
+						// skip irrelevant events
+						continue
+					}
+					if fileMatch {
+						handler(dirWatchEvent{filePath: filePath, originalFilePath: originalFilePath, op: op})
+					} else if recursive && isDir && (op == dirWatchOpCreate || op == dirWatchOpRename) {
+						watchDir(filePath)
+					}
 				}
 			case err, ok := <-watcher.Errors:
 				if !ok {
@@ -200,8 +264,7 @@ func watchDirForChanges(dir string, fileExt string, handler dirChangeHandler) {
 		}
 	}()
 
-	err = watcher.Add(dir)
-	check(err)
+	watchDir(dir)
 
 	<-make(chan bool)
 }

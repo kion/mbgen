@@ -68,7 +68,7 @@ func parsePages(config appConfig, resLoader resourceLoader, thumbHandler imageTh
 			content, err := os.ReadFile(pageEntryPath)
 			check(err)
 			pageId := pageEntryFileName[:len(pageEntryFileName)-len(filepath.Ext(pageEntryFileName))]
-			pageMediaDirPath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, pageId)
+			pageMediaDirPath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, deployPageDirName, os.PathSeparator, pageId)
 			handleThumbnails(pageMediaDirPath, config, thumbHandler)
 			page := parsePage(pageId, string(content), config, resLoader)
 			if useCache {
@@ -119,7 +119,7 @@ func parsePosts(config appConfig, resLoader resourceLoader, thumbHandler imageTh
 			content, err := os.ReadFile(postEntryPath)
 			check(err)
 			postId := postEntryFileName[:len(postEntryFileName)-len(filepath.Ext(postEntryFileName))]
-			postMediaDirPath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, postId)
+			postMediaDirPath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, deployPostDirName, os.PathSeparator, postId)
 			handleThumbnails(postMediaDirPath, config, thumbHandler)
 			post := parsePost(postId, string(content), config, resLoader)
 			if useCache {
@@ -134,7 +134,7 @@ func parsePosts(config appConfig, resLoader resourceLoader, thumbHandler imageTh
 
 func parsePage(pageId string, content string, config appConfig, resLoader resourceLoader) page {
 	page := page{Id: pageId}
-	content, rawBodyContent, cdPhReps, _ := parseContentDirectives(pageId, content, config, resLoader)
+	content, rawBodyContent, cdPhReps, _ := parseContentDirectives(Page, pageId, content, config, resLoader)
 	var buf bytes.Buffer
 	context := parser.NewContext()
 	err := markdown.Convert([]byte(content), &buf, parser.WithContext(context))
@@ -168,7 +168,7 @@ func parsePost(postId string, content string, config appConfig, resLoader resour
 		content = metaDataPlaceholderRegexp.ReplaceAllString(content, metadataContent)
 	}
 	// ================================================================================
-	content, rawBodyContent, cdPhReps, hashTags := parseContentDirectives(postId, content, config, resLoader)
+	content, rawBodyContent, cdPhReps, hashTags := parseContentDirectives(Post, postId, content, config, resLoader)
 	var buf bytes.Buffer
 	context := parser.NewContext()
 	err := markdown.Convert([]byte(content), &buf, parser.WithContext(context))
@@ -227,7 +227,7 @@ func handleThumbnails(mediaDirPath string, config appConfig, thumbHandler imageT
 	}
 }
 
-func parseContentDirectives(entryId string, content string, config appConfig, resLoader resourceLoader) (string, string, map[string]string, []string) {
+func parseContentDirectives(ceType contentEntityType, ceId string, content string, config appConfig, resLoader resourceLoader) (string, string, map[string]string, []string) {
 	rawBodyContent := metaDataPlaceholderRegexp.ReplaceAllString(content, "")
 	rawBodyContent = contentDirectivePlaceholderRegexp.ReplaceAllString(rawBodyContent, "")
 	rawBodyContent = whitespacePlaceholderRegexp.ReplaceAllString(rawBodyContent, " ")
@@ -313,17 +313,17 @@ func parseContentDirectives(entryId string, content string, config appConfig, re
 			}
 			var mediaFileNames []string
 			if mediaArg == "" {
-				mediaFileNames = listAllMedia(entryId, expListMedia)
+				mediaFileNames = listAllMedia(ceType, ceId, expListMedia)
 			} else {
 				for _, a := range strings.Split(mediaArg, ",") {
 					m := strings.TrimSpace(a)
 					mediaFileNames = append(mediaFileNames, m)
 				}
 			}
-			allMedia := parseMediaFileNames(mediaFileNames, entryId, config)
+			allMedia := parseMediaFileNames(mediaFileNames, ceType, ceId, config)
 			contentDirectiveTemplate, err := compileContentDirectiveTemplate(directive, resLoader)
 			if err != nil {
-				exitWithError(" - failed to process " + directive + " directive for " + entryId + ": " + err.Error())
+				exitWithError(" - failed to process " + directive + " directive for " + ceId + ": " + err.Error())
 			}
 			var contentDirectiveMarkupBuffer bytes.Buffer
 			err = contentDirectiveTemplate.Execute(&contentDirectiveMarkupBuffer, contentDirectiveData{
@@ -356,14 +356,14 @@ func parseContentDirectives(entryId string, content string, config appConfig, re
 			}
 			var mediaFileNames []string
 			if mediaArg == "" {
-				mediaFileNames = listAllMedia(entryId, expListMedia)
+				mediaFileNames = listAllMedia(ceType, ceId, expListMedia)
 			} else {
 				for _, a := range strings.Split(mediaArg, ",") {
 					m := strings.TrimSpace(a)
 					mediaFileNames = append(mediaFileNames, m)
 				}
 			}
-			allMedia := parseMediaFileNames(mediaFileNames, entryId, config)
+			allMedia := parseMediaFileNames(mediaFileNames, ceType, ceId, config)
 			if allMedia != nil {
 				inlineMediaTemplate := compileMediaTemplate(resLoader)
 				var inlineMediaMarkupBuffer bytes.Buffer
@@ -443,9 +443,10 @@ func handleContentDirectivePlaceholderReplacements(content string, phReps map[st
 	return content
 }
 
-func listAllMedia(entryId string, skipFiles []string) []string {
+func listAllMedia(contentEntityType contentEntityType, contentEntityId string, skipFiles []string) []string {
+	ceType := strings.ToLower(contentEntityType.String())
 	var allMedia []string
-	mediaDirPath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, entryId)
+	mediaDirPath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, ceType, os.PathSeparator, contentEntityId)
 	if dirExists(mediaDirPath) {
 		videoFiles, err := listFilesByExt(mediaDirPath, videoFileExtensions...)
 		check(err)
@@ -465,13 +466,14 @@ func listAllMedia(entryId string, skipFiles []string) []string {
 	return allMedia
 }
 
-func parseMediaFileNames(mediaFileNames []string, entryId string, config appConfig) []media {
+func parseMediaFileNames(mediaFileNames []string, contentEntityType contentEntityType, contentEntityId string, config appConfig) []media {
 	var allMedia []media
+	ceType := strings.ToLower(contentEntityType.String())
 	for _, mediaFileName := range mediaFileNames {
 		if strings.Contains(mediaFileName, thumbImgFileSuffix) {
 			continue
 		}
-		mediaUri := "/" + mediaDirName + "/" + entryId + "/" + mediaFileName
+		mediaUri := "/" + mediaDirName + "/" + ceType + "/" + contentEntityId + "/" + mediaFileName
 		mediaFileExt := filepath.Ext(mediaFileName)
 		var mType mediaType
 		if slices.Contains(imageFileExtensions, mediaFileExt) {
@@ -481,9 +483,9 @@ func parseMediaFileNames(mediaFileNames []string, entryId string, config appConf
 			for _, thSize := range config.thumbSizes {
 				thFileSuffix := "_" + strconv.Itoa(thSize) + thumbImgFileSuffix + imgFileExt
 				thumbFile := mediaFileName + thFileSuffix
-				thumbFilePath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, entryId, os.PathSeparator, thumbFile)
+				thumbFilePath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, contentEntityId, os.PathSeparator, thumbFile)
 				if fileExists(thumbFilePath) {
-					thumbUri := "/" + mediaDirName + "/" + entryId + "/" + thumbFile
+					thumbUri := "/" + mediaDirName + "/" + ceType + "/" + contentEntityId + "/" + thumbFile
 					thumbs = append(thumbs, thumb{
 						Uri:  thumbUri,
 						Size: thSize,

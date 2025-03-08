@@ -137,14 +137,6 @@ func compileFullTemplate(name string, content string,
 		check(err)
 		mainTemplateMarkup = markup
 	}
-	stylesTemplatePlaceholderReplacement := ""
-	for _, level := range templateIncludeLevels {
-		stylesIncludeFilePath := getIncludeFilePath(stylesFileName, level, resLoader.config)
-		if stylesIncludeFilePath != "" {
-			stylesTemplatePlaceholderReplacement += fmt.Sprintf(`<link rel="stylesheet" href="/resources/%s">`, fmt.Sprintf(stylesIncludeFileNameFormat, level.String()))
-		}
-	}
-	mainTemplateMarkup = strings.Replace(mainTemplateMarkup, stylesTemplatePlaceholder, stylesTemplatePlaceholderReplacement, 1)
 	if mainTemplateMarkupHandler != nil {
 		mainTemplateMarkup = mainTemplateMarkupHandler(mainTemplateMarkup)
 	}

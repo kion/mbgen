@@ -181,7 +181,9 @@ header a.permalink {
         background-color: #777;
     }
     &:before {
-        content: '#';
+        font-family: FontAwesome;
+        content: '\23';
+        margin-right: 0.4em;
     }
 }
 
@@ -292,7 +294,7 @@ header a.permalink {
 .content .media .embedded .video {
     display: block;
     padding: 4px;
-    border: 1px solid #555;
+    border: 3px groove #555;
     border-radius: 2px;
 }
 
@@ -403,9 +405,8 @@ header a.permalink {
 }
 
 #search-summary {
-    padding: 1em;
-    border: 2px solid #555;
-    border-radius: 4px;
+    font-size: 0.8em;
+    color: #777;
 }
 
 #search-input form {
@@ -535,24 +536,15 @@ header .links a.admin-link {
     border-color: #555 !important;
     background-color: #2b2b2b !important;
 }
+
 .EasyMDEContainer .cm-s-easymde .CodeMirror-cursor {
     border-color: #ccc !important;
 }
 
-.EasyMDEContainer .editor-toolbar > * {
-    color: #cc0000 !important;
-}
-
-.EasyMDEContainer .editor-toolbar > .active, .editor-toolbar > button:hover, .editor-preview pre, .cm-s-easymde .cm-comment {
+.editor-preview pre, .cm-s-easymde .cm-comment {
     color: #ff0000 !important;
     background-color: transparent !important;
     border: none !important;
-}
-
-.editor-toolbar {
-    border-top: 1px solid #555 !important;
-    border-left: 1px solid #555 !important;
-    border-right: 1px solid #555 !important;
 }
 
 .EasyMDEContainer .CodeMirror .cm-link {

@@ -5,15 +5,18 @@ embracing the convention-over-configuration philosophy.
 
 ## Features
 
-* Built-in content management (admin) interface
-  * As an alternative: watch & hot reload mode to monitor content source file (`.md`) changes, 
-    generate corresponding output (`.html`) files on the fly, 
-    and dynamically update the corresponding view in browser
+* Built-in admin (content management) interface
+  * As an alternative: watch & hot reload mode to monitor changes 
+    to the content and media (image/video) files, 
+    generate the corresponding output files on the fly, 
+    and dynamically update the live view in browser
 * Built-in search engine
-* Archive generation
-* Tag Index (aka Tag Cloud) generation
-* Thumbnail generation
-* Simple and intuitive to use image and video embedding
+* Built-in support for pagination, as well as tag-based and date-based filtering
+* Archive Index generation
+* Tag Index (Tag Cloud) generation
+* Support for original image file resizing and thumbnail generation
+* Simple and intuitive image and video embedding
+* Support for custom styling and includes
 * Customizable configuration (pagination, thumbnails, etc.)
 
 ## Demo
@@ -50,18 +53,20 @@ This creates the following working dir structure:
 │   ├── deploy ☜ dir to be deployed to server
 │   │   ├── favicon.ico ☜ sample favicon
 │   │   ├── media ☜ media content dir
-│   │   │   ├── sample-page
-│   │   │   ├── sample-post-1
-│   │   │   ├── ...
+│   │   │   │   ├── page
+│   │   │   │   │   ├── sample-page
+│   │   │   │   ├── post
+│   │   │   │   │   ├── sample-post-1
+│   │   │   │   │   ├── ...
 │   ├── include ☜ include files dir
-│   │   ├── default ☜ default theme include files dir
+│   │   ├── pretty-dark ☜ default theme include files dir
 │   ├── pages ☜ page content markdown files dir
 │   │   ├── sample-page.md
 │   ├── posts ☜ post content markdown files dir
 │   │   ├── sample-post-1.md
 │   │   ├── ...
 │   ├── themes ☜ themes dir
-│   │   ├── default ☜ default theme dir
+│   │   ├── pretty-dark ☜ default theme dir
 ```
 
 Run the following command to generate your site:
@@ -103,7 +108,13 @@ $ mbgen serve --watch-reload
 
 Other supported commands:
 
-* parse content folders and print out the corresponding stats:
+* inspect content directories and report/fix any issues found:
+```shell
+$ mbgen inspect
+$ mbgen inspect --fix
+```
+
+* parse content directories and print out the corresponding stats:
 ```shell
 $ mbgen stats
 ```
@@ -131,15 +142,17 @@ $ mbgen help [command]
   ```
   ├── deploy
   │   ├── media
-  │   │   ├── sample-page
-  │   │   │   ├── img-1.jpg
-  │   │   │   ├── vid-1.mp4
-  │   │   ├── sample-post-1
-  │   │   │   ├── img-1.jpg
-  │   │   │   ├── img-2.jpg
-  │   │   │   ├── vid-1.mp4
-  │   │   ├── sample-post-2
-  │   │   │   ├── cover.png
+  │   │   │   ├── page
+  │   │   │   │   ├── sample-page
+  │   │   │   │   │   ├── img-1.jpg
+  │   │   │   │   │   ├── vid-1.mp4
+  │   │   │   ├── post
+  │   │   │   │   ├── sample-post-1
+  │   │   │   │   │   ├── img-1.jpg
+  │   │   │   │   │   ├── img-2.jpg
+  │   │   │   │   │   ├── vid-1.mp4
+  │   │   │   │   ├── sample-post-2
+  │   │   │   │   │   ├── cover.png
   ├── pages
   │   ├── sample-page.md
   ├── posts
@@ -162,6 +175,9 @@ $ mbgen help [command]
     
     Post body in the markdown format
     
+    * [Link to another post]({%post:sample-post-1%})
+    * [Link to another page]({%page:sample-page%})
+
     #Tag4 #Tag5
     
     {media}
@@ -211,23 +227,27 @@ $ mbgen help [command]
         * YouTube
         * Vimeo
   * Custom/additional resources can be integrated on the global and/or theme level 
-    by placing the corresponding resource files 
-    inside the `include` dir (for global level includes) 
+    by placing a `head.html` file inside the `include` dir (for global level includes) 
     and/or the `include/<theme-name>` dir (for theme level includes)
-    * The following are included in **all** generated files: 
-      * `styles.css` - for custom CSS styles
-      * `head.html` - for `<meta>` tags and `<link>` tags 
-        referencing additional resources (e.g. css/js/font files)
-    * To include additional `<meta>` and `<link>` tags for _pages_ only 
-      (i.e. these are never included for _posts_), use the following include files:
+    * `head.html` can include any number of `<meta>`, `<link>`, `<script>` tags 
+      (as well as any other tags allowed in the `<head>` section of the HTML document) 
+      referencing additional resources (e.g. css/js files)
+      * the actual additional resource files could simply be placed in the `deploy/res` dir 
+        and then referenced from the `head.html` file as follows:
+        * `<link rel="stylesheet" href="/res/css/custom.css">`
+        * `<script src="/res/js/custom.js"></script>`
+      * _do **not** place your custom resources in the `deploy/resources` dir, 
+        as it's reserved for the theme-specific/generated resources/includes_
+    * to include/reference additional resources for _pages_ only 
+      (i.e. these would never be included for _posts_), use the following include files:
       * `page-head.html` - is included in **all** generated page files 
       * `page-head--<page>.html` - is included in the generated file for the **specific page only** 
         (`<page>` is the name of the corresponding markdown content file without the `.md` extension, 
         e.g. `page-head--sample-page.html`)
-    * _Global includes are injected before any theme-specific ones 
-      (i.e. theme includes override the global ones)_
-    * Each specific theme might also support some additional includes
-      * Sample files for the supported includes are automatically copied to the `include/<theme-name>` dir 
+    * _global includes are injected before any theme-specific ones 
+      (i.e. theme-specific definitions override the global ones)_
+    * each specific theme might also support some additional includes
+      * sample files for the supported includes are automatically copied to the `include/<theme-name>` dir 
         and should be modified/tweaked to include any custom markup and content 
 
 ## Theme Specific Conventions
@@ -281,6 +301,21 @@ or can even be completely omitted from the config):
 * [optional] `pageSize` - controls the maximum number of posts 
   on any page that renders a list of posts
   - if not specified, the default value of `10` is used
+* [optional] `resizeOrigImages` - the original image resizing is disabled by default, 
+  unless this setting is set to `yes`
+  - `generate` command resizes the original images 
+    (preserving the original image aspect ratio) 
+    with the width/height (whichever one is larger) 
+    exceeding the value specified in the `maxImgSize` option 
+    (whether it's the explicitly specified or the default one)
+  - set this setting to `yes` to enable the original image resizing
+* [optional] `maxImgSize` - defines the max size (in pixels) for the original images
+  - if not specified, the default value of `1920` is used
+  - the original images with the width/height (whichever one is larger) 
+    exceeding this value are resized to fit the specified width/height 
+    (while preserving the original image aspect ratio) if:
+    - an original image is uploaded via the admin interface (see the `serve` command with the `--admin` flag)
+    - the `inspect` command is run with the `--fix` flag (in this case all the original images are inspected/resized)
 * [optional] `useThumbs` - the thumbnail behavior (to optimize the page size / load time) 
   is enabled by default, unless this setting is set to `no`: 
     - `generate` command generates a number of thumbnails 
@@ -310,10 +345,18 @@ or can even be completely omitted from the config):
   to trigger the corresponding thumbnail generation 
   - if not specified, the default value of `0.5` (i.e. **0.5 MB**) is used
   - ignored if the `useThumbs` option is disabled
+* [optional] `jpegQuality` - defines the quality of the generated JPEG thumbnails and original image replacements 
+  (the value should be in the range from `70` to `100`)
+  - if not specified, the default value of `85` is used
+  - has no effect if both the `maxImgSize` and the `useThumbs` options are disabled
+* [optional] `pngCompressionLevel` - defines the compression level of the generated PNG thumbnails and original image replacements 
+  (the value should be one of the following: `DefaultCompression`, `NoCompression`, `BestSpeed`, `BestCompression`)
+  - if not specified, the default value of `DefaultCompression` is used
+  - has no effect if both the `maxImgSize` and the `useThumbs` options are disabled
 * [optional] `serveHost` - host to use for `serve` command
   - if not specified, the default value of `localhost` is used
 * [optional] `servePort` - port to use for `serve` command
-  - if not specified, the default value of `8080` is used
+  - if not specified, the default value of `8888` is used
 
 ## License
 

@@ -12,6 +12,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 )
@@ -127,53 +129,54 @@ func listenAndServe(addr string, admin bool, watch chan watchReloadData, config 
 	if admin {
 		http.HandleFunc("/admin-create", func(writer http.ResponseWriter, request *http.Request) {
 			if request.Method == http.MethodPost {
-				entryType := request.URL.Query().Get("type")
-				entryId := request.URL.Query().Get("id")
-				if entryId == "" {
+				ceType := request.URL.Query().Get("type")
+				ceId := request.URL.Query().Get("id")
+				if ceId == "" {
 					http.Error(writer, "ID is required", http.StatusBadRequest)
 					return
 				} else {
-					mdEntryPath := fmt.Sprintf("%s%c%s", entryType+"s", os.PathSeparator, entryId+markdownFileExtension)
-					if fileExists(mdEntryPath) {
+					mdContentFilePath := fmt.Sprintf("%s%c%s", ceType+"s", os.PathSeparator, ceId+markdownFileExtension)
+					if fileExists(mdContentFilePath) {
 						http.Error(writer, "already exists", http.StatusConflict)
 						return
 					} else {
 						content := "---\n"
-						if entryType == "post" {
+						if ceType == "post" {
 							content += fmt.Sprintf("date: %s\n", time.Now().Format(time.DateOnly))
 							content += fmt.Sprintf("time: %s\n", time.Now().Format(time.TimeOnly))
 						}
-						content += "title: New " + entryType + " title\n"
+						content += "title: New " + ceType + " title\n"
 						content += "\n---\n\n"
-						content += "New " + entryType + " content\n\n"
+						content += "New " + ceType + " content\n\n"
 						content += "{media}"
-						writeDataToFile(mdEntryPath, []byte(content))
+						writeDataToFile(mdContentFilePath, []byte(content))
 						processAndHandleStats(config, resLoader, true)
-						contentEntryRedirectURI := fmt.Sprintf("/%s/%s%s", entryType, entryId, contentFileExtension)
-						writer.Header().Set("Location", contentEntryRedirectURI)
+						redirectURI := fmt.Sprintf("/%s/%s%s", ceType, ceId, contentFileExtension)
+						writer.Header().Set("Location", redirectURI)
 						writer.WriteHeader(http.StatusCreated)
 					}
 				}
 			}
 		})
 		http.HandleFunc("/admin-edit", func(writer http.ResponseWriter, request *http.Request) {
-			entryType := request.URL.Query().Get("type")
-			entryId := request.URL.Query().Get("id")
-			mdEntryPath := fmt.Sprintf("%s%c%s", entryType+"s", os.PathSeparator, entryId+markdownFileExtension)
+			ceType := request.URL.Query().Get("type")
+			ceId := request.URL.Query().Get("id")
+			mdContentFilePath := fmt.Sprintf("%s%c%s", ceType+"s", os.PathSeparator, ceId+markdownFileExtension)
 			if request.Method == http.MethodGet {
-				mdContent := readDataFromFile(mdEntryPath)
+				mdContent := readDataFromFile(mdContentFilePath)
 				_, err := writer.Write(mdContent)
 				check(err)
 			} else if request.Method == http.MethodPost {
 				body, err := io.ReadAll(request.Body)
 				if err != nil {
+					printErr(err)
 					http.Error(writer, "Failed to read request body", http.StatusInternalServerError)
 					return
 				}
-				writeDataToFile(mdEntryPath, body)
+				writeDataToFile(mdContentFilePath, body)
 				processAndHandleStats(config, resLoader, true)
-				contentEntryPath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, entryType, os.PathSeparator, entryId+contentFileExtension)
-				content := readDataFromFile(contentEntryPath)
+				contentFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, ceType, os.PathSeparator, ceId+contentFileExtension)
+				content := readDataFromFile(contentFilePath)
 				content = content[strings.Index(string(content), mainOpeningTag)+len(mainOpeningTag):]
 				content = content[:strings.Index(string(content), mainClosingTag)]
 				_, err = writer.Write(content)
@@ -181,25 +184,25 @@ func listenAndServe(addr string, admin bool, watch chan watchReloadData, config 
 			}
 		})
 		http.HandleFunc("/admin-delete", func(writer http.ResponseWriter, request *http.Request) {
-			entryType := request.URL.Query().Get("type")
-			entryId := request.URL.Query().Get("id")
-			mdEntryPath := fmt.Sprintf("%s%c%s", entryType+"s", os.PathSeparator, entryId+markdownFileExtension)
-			if fileExists(mdEntryPath) {
+			ceType := request.URL.Query().Get("type")
+			ceId := request.URL.Query().Get("id")
+			mdContentFilePath := fmt.Sprintf("%s%c%s", ceType+"s", os.PathSeparator, ceId+markdownFileExtension)
+			if fileExists(mdContentFilePath) {
 				// ==================================================
 				// delete the markdown file
 				// ==================================================
-				deleteFile(mdEntryPath)
+				deleteFile(mdContentFilePath)
 				processAndHandleStats(config, resLoader, true)
 				// ==================================================
 				// delete the content file
 				// ==================================================
-				contentEntryPath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, entryType, os.PathSeparator, entryId+contentFileExtension)
-				deleteIfExists(contentEntryPath)
+				contentFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, ceType, os.PathSeparator, ceId+contentFileExtension)
+				deleteIfExists(contentFilePath)
 				// ==================================================
 				// delete the media directory
 				// ==================================================
-				mediaDir := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, entryId)
-				deleteIfExists(mediaDir)
+				mediaDirPath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, ceType, os.PathSeparator, ceId)
+				deleteIfExists(mediaDirPath)
 				// ==================================================
 				// delete tag files for the no longer referenced tags
 				// ==================================================
@@ -207,18 +210,19 @@ func listenAndServe(addr string, admin bool, watch chan watchReloadData, config 
 				// ==================================================
 				writer.WriteHeader(http.StatusNoContent)
 			} else {
-				http.Error(writer, "Not found: "+entryType+"/"+entryId, http.StatusNotFound)
+				http.Error(writer, "Not found: "+ceType+"/"+ceId, http.StatusNotFound)
 				return
 			}
 		})
 		http.HandleFunc("/admin-media", func(writer http.ResponseWriter, request *http.Request) {
-			entryId := request.URL.Query().Get("id")
-			regenerateEntry := false
+			ceType := contentEntityTypeFromString(request.URL.Query().Get("type"))
+			ceId := request.URL.Query().Get("id")
+			regenerate := false
 			if request.Method == http.MethodGet {
-				mediaDirPath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, entryId)
+				mediaDirPath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, strings.ToLower(ceType.String()), os.PathSeparator, ceId)
 				if dirExists(mediaDirPath) {
-					mediaFileNames := listAllMedia(entryId, nil)
-					listMediaResponse(writer, mediaFileNames, entryId, config, resLoader)
+					mediaFileNames := listAllMedia(ceType, ceId, nil)
+					listMediaResponse(writer, mediaFileNames, ceType, ceId, config, resLoader)
 				}
 			} else if request.Method == http.MethodPost {
 				err := request.ParseMultipartForm(12 << 20) // 12 MB max file size
@@ -232,36 +236,45 @@ func listenAndServe(addr string, admin bool, watch chan watchReloadData, config 
 					http.Error(writer, "No files uploaded", http.StatusBadRequest)
 					return
 				}
+				var skippedFiles []string
 				for _, upMediaFileHeader := range upMediaFiles {
-					upMediaFile, err := upMediaFileHeader.Open()
-					defer closeFile(upMediaFile)
-					if err != nil {
-						printErr(err)
-						http.Error(writer, "Failed to process uploaded media file: "+err.Error(), http.StatusInternalServerError)
-						return
-					}
-					mediaDirPath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, entryId)
-					createDirIfNotExists(mediaDirPath)
-					mediaFilePath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, entryId, os.PathSeparator, upMediaFileHeader.Filename)
-					mediaFile, err := os.Create(mediaFilePath)
-					defer closeFile(mediaFile)
-					if err == nil {
-						_, err = io.Copy(mediaFile, upMediaFile)
-					}
-					if err != nil {
-						printErr(err)
-						http.Error(writer, "Failed to upload media file: "+err.Error(), http.StatusInternalServerError)
-						return
-					} else {
+					fileExt := strings.ToLower(filepath.Ext(upMediaFileHeader.Filename))
+					if slices.Contains(imageFileExtensions, fileExt) || slices.Contains(videoFileExtensions, fileExt) {
+						upMediaFile, err := upMediaFileHeader.Open()
+						defer closeFile(upMediaFile)
+						if err != nil {
+							printErr(err)
+							http.Error(writer, "Failed to process uploaded media file: "+err.Error(), http.StatusInternalServerError)
+							return
+						}
+						mediaDirPath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, strings.ToLower(ceType.String()), os.PathSeparator, ceId)
+						createDirIfNotExists(mediaDirPath)
+						mediaFilePath := fmt.Sprintf("%s%c%s", mediaDirPath, os.PathSeparator, upMediaFileHeader.Filename)
+						mediaFile, err := os.Create(mediaFilePath)
+						defer closeFile(mediaFile)
+						if err == nil {
+							_, err = io.Copy(mediaFile, upMediaFile)
+						}
+						if err != nil {
+							printErr(err)
+							http.Error(writer, "Failed to upload media file: "+err.Error(), http.StatusInternalServerError)
+							return
+						}
+						processOriginalMediaFile(mediaFilePath, config, false)
 						writer.WriteHeader(http.StatusCreated)
-						mediaFileNames := listAllMedia(entryId, nil)
-						listMediaResponse(writer, mediaFileNames, entryId, config, resLoader)
-						regenerateEntry = true
+						mediaFileNames := listAllMedia(ceType, ceId, nil)
+						listMediaResponse(writer, mediaFileNames, ceType, ceId, config, resLoader)
+						regenerate = true
+					} else {
+						skippedFiles = append(skippedFiles, upMediaFileHeader.Filename)
 					}
+				}
+				if len(skippedFiles) > 0 {
+					http.Error(writer, "Skipped (file type not supported): "+strings.Join(skippedFiles, ", "), http.StatusUnprocessableEntity)
 				}
 			} else if request.Method == http.MethodDelete {
 				fileName := request.URL.Query().Get("fileName")
-				mediaDirPath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, entryId)
+				mediaDirPath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, strings.ToLower(ceType.String()), os.PathSeparator, ceId)
 				if dirExists(mediaDirPath) {
 					mediaFileNames, err := listFilesByExt(mediaDirPath, videoFileExtensions...)
 					if err == nil {
@@ -282,7 +295,7 @@ func listenAndServe(addr string, admin bool, watch chan watchReloadData, config 
 						// both the original media file and its thumbnails are deleted
 						// ============================================================
 						if strings.HasPrefix(mediaFileName, fileName) {
-							mediaFilePath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, entryId, os.PathSeparator, mediaFileName)
+							mediaFilePath := fmt.Sprintf("%s%c%s", mediaDirPath, os.PathSeparator, mediaFileName)
 							err := os.Remove(mediaFilePath)
 							if err != nil {
 								printErr(err)
@@ -297,14 +310,12 @@ func listenAndServe(addr string, admin bool, watch chan watchReloadData, config 
 						deleteFile(mediaDirPath)
 					}
 					writer.WriteHeader(http.StatusResetContent)
-					listMediaResponse(writer, mediaFileNames, entryId, config, resLoader)
-					regenerateEntry = true
+					listMediaResponse(writer, mediaFileNames, ceType, ceId, config, resLoader)
+					regenerate = true
 				}
 			}
-			if regenerateEntry {
-				entryType := request.URL.Query().Get("type")
-				ceType := contentEntityTypeFromString(entryType)
-				removeContentEntityFromCache(ceType, entryId+markdownFileExtension)
+			if regenerate {
+				removeContentEntityFromCache(ceType, ceId+markdownFileExtension)
 				processAndHandleStats(config, resLoader, true)
 			}
 		})
@@ -323,8 +334,8 @@ func listenAndServe(addr string, admin bool, watch chan watchReloadData, config 
 	exitWithError(err.Error())
 }
 
-func listMediaResponse(writer http.ResponseWriter, mediaFileNames []string, entryId string, config appConfig, resLoader resourceLoader) {
-	allMedia := parseMediaFileNames(mediaFileNames, entryId, config)
+func listMediaResponse(writer http.ResponseWriter, mediaFileNames []string, ceType contentEntityType, ceId string, config appConfig, resLoader resourceLoader) {
+	allMedia := parseMediaFileNames(mediaFileNames, ceType, ceId, config)
 	if allMedia != nil {
 		inlineMediaTemplate := compileMediaTemplate(resLoader)
 		var inlineMediaMarkupBuffer bytes.Buffer

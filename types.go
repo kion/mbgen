@@ -5,24 +5,72 @@ import (
 	"cloud.google.com/go/civil"
 	"encoding/json"
 	"fmt"
+	"image/png"
 	"regexp"
 	"strings"
 	"time"
 )
 
+type pngCompressionLevel string
+
+const (
+	DefaultCompression pngCompressionLevel = "DefaultCompression"
+	NoCompression      pngCompressionLevel = "NoCompression"
+	BestSpeed          pngCompressionLevel = "BestSpeed"
+	BestCompression    pngCompressionLevel = "BestCompression"
+)
+
+func (p pngCompressionLevel) String() string {
+	return string(p)
+}
+
+func pngCompressionLevelFromString(level string) pngCompressionLevel {
+	switch strings.ToLower(level) {
+	case strings.ToLower(NoCompression.String()):
+		return NoCompression
+	case strings.ToLower(BestSpeed.String()):
+		return BestSpeed
+	case strings.ToLower(BestCompression.String()):
+		return BestCompression
+	case strings.ToLower(DefaultCompression.String()):
+		return BestCompression
+	}
+	return ""
+}
+
+func (p pngCompressionLevel) Value() png.CompressionLevel {
+	switch p {
+	case NoCompression:
+		return png.NoCompression
+	case BestSpeed:
+		return png.BestSpeed
+	case BestCompression:
+		return png.BestCompression
+	}
+	return png.DefaultCompression
+}
+
+func pngCompressionLevelStringValues() []string {
+	return []string{NoCompression.String(), BestSpeed.String(), BestCompression.String(), DefaultCompression.String()}
+}
+
 type appConfig struct {
-	siteName         string
-	theme            string
-	homePage         string
-	generateArchive  bool
-	generateTagIndex bool
-	enableSearch     bool
-	pageSize         int
-	useThumbs        bool
-	thumbSizes       []int
-	thumbThreshold   float64
-	serveHost        string
-	servePort        int
+	siteName            string
+	theme               string
+	homePage            string
+	generateArchive     bool
+	generateTagIndex    bool
+	enableSearch        bool
+	pageSize            int
+	resizeOrigImages    bool
+	maxImgSize          int
+	useThumbs           bool
+	thumbSizes          []int
+	thumbThreshold      float64
+	jpegQuality         int
+	pngCompressionLevel pngCompressionLevel
+	serveHost           string
+	servePort           int
 }
 
 type appCommandDescriptor struct {
@@ -61,8 +109,6 @@ const (
 	Global
 	Theme
 )
-
-var templateIncludeLevels = /* const */ []templateIncludeLevel{Global, Theme}
 
 func (t templateIncludeLevel) String() string {
 	switch t {
@@ -386,13 +432,28 @@ type stats struct {
 }
 
 type watchReloadData struct {
-	Type    contentEntityType `json:"type"`
-	Id      string            `json:"id"`
-	Deleted bool              `json:"deleted"`
+	Type contentEntityType `json:"type"`
+	Id   string            `json:"id"`
+	Op   dirWatchOp        `json:"op"`
 }
 
 type processorOutputHandler func(outputFilePath string, data []byte) bool
 
-type imageThumbnailHandler func(imgDirPath string, config appConfig)
+type imageThumbnailHandler func(mediaDirPath string, config appConfig)
 
-type dirChangeHandler func(changedFilePath string, deleted bool)
+type dirWatchOp string
+
+const (
+	dirWatchOpCreate dirWatchOp = "create"
+	dirWatchOpUpdate dirWatchOp = "update"
+	dirWatchOpRename dirWatchOp = "rename"
+	dirWatchOpDelete dirWatchOp = "delete"
+)
+
+type dirWatchEvent struct {
+	filePath         string
+	originalFilePath *string
+	op               dirWatchOp
+}
+
+type dirWatchHandler func(dwEvent dirWatchEvent)

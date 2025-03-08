@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	appVersion                                  = "1.5.8"
+	appVersion                                  = "1.6.0"
 	defaultGitHubRepoUrl                        = "github.com/kion/mbgen"
 	defaultGitHubRepoThemesUrl                  = defaultGitHubRepoUrl + "/themes"
 	defaultGitHubRepoPageContentSamplesUrl      = defaultGitHubRepoUrl + "/content-samples/pages"
@@ -34,8 +34,6 @@ const (
 	searchJSFileName                            = "search.js"
 	directivePlaceholderReplacementFormat       = ":@@@:%s:@@@:"
 	hashTagMarkdownReplacementFormat            = "[#%s](/" + deployTagsDirName + "/%s/)"
-	stylesFileName                              = "styles.css"
-	stylesIncludeFileNameFormat                 = "styles-include-%s.css"
 	markdownPagesDirName                        = "pages"
 	markdownPostsDirName                        = "posts"
 	markdownFileExtension                       = ".md"
@@ -55,9 +53,16 @@ const (
 	defaultGenerateTagIndex                     = true
 	defaultEnableSearch                         = true
 	defaultPageSize                             = 10
+	defaultResizeOrigImages                     = false
+	defaultMaxImgSize                           = 1920
+	minAllowedMaxImgSize                        = 1080
 	minAllowedThumbWidth                        = 320
 	minAllowedThumbThreshold                    = 0.3
 	defaultThumbThreshold                       = 0.5
+	defaultJPEGQuality                          = 85
+	minAllowedJPEGQuality                       = 70
+	maxAllowedJPEGQuality                       = 100
+	defaultPNGCompressionLevel                  = DefaultCompression
 	defaultUseThumbs                            = true
 	defaultServeHost                            = "localhost"
 	defaultServePort                            = 8888
@@ -66,9 +71,9 @@ const (
 	defaultThemeName                            = "pretty-dark"
 	defaultThemeAlias                           = "default"
 	downloadedThemeDirSuffix                    = "-downloaded"
-	stylesTemplatePlaceholder                   = "{{@ styles @}}"
 	pageHeadTemplatePlaceholder                 = "{{@ page-head @}}"
 	subTemplatePlaceholder                      = "{{@ sub-template @}}"
+	commandInspectOptionFix                     = "--fix"
 	commandCleanupTargetContent                 = "content"
 	commandCleanupTargetThumbs                  = "thumbs"
 	commandCleanupTargetTags                    = "tags"

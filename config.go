@@ -12,18 +12,22 @@ import (
 
 func defaultConfig() appConfig {
 	return appConfig{
-		siteName:         "",
-		theme:            "",
-		homePage:         "",
-		generateArchive:  defaultGenerateArchive,
-		generateTagIndex: defaultGenerateTagIndex,
-		enableSearch:     defaultEnableSearch,
-		pageSize:         defaultPageSize,
-		useThumbs:        defaultUseThumbs,
-		thumbSizes:       defaultThumbSizes,
-		thumbThreshold:   defaultThumbThreshold,
-		serveHost:        defaultServeHost,
-		servePort:        defaultServePort,
+		siteName:            "",
+		theme:               "",
+		homePage:            "",
+		generateArchive:     defaultGenerateArchive,
+		generateTagIndex:    defaultGenerateTagIndex,
+		enableSearch:        defaultEnableSearch,
+		pageSize:            defaultPageSize,
+		resizeOrigImages:    defaultResizeOrigImages,
+		maxImgSize:          defaultMaxImgSize,
+		useThumbs:           defaultUseThumbs,
+		thumbSizes:          defaultThumbSizes,
+		thumbThreshold:      defaultThumbThreshold,
+		jpegQuality:         defaultJPEGQuality,
+		pngCompressionLevel: DefaultCompression,
+		serveHost:           defaultServeHost,
+		servePort:           defaultServePort,
 	}
 }
 
@@ -80,6 +84,31 @@ func readConfig() appConfig {
 		}
 	}
 
+	resizeOrigImages := cm["resizeOrigImages"]
+	if resizeOrigImages != "" {
+		v := strings.ToLower(resizeOrigImages)
+		config.resizeOrigImages = v != "no" && v != "false"
+	}
+
+	maxImgSize := cm["maxImgSize"]
+	if maxImgSize != "" {
+		mis, err := strconv.Atoi(maxImgSize)
+		if err != nil || mis < minAllowedMaxImgSize {
+			var errMsg string
+			if err != nil {
+				errMsg = err.Error()
+			} else {
+				errMsg += fmt.Sprintf(" (min allowed max image size value: %d)", minAllowedMaxImgSize)
+			}
+			println(
+				" - invalid config max image size value: "+maxImgSize+errMsg,
+				" - will use the default value instead",
+			)
+		} else {
+			config.maxImgSize = mis
+		}
+	}
+
 	useThumbs := cm["useThumbs"]
 	if useThumbs != "" {
 		v := strings.ToLower(useThumbs)
@@ -130,6 +159,38 @@ func readConfig() appConfig {
 			)
 		} else {
 			config.thumbThreshold = tts
+		}
+	}
+
+	jpegQuality := cm["jpegQuality"]
+	if jpegQuality != "" {
+		jq, err := strconv.Atoi(jpegQuality)
+		if err != nil || jq < minAllowedJPEGQuality || jq > maxAllowedJPEGQuality {
+			var errMsg string
+			if err != nil {
+				errMsg = err.Error()
+			} else if jq < minAllowedJPEGQuality || jq > maxAllowedJPEGQuality {
+				errMsg += fmt.Sprintf(" (allowed range: %d - %d)", minAllowedJPEGQuality, maxAllowedJPEGQuality)
+			}
+			println(
+				" - invalid config jpeg quality value: "+jpegQuality+errMsg,
+				" - will use the default value instead",
+			)
+		} else {
+			config.jpegQuality = jq
+		}
+	}
+
+	pngCompressionLevel := cm["pngCompressionLevel"]
+	if pngCompressionLevel != "" {
+		pcl := pngCompressionLevelFromString(pngCompressionLevel)
+		if pcl == "" {
+			println(
+				" - invalid config png compression level value: "+pngCompressionLevel+" (allowed values: "+strings.Join(pngCompressionLevelStringValues(), ", ")+")",
+				" - will use the default value instead",
+			)
+		} else {
+			config.pngCompressionLevel = pcl
 		}
 	}
 
@@ -223,6 +284,28 @@ func writeConfig(config appConfig) {
 	}
 
 	yml += "\n"
+	var resizeOrigImages bool
+	if defaultResizeOrigImages == config.resizeOrigImages {
+		resizeOrigImages = defaultResizeOrigImages
+		yml += "#resizeOrigImages: "
+	} else {
+		resizeOrigImages = config.resizeOrigImages
+		yml += "resizeOrigImages: "
+	}
+	if resizeOrigImages {
+		yml += "yes"
+	} else {
+		yml += "no"
+	}
+
+	yml += "\n"
+	if defaultMaxImgSize == config.maxImgSize {
+		yml += "#maxImgSize: " + strconv.Itoa(defaultMaxImgSize)
+	} else {
+		yml += "maxImgSize: " + strconv.Itoa(config.maxImgSize)
+	}
+
+	yml += "\n"
 	var useThumbs bool
 	if defaultUseThumbs == config.useThumbs {
 		useThumbs = defaultUseThumbs
@@ -252,6 +335,20 @@ func writeConfig(config appConfig) {
 		yml += "#thumbThreshold: " + strings.TrimRight(fmt.Sprintf("%.2f", defaultThumbThreshold), "0")
 	} else {
 		yml += "thumbThreshold: " + strings.TrimRight(fmt.Sprintf("%.2f", config.thumbThreshold), "0")
+	}
+
+	yml += "\n"
+	if defaultJPEGQuality == config.jpegQuality {
+		yml += "#jpegQuality: " + strconv.Itoa(defaultJPEGQuality)
+	} else {
+		yml += "jpegQuality: " + strconv.Itoa(config.jpegQuality)
+	}
+
+	yml += "\n"
+	if defaultPNGCompressionLevel == config.pngCompressionLevel {
+		yml += "#pngCompressionLevel: " + defaultPNGCompressionLevel.String()
+	} else {
+		yml += "pngCompressionLevel: " + config.pngCompressionLevel.String()
 	}
 
 	yml += "\n"
@@ -295,6 +392,14 @@ func printConfig(config appConfig) {
 	}
 	println(" - enable search: " + enableSearch)
 	println(fmt.Sprintf(" - page size: %d", config.pageSize))
+	var resizeOrigImages string
+	if config.resizeOrigImages {
+		resizeOrigImages = "yes"
+	} else {
+		resizeOrigImages = "no"
+	}
+	println(" - resize original images: " + resizeOrigImages)
+	println(fmt.Sprintf(" - max image size: %d", config.maxImgSize))
 	var usingThumbs string
 	if config.useThumbs {
 		usingThumbs = "yes"
@@ -304,6 +409,8 @@ func printConfig(config appConfig) {
 	println(" - use thumbs: " + usingThumbs)
 	println(" - thumb sizes: " + strings.Trim(strings.Join(strings.Fields(fmt.Sprint(config.thumbSizes)), ", "), "[]"))
 	println(fmt.Sprintf(" - thumb threshold: %.2f", config.thumbThreshold))
+	println(fmt.Sprintf(" - jpeg quality: %d", config.jpegQuality))
+	println(" - png compression level: " + config.pngCompressionLevel.String())
 	println(" - serve host: " + config.serveHost)
 	println(fmt.Sprintf(" - serve port: %d", config.servePort))
 	sprintln("[----------------------]")

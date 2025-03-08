@@ -35,28 +35,33 @@ function initWebSocket() {
             return;
         }
         console.log(' - [reload] websocket message received: ' + evt.data);
-        const msg = JSON.parse(evt.data);
         const uri = location.pathname;
-        const home = uri === '/';
-        const archive = !home && uri.startsWith('/archive/');
-        const tags = !home && !archive && uri.startsWith('/tags/');
-        const single = !home && !archive && !tags && uri.startsWith('/' + msg.type + '/');
-        const entryEl = document.getElementById(msg.id);
-        const reload = home || archive || (single && !!entryEl);
-        if (reload) {
-            if (!home && !archive && msg.deleted) {
-                location.href = '/';
+        const home = uri === '/' || uri === '/index.html';
+        const archive = !home && uri === '/archive/';
+        const tags = !home && !archive && uri === '/tags/';
+        if (!archive && !tags) {
+            const msg = JSON.parse(evt.data);
+            const single = !home && !archive && !tags && (uri.startsWith('/post/') || uri.startsWith('/page/'));
+            if (!single && msg.op === 'create') {
+                location.reload();
             } else {
-                reloadEntry(msg.type, msg.id, msg.deleted, single, entryEl);
+                const exactSingle = single && uri.startsWith('/' + msg.type + '/' + msg.id);
+                const removed = msg.op === 'delete' || msg.op === 'rename';
+                if (exactSingle && removed) {
+                    location.href = '/';
+                } else if (!single || (exactSingle && msg.op === 'update')) {
+                    const ceEl = document.getElementById(msg.id);
+                    reloadEntry(msg.type, msg.id, removed, exactSingle, ceEl);
+                }
             }
         }
     }
 }
 
-function reloadEntry(type, id, deleted, single, entryEl) {
-    if (entryEl) {
-        if (deleted) {
-            entryEl.remove();
+function reloadEntry(type, id, removed, exactSingle, ceEl) {
+    if (ceEl) {
+        if (removed) {
+            ceEl.remove();
         } else {
             const xhr = new XMLHttpRequest();
             const typeIdPath = type + '/' + id;
@@ -67,11 +72,11 @@ function reloadEntry(type, id, deleted, single, entryEl) {
                     const lDoc = document.implementation.createHTMLDocument();
                     lDoc.documentElement.innerHTML = xhr.responseText;
                     const lMainEl = lDoc.getElementsByTagName('main')[0];
-                    if (!single) {
+                    if (!exactSingle) {
                         const lHeaderEl = lMainEl.getElementsByTagName('header')[0];
                         lHeaderEl.innerHTML += '<span class="links"><a href="/' + typeIdPath + '.html" class="permalink"><i class="fa-solid fa-link"></i></a></span>';
                     }
-                    entryEl.outerHTML = lMainEl.innerHTML;
+                    ceEl.outerHTML = lMainEl.innerHTML;
                 } else {
                     console.error('failed to reload content for: ' + typeIdPath);
                 }
