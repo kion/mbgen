@@ -273,24 +273,7 @@ header a.permalink {
     row-gap: 1em;
 }
 
-.content .media .image {
-    width: calc(100% - 0.5em);
-    height: auto;
-    padding: 4px;
-    border: 1px solid #555;
-    border-radius: 2px;
-}
-
-.content .media .image img {
-    width: 100%;
-    display: block;
-}
-
-.content .media .image:not(:last-of-type),
-.content .media .video:not(:last-of-type){
-    margin-bottom: 1em;
-}
-
+.content .media .image,
 .content .media .video,
 .content .media .embedded .video {
     display: block;
@@ -299,9 +282,15 @@ header a.permalink {
     border-radius: 2px;
 }
 
+.content .media .image img,
 .content .media .video video {
     width: 100%;
     display: block;
+}
+
+.content .media .image:not(:last-of-type),
+.content .media .video:not(:last-of-type){
+    margin-bottom: 1em;
 }
 
 .content .media .embedded .video .iframe-responsive {
