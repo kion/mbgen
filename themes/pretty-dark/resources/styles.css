@@ -283,6 +283,7 @@ header a.permalink {
 
 .content .media .image img {
     width: 100%;
+    display: block;
 }
 
 .content .media .image:not(:last-of-type),
@@ -294,12 +295,13 @@ header a.permalink {
 .content .media .embedded .video {
     display: block;
     padding: 4px;
-    border: 3px groove #555;
+    border: 1px solid #555;
     border-radius: 2px;
 }
 
 .content .media .video video {
     width: 100%;
+    display: block;
 }
 
 .content .media .embedded .video .iframe-responsive {
