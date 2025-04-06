@@ -295,49 +295,50 @@ func parseContentDirectives(ceType contentEntityType, ceId string, content strin
 		for _, wp := range wrapPlaceholders {
 			placeholder := wp[0]
 			directive := wp[1]
-			propStr := strings.Trim(wp[2], "()")
-			mediaArg := wp[4]
-			text := strings.TrimSpace(wp[5])
-			var buf bytes.Buffer
-			err := markdown.Convert([]byte(text), &buf)
-			check(err)
-			text = strings.TrimSpace(buf.String())
-			props := make(map[string]string)
-			if propStr != "" {
-				for _, pStr := range strings.Split(propStr, ",") {
-					prop := strings.Split(strings.TrimSpace(pStr), "=")
-					key := strings.TrimSpace(prop[0])
-					val := strings.TrimSpace(prop[1])
-					props[key] = val
-				}
-			}
-			var mediaFileNames []string
-			if mediaArg == "" {
-				mediaFileNames = listAllMedia(ceType, ceId, expListMedia)
-			} else {
-				for _, a := range strings.Split(mediaArg, ",") {
-					m := strings.TrimSpace(a)
-					mediaFileNames = append(mediaFileNames, m)
-				}
-			}
-			allMedia := parseMediaFileNames(mediaFileNames, ceType, ceId, config)
 			contentDirectiveTemplate, err := compileContentDirectiveTemplate(directive, resLoader)
 			if err != nil {
-				exitWithError(" - failed to process " + directive + " directive for " + ceId + ": " + err.Error())
+				println(" - failed to process " + directive + " directive for " + ceId + ": " + err.Error())
+			} else {
+				propStr := strings.Trim(wp[2], "()")
+				mediaArg := wp[4]
+				text := strings.TrimSpace(wp[5])
+				var buf bytes.Buffer
+				err := markdown.Convert([]byte(text), &buf)
+				check(err)
+				text = strings.TrimSpace(buf.String())
+				props := make(map[string]string)
+				if propStr != "" {
+					for _, pStr := range strings.Split(propStr, ",") {
+						prop := strings.Split(strings.TrimSpace(pStr), "=")
+						key := strings.TrimSpace(prop[0])
+						val := strings.TrimSpace(prop[1])
+						props[key] = val
+					}
+				}
+				var mediaFileNames []string
+				if mediaArg == "" {
+					mediaFileNames = listAllMedia(ceType, ceId, expListMedia)
+				} else {
+					for _, a := range strings.Split(mediaArg, ",") {
+						m := strings.TrimSpace(a)
+						mediaFileNames = append(mediaFileNames, m)
+					}
+				}
+				allMedia := parseMediaFileNames(mediaFileNames, ceType, ceId, config)
+				var contentDirectiveMarkupBuffer bytes.Buffer
+				err = contentDirectiveTemplate.Execute(&contentDirectiveMarkupBuffer, contentDirectiveData{
+					Text:  text,
+					Media: allMedia,
+					Props: props,
+				})
+				check(err)
+				ph := fmt.Sprintf(directivePlaceholderReplacementFormat, uuid.New().String())
+				if phReps == nil {
+					phReps = make(map[string]string)
+				}
+				phReps[ph] = strings.TrimSpace(contentDirectiveMarkupBuffer.String())
+				content = strings.Replace(content, placeholder, ph, 1)
 			}
-			var contentDirectiveMarkupBuffer bytes.Buffer
-			err = contentDirectiveTemplate.Execute(&contentDirectiveMarkupBuffer, contentDirectiveData{
-				Text:  text,
-				Media: allMedia,
-				Props: props,
-			})
-			check(err)
-			ph := fmt.Sprintf(directivePlaceholderReplacementFormat, uuid.New().String())
-			if phReps == nil {
-				phReps = make(map[string]string)
-			}
-			phReps[ph] = strings.TrimSpace(contentDirectiveMarkupBuffer.String())
-			content = strings.Replace(content, placeholder, ph, 1)
 		}
 	}
 	if mediaPlaceholders != nil {

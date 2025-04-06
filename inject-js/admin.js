@@ -50,13 +50,16 @@ function renderAdminCreateButtons(headerEl) {
 function renderContentEntryAdminLinks(entryType, entryId, contentEntryEl) {
     const headerEl = contentEntryEl.getElementsByTagName('header')[0];
     const linksEl = headerEl.getElementsByClassName('links')[0];
-    const adminEditHtml = '<a class="admin-link admin-edit"><i class="fa-solid fa-edit"></i></a>'
-    const adminMediaHtml = '<a class="admin-link admin-media"><i class="fa-solid fa-images"></i></a>'
-    const adminDeleteHtml = '<a class="admin-link admin-delete"><i class="fa-solid fa-trash-can"></i></a>'
-    if (linksEl) {
-        linksEl.innerHTML = linksEl.innerHTML + adminEditHtml + adminMediaHtml + adminDeleteHtml;
-    } else {
-        headerEl.innerHTML += '<span class="links">' + adminEditHtml + adminMediaHtml + adminDeleteHtml + '</span>';
+    if (!linksEl || linksEl.getElementsByClassName('admin-link').length === 0) {
+        // render admin links only if there are no admin links already
+        const adminEditHtml = '<a class="admin-link admin-edit"><i class="fa-solid fa-edit"></i></a>'
+        const adminMediaHtml = '<a class="admin-link admin-media"><i class="fa-solid fa-images"></i></a>'
+        const adminDeleteHtml = '<a class="admin-link admin-delete"><i class="fa-solid fa-trash-can"></i></a>'
+        if (linksEl) {
+            linksEl.innerHTML = linksEl.innerHTML + adminEditHtml + adminMediaHtml + adminDeleteHtml;
+        } else {
+            headerEl.innerHTML += '<span class="links">' + adminEditHtml + adminMediaHtml + adminDeleteHtml + '</span>';
+        }
     }
     registerAdminEventHandlers(entryType, entryId, contentEntryEl);
 }

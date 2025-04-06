@@ -97,33 +97,39 @@ func listenAndServe(addr string, admin bool, watch chan watchReloadData, config 
 			if !specificResourceRequested {
 				filePath += indexPageFileName
 			}
-			data, err := os.ReadFile(filePath)
-			check(err)
-			html := string(data)
-			if strings.HasSuffix(filePath, contentFileExtension) {
-				if admin {
-					html = strings.Replace(html,
-						bodyClosingTag,
-						jsOpeningTag+adminJS+jsClosingTag+bodyClosingTag,
-						1)
-					html = strings.Replace(html,
-						bodyClosingTag,
-						jsOpeningTag+mdEditorJS+jsClosingTag+bodyClosingTag,
-						1)
-					html = strings.Replace(html,
-						headClosingTag,
-						styleOpeningTag+mdEditorCSS+styleClosingTag+bodyClosingTag,
-						1)
+			if fileExists(filePath) {
+				data, err := os.ReadFile(filePath)
+				check(err)
+				if strings.HasSuffix(filePath, contentFileExtension) {
+					html := string(data)
+					if admin {
+						html = strings.Replace(html,
+							bodyClosingTag,
+							jsOpeningTag+adminJS+jsClosingTag+bodyClosingTag,
+							1)
+						html = strings.Replace(html,
+							bodyClosingTag,
+							jsOpeningTag+mdEditorJS+jsClosingTag+bodyClosingTag,
+							1)
+						html = strings.Replace(html,
+							headClosingTag,
+							styleOpeningTag+mdEditorCSS+styleClosingTag+bodyClosingTag,
+							1)
+					}
+					if watch != nil {
+						html = strings.Replace(html,
+							bodyClosingTag,
+							jsOpeningTag+watchReloadJS+jsClosingTag+bodyClosingTag,
+							1)
+					}
+					_, err = writer.Write([]byte(html))
+				} else {
+					_, err = writer.Write(data)
 				}
-				if watch != nil {
-					html = strings.Replace(html,
-						bodyClosingTag,
-						jsOpeningTag+watchReloadJS+jsClosingTag+bodyClosingTag,
-						1)
-				}
+				check(err)
+			} else {
+				println(" - [warning] file does not exist: " + filePath)
 			}
-			_, err = writer.Write([]byte(html))
-			check(err)
 		}
 	})
 	if admin {

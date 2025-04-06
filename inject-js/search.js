@@ -148,9 +148,6 @@ function processQuery(query, searchIndex) {
         searchSummaryEl.innerHTML = '<label>No records found</label>';
     }
     searchSummaryEl.style.display = 'block';
-    if (typeof renderAdmin === 'function') {
-        renderAdmin();
-    }
     searchOutputEl.style.display = 'block';
     // ================================================================================
 }
@@ -166,6 +163,9 @@ function renderNextSearchResultsPage() {
         searchPagerEl.style.display = 'block';
     } else {
         searchPagerEl.style.display = 'none';
+    }
+    if (typeof renderAdmin === 'function') {
+        renderAdmin();
     }
 }
 
