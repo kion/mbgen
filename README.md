@@ -201,6 +201,13 @@ $ mbgen help [command]
     * `{%<entry-type>:<entry-id>%}` - renders a URI to the given `<entry-id>` of the given `<entry-type>`, e.g.:
       * `[Sample Page]({%page:sample-page%})` - would render a link with title `Sample Page` to the page defined in the `pages/sample-project.md`
       * `[Sample Post 1]({%post:sample-post-1%})` - would render a link with title `Sample Post 1` to the post defined in the `posts/sample-post-1.md`
+    * `{%search:<search query>%}` - renders a URI to the search page with the given `<search query>` 
+      (_note: this content directive would work as expected only if 
+      the `enableSearch` configuration option was not disabled - see more details in the corresponding section below)_, e.g.:
+      * `[Search for "something interesting"]({%search:something interesting%})` - would render a link with title `Search for "something interesting"` pointing to `/search.html?q=something%20interesting`
+        * _Search would return content entries containing the words `something` **or** `interesting`_
+      * `[Search for "something+interesting"]({%search:something+interesting%})` - would render a link with title `Search for "something+interesting"` pointing to `/search.html?q=something%2Binteresting`
+        * _Search would return content entries containing the words `something` **and** `interesting`_
     * `{media(<properties>):<file(s)>}` - renders images/videos from the corresponding `deploy/media/<entry-id>` dir
       * to render specific media files, list them explicitly, e.g.: 
         * `{media:1.jpg}`

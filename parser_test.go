@@ -25,6 +25,10 @@ const testPageLinkPlaceholder = "{%page:sample-page-1%}"
 const testPageLinkURI = "/page/sample-page-1" + contentFileExtension
 const testPostLinkPlaceholder = "{%post:sample-post-1%}"
 const testPostLinkURI = "/post/sample-post-1" + contentFileExtension
+const testSearchLink1Placeholder = "{%search:term1 term2%}"
+const testSearchLink1URI = "/search" + contentFileExtension + "?q=term1%20term2"
+const testSearchLink2Placeholder = "{%search:term1+term2%}"
+const testSearchLink2URI = "/search" + contentFileExtension + "?q=term1%2Bterm2"
 const tag1 = "tag1"
 const tag2 = "Tag2"
 const tag3 = "TAG3"
@@ -41,6 +45,8 @@ title: %s
 
 [Page Link](%s)
 [Post Link](%s)
+[Search Link 1](%s)
+[Search Link 2](%s)
 `
 const postContentTemplate = `---
 title: %s
@@ -58,6 +64,8 @@ tags:
 
 [Page Link](%s)
 [Post Link](%s)
+[Search Link 1](%s)
+[Search Link 2](%s)
 `
 
 var testPageContent = fmt.Sprintf(pageContentTemplate,
@@ -68,6 +76,8 @@ var testPageContent = fmt.Sprintf(pageContentTemplate,
 	testEmbed3,
 	testPageLinkPlaceholder,
 	testPostLinkPlaceholder,
+	testSearchLink1Placeholder,
+	testSearchLink2Placeholder,
 )
 
 var testPostContent = fmt.Sprintf(postContentTemplate,
@@ -81,6 +91,8 @@ var testPostContent = fmt.Sprintf(postContentTemplate,
 	testEmbed3,
 	testPageLinkPlaceholder,
 	testPostLinkPlaceholder,
+	testSearchLink1Placeholder,
+	testSearchLink2Placeholder,
 )
 
 func TestParser(t *testing.T) {
@@ -121,6 +133,8 @@ func TestParser(t *testing.T) {
 	verifyEmbeddedMedia(page.Body, expectedEmbeddedMedia, t)
 	verifyStringContains(page.Body, testPageLinkURI, t)
 	verifyStringContains(page.Body, testPostLinkURI, t)
+	verifyStringContains(page.Body, testSearchLink1URI, t)
+	verifyStringContains(page.Body, testSearchLink2URI, t)
 
 	post := parsePost("post", testPostContent, config, resLoader)
 	verifyStringsEqual(post.Title, testPostTitle, t)
@@ -128,6 +142,8 @@ func TestParser(t *testing.T) {
 	verifyEmbeddedMedia(post.Body, expectedEmbeddedMedia, t)
 	verifyStringContains(post.Body, testPageLinkURI, t)
 	verifyStringContains(post.Body, testPostLinkURI, t)
+	verifyStringContains(post.Body, testSearchLink1URI, t)
+	verifyStringContains(post.Body, testSearchLink2URI, t)
 	verifyStringSlicesEqual(post.Tags, expectedTags, t)
 }
 

@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	appVersion                                  = "1.6.1"
+	appVersion                                  = "1.6.2"
 	defaultGitHubRepoUrl                        = "github.com/kion/mbgen"
 	defaultGitHubRepoThemesUrl                  = defaultGitHubRepoUrl + "/themes"
 	defaultGitHubRepoPageContentSamplesUrl      = defaultGitHubRepoUrl + "/content-samples/pages"
@@ -113,10 +113,11 @@ var (
 	whitespacePlaceholderRegexp          = /* const */ regexp.MustCompile(`\s+`)
 	includeTemplateFilePlaceholderRegexp = /* const */ regexp.MustCompile(`{{@\s*([\w-_]+\.html)\s*@}}`)
 	includeContentFilePlaceholderRegexp  = /* const */ regexp.MustCompile(`{{#\s*([\w-_]+\.html)\s*#}}`)
-	contentLinkPlaceholderRegexp         = /* const */ regexp.MustCompile(`{%\s*([\w-_]+):([\w-_]+)\s*%}`)
-	mediaPlaceholderRegexp               = /* const */ regexp.MustCompile(`{media(\([\s\w=,]+\))?(:\s*([\w\s-_.,*]+))?}`)
-	embedMediaPlaceholderRegexp          = /* const */ regexp.MustCompile(`{embed:\s*([^}]+)}`)
-	wrapPlaceholderRegexp                = /* const */ regexp.MustCompile(`\{([\w-_.]+)(\([\s\w=,]+\))?(:\s*([\w\s-_.,*]+))?}([^{}]*){/}`)
+	searchLinkPlaceholderRegexp          = /* const */ regexp.MustCompile(`{%\s*search\s*:\s*([^{}%]+)\s*%}`)
+	contentLinkPlaceholderRegexp         = /* const */ regexp.MustCompile(`{%\s*([\w-_]+)\s*:\s*([\w-_]+)\s*%}`)
+	mediaPlaceholderRegexp               = /* const */ regexp.MustCompile(`{\s*media(\([\s\w=,]+\))?(\s*:\s*([\w\s-_.,*]+))?\s*}`)
+	embedMediaPlaceholderRegexp          = /* const */ regexp.MustCompile(`{\s*embed\s*:\s*([^}]+)\s*}`)
+	wrapPlaceholderRegexp                = /* const */ regexp.MustCompile(`\{\s*([\w-_.]+)\s*(\([\s\w=,]+\))?(\s*:\s*([\w\s-_.,*]+))?\s*}([^{}]*){/}`)
 	hashTagRegex                         = /* const */ regexp.MustCompile(`#(\p{L}+[_-]*\p{L}*)`)
 )
 

@@ -10,6 +10,7 @@ import (
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/renderer/html"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
@@ -261,6 +262,16 @@ func parseContentDirectives(ceType contentEntityType, ceId string, content strin
 			if ceType != UndefinedContentEntityType {
 				link = "/" + strings.ToLower(ceType.String()) + "/" + entryId + contentFileExtension
 			}
+			content = strings.Replace(content, placeholder, link, 1)
+		}
+	}
+	searchLinkPlaceholders := searchLinkPlaceholderRegexp.FindAllStringSubmatch(content, -1)
+	if searchLinkPlaceholders != nil {
+		for _, slp := range searchLinkPlaceholders {
+			placeholder := slp[0]
+			searchQuery := url.QueryEscape(strings.ToLower(strings.TrimSpace(slp[1])))
+			searchQuery = strings.ReplaceAll(searchQuery, "+", "%20")
+			link := "/" + searchPageFileName + "?q=" + searchQuery
 			content = strings.Replace(content, placeholder, link, 1)
 		}
 	}

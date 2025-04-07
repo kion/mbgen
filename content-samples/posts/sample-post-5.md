@@ -15,5 +15,6 @@ Ultrices neque ornare aenean euismod elementum. Sed lectus vestibulum mattis ull
 
 * [Link to another post]({%post:sample-post-3%})
 * [Link to another page]({%page:sample-page%})
+* [Search for "with+cover"]({%search:with+cover%})
 
 {/}
