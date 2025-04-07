@@ -6,16 +6,15 @@ embracing the convention-over-configuration philosophy.
 ## Features
 
 * Built-in admin (content management) interface
-  * As an alternative: watch & hot reload mode to monitor changes 
-    to the content and media (image/video) files, 
-    generate the corresponding output files on the fly, 
-    and dynamically update the live view in browser
+* Watch & hot reload mode: monitor changes to the content and media (image/video) files, 
+  generate the corresponding output files on the fly, and dynamically update the live view in browser
 * Built-in search engine
-* Built-in support for pagination, as well as tag-based and date-based filtering
 * Archive Index generation
 * Tag Index (Tag Cloud) generation
+* Built-in support for pagination, as well as tag-based and date-based filtering
+* Simple and intuitive media (image/video) embedding with custom rendering options
 * Support for original image file resizing and thumbnail generation
-* Simple and intuitive image and video embedding
+* Easy to use content directives (e.g. hashtags, links to other posts/pages, etc.)
 * Support for custom styling and includes
 * Customizable configuration (pagination, thumbnails, etc.)
 
