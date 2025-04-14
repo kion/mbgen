@@ -80,13 +80,6 @@ copies all the required theme resources (like fonts, styles, etc.) the static fi
 as well as generates the thumbnails for the content images whenever appropriate 
 _(this default behavior can be disabled in the `config.yml`)_.
 
-Inspect content directories and report/fix any issues found using the following command:
-
-```shell
-$ mbgen inspect
-$ mbgen inspect --fix
-```
-
 Run the following command to start a simple http server to serve the generated site locally:
 
 ```shell
@@ -98,6 +91,8 @@ Then open the following address in a browser to preview your site:
 [http://localhost:8888/](http://localhost:8080/)
 
 _(the default host and port values can be modified in the `config.yml`)_
+
+## Admin Commands / Content Management
 
 Use the `--admin` flag to render content management UI components to create/edit/delete pages and posts:
 
@@ -113,19 +108,20 @@ automatically regenerate the site on the fly, and see the changes dynamically re
 $ mbgen serve --watch-reload
 ```
 
-If you have `rsync` installed and available in your `PATH`,
-you can use the `deploy` command to upload the generated site (i.e. the `deploy` dir) to a remote server 
+## Deployment
+
+You can upload the `deploy` dir to a remote server manually / using any tool of your choice.
+
+However, if you have `rsync` installed and available in your `PATH`,
+you can use the built-in `deploy` command to upload the generated site (i.e. the `deploy` dir) to a remote server
 (only the files that have changed since the last upload will be transferred):
 
 ```shell
 $ mbgen deploy
 ```
 
-This requires the `deployPath`, `deployHost`, and `deployUsername` config options to be set in the `config.yml` file 
-(see more details in the corresponding section down below).
-
 Note that the `deploy` command uploads sub-dirs and files inside the `deploy` dir in a specific order
-(e.g. media files first, then pages and single posts, then paginated files, etc.) 
+(e.g. media files first, then pages and single posts, then paginated files, etc.)
 to avoid broken links/refs on the site during the upload process.
 
 The `rsync` command is always run with the following options:
@@ -134,19 +130,29 @@ The `rsync` command is always run with the following options:
 --archive --compress --delete --no-t --no-o --no-g --no-p --progress --verbose
 ```
 
-Other supported commands:
+In order to use this command, the `deployPath`, `deployHost`, and `deployUsername` config options must be set in the `config.yml` file
+(see more details in the corresponding section down below).
 
-* parse content directories and print out the corresponding stats:
+## Other Commands
+
+* Inspect content directories and report/fix any issues found:
+
+```shell
+$ mbgen inspect
+$ mbgen inspect --fix
+```
+
+* Parse content directories and print out the corresponding stats:
 ```shell
 $ mbgen stats
 ```
 
-* install/update and/or activate a theme:
+* Install/update and/or activate a theme:
 ```shell
 $ mbgen theme <action> <theme>
 ```
 
-* print out help/usage information:
+* Print out help/usage information:
 ```shell
 $ mbgen help [command]
 ```
