@@ -17,6 +17,7 @@ embracing the convention-over-configuration philosophy.
 * Easy to use content directives (e.g. hashtags, links to other posts/pages, etc.)
 * Support for custom styling and includes
 * Customizable configuration (pagination, thumbnails, etc.)
+* Built-in support for deploying the generated site to a remote server using `rsync`
 
 ## Demo
 
@@ -79,6 +80,13 @@ copies all the required theme resources (like fonts, styles, etc.) the static fi
 as well as generates the thumbnails for the content images whenever appropriate 
 _(this default behavior can be disabled in the `config.yml`)_.
 
+Inspect content directories and report/fix any issues found using the following command:
+
+```shell
+$ mbgen inspect
+$ mbgen inspect --fix
+```
+
 Run the following command to start a simple http server to serve the generated site locally:
 
 ```shell
@@ -105,13 +113,28 @@ automatically regenerate the site on the fly, and see the changes dynamically re
 $ mbgen serve --watch-reload
 ```
 
-Other supported commands:
+If you have `rsync` installed and available in your `PATH`,
+you can use the `deploy` command to upload the generated site (i.e. the `deploy` dir) to a remote server 
+(only the files that have changed since the last upload will be transferred):
 
-* inspect content directories and report/fix any issues found:
 ```shell
-$ mbgen inspect
-$ mbgen inspect --fix
+$ mbgen deploy
 ```
+
+This requires the `deployPath`, `deployHost`, and `deployUsername` config options to be set in the `config.yml` file 
+(see more details in the corresponding section down below).
+
+Note that the `deploy` command uploads sub-dirs and files inside the `deploy` dir in a specific order
+(e.g. media files first, then pages and single posts, then paginated files, etc.) 
+to avoid broken links/refs on the site during the upload process.
+
+The `rsync` command is always run with the following options:
+
+```
+--archive --compress --delete --no-t --no-o --no-g --no-p --progress --verbose
+```
+
+Other supported commands:
 
 * parse content directories and print out the corresponding stats:
 ```shell
@@ -363,6 +386,12 @@ or can even be completely omitted from the config):
   - if not specified, the default value of `localhost` is used
 * [optional] `servePort` - port to use for `serve` command
   - if not specified, the default value of `8888` is used
+* [optional] `deployPath` - deploy destination path
+  - must be specified for the `deploy` command to work 
+  - _if `deployHost` and `deployUsername` config options are not specified,
+    the `deployPath` is used as a local path - this is mostly useful for testing purposes only_
+* [optional] `deployHost` - remote host (a domain name or an IP address) to deploy the site to
+* [optional] `deployUsername` - username for the SSH connection to the remote deployment host
 
 ## License
 

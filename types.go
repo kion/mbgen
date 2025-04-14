@@ -71,6 +71,9 @@ type appConfig struct {
 	pngCompressionLevel pngCompressionLevel
 	serveHost           string
 	servePort           int
+	deployPath          string
+	deployHost          string
+	deployUsername      string
 }
 
 type appCommandDescriptor struct {
@@ -457,3 +460,9 @@ type dirWatchEvent struct {
 }
 
 type dirWatchHandler func(dwEvent dirWatchEvent)
+
+type deployOptions struct {
+	source      string
+	destination string
+	exclude     []string
+}

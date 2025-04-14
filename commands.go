@@ -108,6 +108,13 @@ var (
 			"   - the default theme name is: \"" + defaultThemeName + "\", but you can also use the \"" + defaultThemeAlias + "\" alias instead\n\n",
 		reqConfig: true,
 	}
+	commandDeploy = /* const */ appCommandDescriptor{
+		command: "deploy",
+		description: "deploy generated site to a remote server\n\n" +
+			" - requires the `deployPath`, `deployHost`, and `deployUsername` config options to be set in the `config.yml`",
+		usage:     "mbgen deploy\n\n",
+		reqConfig: true,
+	}
 )
 
 func getSupportedCommands() map[string]tuple2[appCommand, appCommandDescriptor] {
@@ -121,6 +128,7 @@ func getSupportedCommands() map[string]tuple2[appCommand, appCommandDescriptor] 
 		commandStats.command:    {_stats, commandStats},
 		commandServe.command:    {_serve, commandServe},
 		commandTheme.command:    {_theme, commandTheme},
+		commandDeploy.command:   {_deploy, commandDeploy},
 	}
 }
 
@@ -656,6 +664,21 @@ func copyThemeIncludes(theme string) {
 				}
 			}
 		}
+	}
+}
+
+func _deploy(config appConfig, commandArgs ...string) {
+	if config.deployPath == "" {
+		sprintln("error: no deploy path specified in the config file")
+	} else {
+		deployDestination := config.deployPath
+		if config.deployHost != "" {
+			deployDestination = config.deployHost + ":" + deployDestination
+			if config.deployUsername != "" {
+				deployDestination = config.deployUsername + "@" + deployDestination
+			}
+		}
+		rsyncDeploy(deployDestination)
 	}
 }
 

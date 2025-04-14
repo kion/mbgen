@@ -12,9 +12,6 @@ import (
 
 func defaultConfig() appConfig {
 	return appConfig{
-		siteName:            "",
-		theme:               "",
-		homePage:            "",
 		generateArchive:     defaultGenerateArchive,
 		generateTagIndex:    defaultGenerateTagIndex,
 		enableSearch:        defaultEnableSearch,
@@ -208,6 +205,18 @@ func readConfig() appConfig {
 		}
 	}
 
+	if deployPath, ok := cm["deployPath"]; ok && deployPath != "" {
+		config.deployPath = deployPath
+	}
+
+	if deployHost, ok := cm["deployHost"]; ok && deployHost != "" {
+		config.deployHost = deployHost
+	}
+
+	if deployUsername, ok := cm["deployUsername"]; ok && deployUsername != "" {
+		config.deployUsername = deployUsername
+	}
+
 	return config
 }
 
@@ -365,6 +374,27 @@ func writeConfig(config appConfig) {
 		yml += "servePort: " + strconv.Itoa(config.servePort)
 	}
 
+	yml += "\n"
+	if config.deployPath != "" {
+		yml += "deployPath: " + config.deployPath
+	} else {
+		yml += "#deployPath: "
+	}
+
+	yml += "\n"
+	if config.deployHost != "" {
+		yml += "deployHost: " + config.deployHost
+	} else {
+		yml += "#deployHost: "
+	}
+
+	yml += "\n"
+	if config.deployUsername != "" {
+		yml += "deployUsername: " + config.deployUsername
+	} else {
+		yml += "#deployUsername: "
+	}
+
 	writeDataToFileIfChanged(configFileName, []byte(yml))
 }
 
@@ -413,5 +443,14 @@ func printConfig(config appConfig) {
 	println(" - png compression level: " + config.pngCompressionLevel.String())
 	println(" - serve host: " + config.serveHost)
 	println(fmt.Sprintf(" - serve port: %d", config.servePort))
+	if config.deployPath != "" {
+		println(" - deploy path: " + config.deployPath)
+	}
+	if config.deployHost != "" {
+		println(" - deploy host: " + config.deployHost)
+	}
+	if config.deployUsername != "" {
+		println(" - deploy username: " + config.deployUsername)
+	}
 	sprintln("[----------------------]")
 }
