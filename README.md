@@ -113,12 +113,14 @@ $ mbgen serve --watch-reload
 You can upload the `deploy` dir to a remote server manually / using any tool of your choice.
 
 However, if you have `rsync` installed and available in your `PATH`,
-you can use the built-in `deploy` command to upload the generated site (i.e. the `deploy` dir) to a remote server
-(only the files that have changed since the last upload will be transferred):
+you can use the built-in `deploy` command to upload the generated site (i.e. the `deploy` dir) to a remote server 
+(which should be accessible via SSH and have `rsync` installed/available as well):
 
 ```shell
 $ mbgen deploy
 ```
+
+_(`rsync` will upload only the files that have changed since the last deployment)_
 
 Note that the `deploy` command uploads sub-dirs and files inside the `deploy` dir in a specific order
 (e.g. media files first, then pages and single posts, then paginated files, etc.)
