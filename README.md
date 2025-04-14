@@ -394,7 +394,7 @@ or can even be completely omitted from the config):
   - if not specified, the default value of `localhost` is used
 * [optional] `servePort` - port to use for `serve` command
   - if not specified, the default value of `8888` is used
-* [optional] `deployPath` - deploy destination path (e.g. `/var/www/html/`)
+* [optional] `deployPath` - deploy destination path (e.g. `/var/www/html`)
   - must be specified for the `deploy` command to work 
   - _if `deployHost` and `deployUsername` config options are not specified,
     the `deployPath` is used as a local path - this is mostly useful for testing purposes only_
