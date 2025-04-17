@@ -112,27 +112,38 @@ $ mbgen serve --watch-reload
 
 You can upload the `deploy` dir to a remote server manually / using any tool of your choice.
 
+Ideally, the sub-dirs and files inside the `deploy` dir should be uploaded in the following order:
+
+* `media` dir - all the media files (images/videos)
+* `page` dir - all the generated single page files
+* `post` dir - all the generated single post files
+* `posts` dir - all the generated paginated post files
+* `tags` dir - all the generated tag-scoped post files
+* `archive` dir - all the generated archive index & month-scoped post files
+* everything else inside the `deploy` dir, excluding the directories listed above
+
+This way you can avoid broken links/refs on the site during the upload process.
+
 However, if you have `rsync` installed and available in your `PATH`,
-you can use the built-in `deploy` command to upload the generated site (i.e. the `deploy` dir) to a remote server 
-(which should be accessible via SSH and have `rsync` installed/available as well):
+you don't have to handle the upload process manually and worry about the upload order of the files and directories.
+
+You can simply use the built-in `deploy` command to upload the generated site to a remote server 
+(which should be accessible via SSH and have `rsync` installed/available as well), 
+which would make sure to use the appropriate upload order (as outlined above):
 
 ```shell
 $ mbgen deploy
 ```
 
-_(`rsync` will upload only the files that have changed since the last deployment)_
-
-Note that the `deploy` command uploads sub-dirs and files inside the `deploy` dir in a specific order
-(e.g. media files first, then pages and single posts, then paginated files, etc.)
-to avoid broken links/refs on the site during the upload process.
-
-The `rsync` command is always run with the following options:
+The `rsync` tool itself is always invoked with the following options:
 
 ```
 --archive --compress --delete --no-t --no-o --no-g --no-p --progress --verbose
 ```
 
-In order to use this command, the `deployPath`, `deployHost`, and `deployUsername` config options must be set in the `config.yml` file
+_(it would upload only the files changed since the last deployment, which is what this tool is designed for! ;))_
+
+In order to use the `mbgen deploy` command, the `deployPath`, `deployHost`, and `deployUsername` config options must be set in the `config.yml` file
 (see more details in the corresponding section down below).
 
 ## Other Commands

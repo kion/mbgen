@@ -46,6 +46,14 @@ func rsyncDeploy(destination string) {
 				destination: fmt.Sprintf("%s%c%s", destination, destPathSeparator, deployPostsDirName),
 			},
 			{
+				source:      fmt.Sprintf("%s%c%s%c", source, os.PathSeparator, deployTagsDirName, os.PathSeparator),
+				destination: fmt.Sprintf("%s%c%s", destination, destPathSeparator, deployTagsDirName),
+			},
+			{
+				source:      fmt.Sprintf("%s%c%s%c", source, os.PathSeparator, deployArchiveDirName, os.PathSeparator),
+				destination: fmt.Sprintf("%s%c%s", destination, destPathSeparator, deployArchiveDirName),
+			},
+			{
 				source:      fmt.Sprintf("%s%c", source, os.PathSeparator),
 				destination: destination,
 				exclude: []string{
@@ -53,43 +61,47 @@ func rsyncDeploy(destination string) {
 					deployPageDirName,
 					deployPostDirName,
 					deployPostsDirName,
+					deployTagsDirName,
+					deployArchiveDirName,
 				},
 			},
 		}
 
 		for i := 0; i < len(deployOpts); i++ {
 			dOpts := deployOpts[i]
-			fmt.Printf("\n - deploy: %s -> %s\n", dOpts.source, dOpts.destination)
-			args := []string{
-				"--archive",
-				"--compress",
-				"--delete",
-				"--no-t",
-				"--no-o",
-				"--no-g",
-				"--no-p",
-				"--progress",
-				"--verbose",
-			}
-			if len(dOpts.exclude) > 0 {
-				for _, exclude := range dOpts.exclude {
-					args = append(args, fmt.Sprintf("--exclude=%s", exclude))
+			if dirExists(dOpts.source) {
+				fmt.Printf("\n - deploy: %s -> %s\n", dOpts.source, dOpts.destination)
+				args := []string{
+					"--archive",
+					"--compress",
+					"--delete",
+					"--no-t",
+					"--no-o",
+					"--no-g",
+					"--no-p",
+					"--progress",
+					"--verbose",
 				}
-			}
-			args = append(args, dOpts.source)
-			args = append(args, dOpts.destination)
-			cmd := exec.Command("rsync", args...)
-			output, err := cmd.Output()
-			check(err)
-			outputLines := strings.Split(string(output), "\n")
-			for _, line := range outputLines {
-				line = strings.TrimSpace(line)
-				if strings.HasPrefix(line, "sent") ||
-					strings.HasPrefix(line, "total") {
-					fmt.Println(" - " + line)
+				if len(dOpts.exclude) > 0 {
+					for _, exclude := range dOpts.exclude {
+						args = append(args, fmt.Sprintf("--exclude=%s", exclude))
+					}
 				}
+				args = append(args, dOpts.source)
+				args = append(args, dOpts.destination)
+				cmd := exec.Command("rsync", args...)
+				output, err := cmd.Output()
+				check(err)
+				outputLines := strings.Split(string(output), "\n")
+				for _, line := range outputLines {
+					line = strings.TrimSpace(line)
+					if strings.HasPrefix(line, "sent") ||
+						strings.HasPrefix(line, "total") {
+						fmt.Println(" - " + line)
+					}
+				}
+				fmt.Printf(" - deploy: %s -> %s [complete]\n", dOpts.source, dOpts.destination)
 			}
-			fmt.Printf(" - deploy: %s -> %s [complete]\n", dOpts.source, dOpts.destination)
 		}
 	}
 }
