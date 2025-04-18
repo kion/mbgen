@@ -178,10 +178,10 @@ type templateContent struct {
 }
 
 type contentDirectiveData struct {
-	Text  string
-	Media []media
-	Embed []embeddedMedia
-	Props map[string]string
+	Text          string
+	Media         []media
+	EmbeddedMedia *embeddedMedia
+	Props         map[string]string
 }
 
 func (c contentDirectiveData) Images() []media {

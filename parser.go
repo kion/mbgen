@@ -397,25 +397,25 @@ func parseContentDirectives(ceType contentEntityType, ceId string, content strin
 	}
 	embedMediaPlaceholders := embedMediaPlaceholderRegexp.FindAllStringSubmatch(content, -1)
 	if embedMediaPlaceholders != nil {
-		var em []embeddedMedia
 		for _, emp := range embedMediaPlaceholders {
+			var em *embeddedMedia
 			placeholder := emp[0]
 			url := emp[1]
 			for _, emt := range embeddedMediaTypes {
 				code := emt.getCode(url)
 				if code != "" {
-					em = append(em, embeddedMedia{
+					em = &embeddedMedia{
 						MediaType: emt,
 						Code:      code,
-					})
+					}
 					break
 				}
 			}
-			if len(em) > 0 {
+			if em != nil {
 				inlineMediaTemplate := compileMediaTemplate(resLoader)
 				var inlineMediaMarkupBuffer bytes.Buffer
 				err := inlineMediaTemplate.Execute(&inlineMediaMarkupBuffer, contentDirectiveData{
-					Embed: em,
+					EmbeddedMedia: em,
 				})
 				check(err)
 				ph := fmt.Sprintf(directivePlaceholderReplacementFormat, uuid.New().String())

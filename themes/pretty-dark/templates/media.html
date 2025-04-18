@@ -1,7 +1,7 @@
 {{ $ccStr := index .Props "cc" }}
 <section class="media">
-    {{ if .Embed }}
-        {{ $embeddedMedia := .Embed }}
+    {{ if .EmbeddedMedia }}
+        {{ $em := .EmbeddedMedia }}
         {{@ media-embedded.html @}}
     {{ end }}
     {{ $media := .Videos }}

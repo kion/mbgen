@@ -1,6 +1,5 @@
-{{ if $embeddedMedia }}
+{{ if $em }}
 <section class="embedded">
-{{ range $em := $embeddedMedia }}
     {{ if eq $em.MediaType.String "youtube" }}
     <div class="video">
         <div class="iframe-responsive">
@@ -15,6 +14,5 @@
         </div>
     </div>
     {{ end }}
-{{ end }}
 </section>
 {{ end }}
