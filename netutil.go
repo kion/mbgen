@@ -334,6 +334,7 @@ func listenAndServe(addr string, admin bool, watch chan watchReloadData, config 
 					http.Error(writer, "Deploy path is not configured", http.StatusFailedDependency)
 					return
 				}
+				_generate(config)
 				_deploy(config)
 				writer.WriteHeader(http.StatusOK)
 			}
