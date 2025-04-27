@@ -1,5 +1,6 @@
 const supportedMediaFileExt = ['.jpg', '.jpeg', '.png', '.gif', '.mp4', '.mkv', '.mov'];
 const supportedMediaFileExtStr = supportedMediaFileExt.join(',');
+const deployCommandAvailable = ":@@@:deploy-command-available:@@@:" === "true";
 
 (function() {
     renderAdmin();
@@ -8,12 +9,10 @@ const supportedMediaFileExtStr = supportedMediaFileExt.join(',');
 function renderAdmin() {
     const uri = location.pathname;
     const home = uri === '/' || uri === '/index.html';
-    if (home) {
-        const headerEl = document.getElementsByTagName('header')[0];
-        renderAdminCreateButtons(headerEl);
-    }
     const archive = !home && uri === '/archive/';
     const tags = !home && !archive && uri === '/tags/';
+    const headerEl = document.getElementsByTagName('header')[0];
+    renderAdminCreateButtons(headerEl);
     if (!archive && !tags) {
         const mainEl = document.getElementsByTagName('main')[0];
         const contentEntryEls = mainEl.getElementsByClassName('content-entry');
@@ -32,6 +31,9 @@ function renderAdminCreateButtons(headerEl) {
     const adminCreateHtml =
         '<section class="admin-create">' +
             '<section class="admin-controls">' +
+                (deployCommandAvailable
+                    ? '<button class="admin-btn" id="admin-deploy"><i class="fa-solid fa-upload"></i>Deploy</button>'
+                    : '') +
                 '<button class="admin-btn" id="admin-create-page"><i class="fa-solid fa-square-plus"></i>Create New Page</button>' +
                 '<button class="admin-btn" id="admin-create-post"><i class="fa-solid fa-calendar-plus"></i>Create New Post</button>' +
             '</section>' +
@@ -44,6 +46,21 @@ function renderAdminCreateButtons(headerEl) {
     const adminCreatePostBtn = document.getElementById('admin-create-post');
     adminCreatePostBtn.onclick = function() {
         adminCreatePost();
+    }
+    if (deployCommandAvailable) {
+        const adminDeployBtn = document.getElementById('admin-deploy');
+        adminDeployBtn.onclick = function() {
+            adminDeploy(
+                function(){
+                    adminDeployBtn.disabled = true;
+                    adminDeployBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>Deploying...';
+                },
+                function(){
+                    adminDeployBtn.disabled = false;
+                    adminDeployBtn.innerHTML = '<i class="fa-solid fa-upload"></i>Deploy';
+                }
+            );
+        }
     }
 }
 
@@ -345,6 +362,38 @@ function uploadMediaFormData(entryType, entryId, mediaUploadFormData, successCal
             failureCallbackFn(xhr.responseText);
         }
     }
+}
+
+function adminDeploy(beforeFn, afterFn) {
+    if (beforeFn && typeof beforeFn === 'function') {
+        beforeFn();
+    }
+    new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/admin-deploy', true);
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                resolve('Deployment successful');
+            } else {
+                reject('Deployment failed: ' + xhr.responseText);
+            }
+        };
+        xhr.onerror = function() {
+            reject('Failed to invoke deploy command');
+        };
+        xhr.send();
+    })
+    .then(message => {
+        alert(message);
+    })
+    .catch(error => {
+        alert(error);
+    })
+    .finally(() => {
+        if (afterFn && typeof afterFn === 'function') {
+            afterFn();
+        }
+    });
 }
 
 function hideAdminControls(contentEntryEl) {

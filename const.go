@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	appVersion                                  = "1.6.5"
+	appVersion                                  = "1.6.6"
 	defaultGitHubRepoUrl                        = "github.com/kion/mbgen"
 	defaultGitHubRepoThemesUrl                  = defaultGitHubRepoUrl + "/themes"
 	defaultGitHubRepoPageContentSamplesUrl      = defaultGitHubRepoUrl + "/content-samples/pages"
@@ -100,6 +100,7 @@ const (
 	bodyClosingTag                              = "</body>"
 	mainOpeningTag                              = "<main>"
 	mainClosingTag                              = "</main>"
+	deployCommandAvailablePlaceholder           = ":@@@:deploy-command-available:@@@:"
 )
 
 var (

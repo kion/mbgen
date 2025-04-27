@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -103,6 +104,8 @@ func listenAndServe(addr string, admin bool, watch chan watchReloadData, config 
 				if strings.HasSuffix(filePath, contentFileExtension) {
 					html := string(data)
 					if admin {
+						deployCommandAvailable := config.deployPath != ""
+						adminJS = strings.Replace(adminJS, deployCommandAvailablePlaceholder, strconv.FormatBool(deployCommandAvailable), 1)
 						html = strings.Replace(html,
 							bodyClosingTag,
 							jsOpeningTag+adminJS+jsClosingTag+bodyClosingTag,
@@ -323,6 +326,16 @@ func listenAndServe(addr string, admin bool, watch chan watchReloadData, config 
 			if regenerate {
 				removeContentEntityFromCache(ceType, ceId+markdownFileExtension)
 				processAndHandleStats(config, resLoader, true)
+			}
+		})
+		http.HandleFunc("/admin-deploy", func(writer http.ResponseWriter, request *http.Request) {
+			if request.Method == http.MethodPost {
+				if config.deployPath == "" {
+					http.Error(writer, "Deploy path is not configured", http.StatusFailedDependency)
+					return
+				}
+				_deploy(config)
+				writer.WriteHeader(http.StatusOK)
 			}
 		})
 	}
