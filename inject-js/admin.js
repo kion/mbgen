@@ -12,7 +12,7 @@ function renderAdmin() {
     const archive = !home && uri === '/archive/';
     const tags = !home && !archive && uri === '/tags/';
     const headerEl = document.getElementsByTagName('header')[0];
-    renderAdminCreateButtons(headerEl);
+    renderAdminButtons(headerEl);
     if (!archive && !tags) {
         const mainEl = document.getElementsByTagName('main')[0];
         const contentEntryEls = mainEl.getElementsByClassName('content-entry');
@@ -27,39 +27,41 @@ function renderAdmin() {
     }
 }
 
-function renderAdminCreateButtons(headerEl) {
-    const adminCreateHtml =
-        '<section class="admin-create">' +
+function renderAdminButtons(headerEl) {
+    if (headerEl.parentElement.getElementsByClassName('admin-create').length === 0) {
+        const adminCreateHtml =
+            '<section class="admin-create">' +
             '<section class="admin-controls">' +
-                (deployCommandAvailable
-                    ? '<button class="admin-btn" id="admin-deploy"><i class="fa-solid fa-upload"></i>Deploy</button>'
-                    : '') +
-                '<button class="admin-btn" id="admin-create-page"><i class="fa-solid fa-square-plus"></i>Create New Page</button>' +
-                '<button class="admin-btn" id="admin-create-post"><i class="fa-solid fa-calendar-plus"></i>Create New Post</button>' +
+            (deployCommandAvailable
+                ? '<button class="admin-btn" id="admin-deploy"><i class="fa-solid fa-upload"></i>Deploy</button>'
+                : '') +
+            '<button class="admin-btn" id="admin-create-page"><i class="fa-solid fa-square-plus"></i>Create New Page</button>' +
+            '<button class="admin-btn" id="admin-create-post"><i class="fa-solid fa-calendar-plus"></i>Create New Post</button>' +
             '</section>' +
-        '</section>';
-    headerEl.outerHTML += adminCreateHtml;
-    const adminCreatePageBtn = document.getElementById('admin-create-page');
-    adminCreatePageBtn.onclick = function() {
-        adminCreatePage();
-    }
-    const adminCreatePostBtn = document.getElementById('admin-create-post');
-    adminCreatePostBtn.onclick = function() {
-        adminCreatePost();
-    }
-    if (deployCommandAvailable) {
-        const adminDeployBtn = document.getElementById('admin-deploy');
-        adminDeployBtn.onclick = function() {
-            adminDeploy(
-                function(){
-                    adminDeployBtn.disabled = true;
-                    adminDeployBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>Deploying...';
-                },
-                function(){
-                    adminDeployBtn.disabled = false;
-                    adminDeployBtn.innerHTML = '<i class="fa-solid fa-upload"></i>Deploy';
-                }
-            );
+            '</section>';
+        headerEl.outerHTML += adminCreateHtml;
+        const adminCreatePageBtn = document.getElementById('admin-create-page');
+        adminCreatePageBtn.onclick = function() {
+            adminCreatePage();
+        }
+        const adminCreatePostBtn = document.getElementById('admin-create-post');
+        adminCreatePostBtn.onclick = function() {
+            adminCreatePost();
+        }
+        if (deployCommandAvailable) {
+            const adminDeployBtn = document.getElementById('admin-deploy');
+            adminDeployBtn.onclick = function() {
+                adminDeploy(
+                    function(){
+                        adminDeployBtn.disabled = true;
+                        adminDeployBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>Deploying...';
+                    },
+                    function(){
+                        adminDeployBtn.disabled = false;
+                        adminDeployBtn.innerHTML = '<i class="fa-solid fa-upload"></i>Deploy';
+                    }
+                );
+            }
         }
     }
 }
