@@ -465,21 +465,11 @@ func generateFeeds(posts []post, config appConfig, handleOutput processorOutputH
 			exitWithError(fmt.Sprintf(errPostDateMissing, p.Id))
 		}
 
-		// build feed item title with date/time/title
-		itemTitle := p.FmtDate() // always starts with date: "2023-08-01"
+		// build feed item title
+		itemTitle := buildFeedItemTitle(p)
 
-		if !p.Time.IsZero() {
-			itemTitle += " " + p.FmtTime() // add time if present: "2023-08-01 19:15"
-		}
-
-		if p.Title != "" {
-			itemTitle += " | " + p.Title // add title if present: "2023-08-01 19:15 | My Post"
-		}
-
-		// optimize images for feeds by replacing srcset with smallest thumbnails
-		itemContent := optimizeImagesForFeeds(p.Body, config.thumbSizes)
-		// convert relative URLs to absolute in post body
-		itemContent = convertRelativeURLsToAbsolute(itemContent, config.siteBaseURL)
+		// build feed item content excerpt
+		itemContent := buildFeedItemExcerpt(p, config)
 
 		// construct item URL (deployPostDirName is "post", not "deploy/post")
 		itemURL := fmt.Sprintf("%s/%s/%s%s", config.siteBaseURL, deployPostDirName, p.Id, contentFileExtension)
@@ -529,6 +519,109 @@ func generateFeeds(posts []post, config appConfig, handleOutput processorOutputH
 	}
 }
 
+// buildFeedItemTitle creates the title for a feed item
+func buildFeedItemTitle(p post) string {
+	itemTitle := p.FmtDate() // always starts with date
+
+	if !p.Time.IsZero() {
+		itemTitle += " " + p.FmtTime() // add time if present
+	}
+
+	if p.Title != "" {
+		itemTitle += " | " + p.Title // add title if present
+	} else if len(p.Tags) > 0 {
+		// when no title, append tags
+		var tagStrings []string
+		for _, tag := range p.Tags {
+			tagStrings = append(tagStrings, "#"+tag)
+		}
+		itemTitle += " | " + strings.Join(tagStrings, " ")
+	}
+
+	return itemTitle
+}
+
+// buildFeedItemExcerpt creates an HTML excerpt from the post's cleaned markdown content
+// extracts up to 3 sentences, converts to HTML, and adds a "continue reading" link
+func buildFeedItemExcerpt(p post, config appConfig) string {
+	// extract first N sentences from the cleaned markdown
+	sentences := extractSentences(p.FeedContent, feedExcerptSentenceCnt)
+
+	var excerptMarkdown string
+	if len(sentences) > 0 {
+		excerptMarkdown = strings.Join(sentences, ". ")
+		// add ellipsis if we truncated
+		if len(sentences) == feedExcerptSentenceCnt || !strings.HasSuffix(p.FeedContent, sentences[len(sentences)-1]) {
+			excerptMarkdown += "..."
+		}
+	} else {
+		// fallback: use first N words if no sentences found
+		excerptMarkdown = extractFirstNWords(p.FeedContent, feedExcerptFallbackWordCnt)
+		if len(strings.Fields(p.FeedContent)) > feedExcerptFallbackWordCnt {
+			excerptMarkdown += "..."
+		}
+	}
+
+	// convert the markdown excerpt to HTML (preserves formatting)
+	var buf bytes.Buffer
+	err := markdown.Convert([]byte(excerptMarkdown), &buf)
+	check(err)
+	htmlExcerpt := strings.TrimSpace(buf.String())
+
+	// convert relative URLs to absolute (for hashtag links, etc.)
+	htmlExcerpt = convertRelativeURLsToAbsolute(htmlExcerpt, config.siteBaseURL)
+
+	// build the "continue reading" link
+	postURL := fmt.Sprintf("%s/%s/%s%s", config.siteBaseURL, deployPostDirName, p.Id, contentFileExtension)
+	continueLink := fmt.Sprintf(`<p><a href="%s">%s</a></p>`, postURL, config.feedPostContinueReadingText)
+
+	return htmlExcerpt + continueLink
+}
+
+// extractSentences splits text into sentences and returns up to maxSentences
+func extractSentences(text string, maxSentences int) []string {
+	var sentences []string
+	var current strings.Builder
+
+	runes := []rune(text)
+	for i := 0; i < len(runes); i++ {
+		current.WriteRune(runes[i])
+
+		// check if we hit a sentence boundary (period followed by space/end, or end of text)
+		if runes[i] == '.' {
+			if i+1 >= len(runes) || runes[i+1] == ' ' || runes[i+1] == '\n' {
+				sentence := strings.TrimSpace(current.String())
+				if sentence != "" {
+					sentences = append(sentences, sentence)
+					if len(sentences) >= maxSentences {
+						break
+					}
+				}
+				current.Reset()
+			}
+		}
+	}
+
+	// add any remaining text as the last sentence if we haven't reached the limit
+	if current.Len() > 0 && len(sentences) < maxSentences {
+		sentence := strings.TrimSpace(current.String())
+		if sentence != "" {
+			sentences = append(sentences, sentence)
+		}
+	}
+
+	return sentences
+}
+
+// extractFirstNWords extracts the first N words from text
+func extractFirstNWords(text string, n int) string {
+	words := strings.Fields(text)
+	if len(words) <= n {
+		return text
+	}
+	return strings.Join(words[:n], " ")
+}
+
 func getPostTimestamp(post post) time.Time {
 	if post.Date.IsZero() {
 		exitWithError(fmt.Sprintf(errPostDateMissing, post.Id))
@@ -545,77 +638,9 @@ func getPostTimestamp(post post) time.Time {
 	return time.Date(post.Date.Year, post.Date.Month, post.Date.Day, hour, minute, sec, 0, loc).UTC()
 }
 
-// optimizeImagesForFeeds replaces srcset attributes with smallest thumbnail in src for better feed reader compatibility
-func optimizeImagesForFeeds(htmlContent string, thumbSizes []int) string {
-	if len(thumbSizes) == 0 {
-		return htmlContent
-	}
-
-	smallestThumbSize := thumbSizes[0]
-	for _, size := range thumbSizes {
-		if size < smallestThumbSize {
-			smallestThumbSize = size
-		}
-	}
-
-	htmlContent = imgWithSrcsetRegexp.ReplaceAllStringFunc(htmlContent, func(match string) string {
-		// extract the srcset value to find the smallest thumbnail URL
-		srcsetMatch := srcsetAttrRegexp.FindStringSubmatch(match)
-		if len(srcsetMatch) < 2 {
-			return match
-		}
-
-		srcset := srcsetMatch[1]
-
-		// find the smallest thumbnail URL from srcset (format: "url1 480w, url2 960w, url3 1680w")
-		// we want the first entry which should be the smallest
-		smallestThumbURL := ""
-		srcsetParts := srcsetFirstEntryRegexp.FindStringSubmatch(srcset)
-		if len(srcsetParts) >= 2 {
-			smallestThumbURL = srcsetParts[1]
-		}
-
-		if smallestThumbURL == "" {
-			// fallback: construct smallest thumb URL from src attribute
-			srcMatch := srcAttrRegexp.FindStringSubmatch(match)
-			if len(srcMatch) >= 2 {
-				srcURL := srcMatch[1]
-				// if src already points to a thumbnail, extract base name and reconstruct with smallest size
-				if thumbMatch := thumbPatternRegexp.FindStringSubmatch(srcURL); len(thumbMatch) >= 4 {
-					smallestThumbURL = fmt.Sprintf("%s_%d_thumb%s", thumbMatch[1], smallestThumbSize, thumbMatch[3])
-				} else {
-					// src points to original image, keep it
-					smallestThumbURL = srcURL
-				}
-			}
-		}
-
-		// extract other attributes (like alt, etc.)
-		attrsMatch := imgAttrsRegexp.FindStringSubmatch(match)
-		attrs := ""
-		if len(attrsMatch) >= 2 {
-			attrs = attrsMatch[1]
-		}
-
-		// rebuild img tag with smallest thumbnail in src and add inline styles for better feed reader layout
-		if smallestThumbURL != "" {
-			return fmt.Sprintf(`<img src="%s" width="%d" style="margin-bottom: 10px;" %s>`, smallestThumbURL, smallestThumbSize, attrs)
-		}
-
-		// fallback: just remove srcset
-		return srcsetAttrRemovalRegexp.ReplaceAllString(match, "")
-	})
-
-	return htmlContent
-}
-
-// convertRelativeURLsToAbsolute converts all relative URLs in HTML content to absolute URLs
+// convertRelativeURLsToAbsolute converts relative URLs in href attributes to absolute URLs
 func convertRelativeURLsToAbsolute(htmlContent string, siteBaseURL string) string {
-	// convert `href` relative URLs
-	htmlContent = relativeURLHrefRegexp.ReplaceAllString(htmlContent, `href="`+siteBaseURL+`$1"`)
-	// convert `src` relative URLs
-	htmlContent = relativeURLSrcRegexp.ReplaceAllString(htmlContent, `src="`+siteBaseURL+`$1"`)
-	return htmlContent
+	return relativeURLHrefRegexp.ReplaceAllString(htmlContent, `href="`+siteBaseURL+`$1"`)
 }
 
 func buildTemplateConfigMap(config appConfig) map[string]any {

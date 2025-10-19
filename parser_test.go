@@ -180,3 +180,148 @@ func verifyEmbeddedMedia(body string, expected []embeddedMedia, t *testing.T) {
 		}
 	}
 }
+
+func TestMetadataStripping(t *testing.T) {
+	// test that YAML frontmatter is properly stripped from FeedContent and search data
+	// this test uses more complex YAML with various characters (periods, brackets, etc.)
+	postContent := `---
+date: 2025-08-30
+time: 19:30:00
+title: Read a new book (and it's great!). Sci-Fi is awesome!
+tags:
+  - Books
+  - Sci-Fi
+---
+
+This is the actual post body content. It should appear in feeds and search.
+
+More content here with **formatting** and [links](http://example.com).`
+
+	defaultThemeTemplatesDir := fmt.Sprintf("%s%c%s%c%s", "themes", os.PathSeparator, defaultThemeName, os.PathSeparator, "templates")
+	resLoader := resourceLoader{
+		config: defaultConfig(),
+		loadTemplate: func(templateFileName string) ([]byte, error) {
+			templateFilePath := fmt.Sprintf("%s%c%s", defaultThemeTemplatesDir, os.PathSeparator, templateFileName)
+			return os.ReadFile(templateFilePath)
+		},
+		loadInclude: func(includeFileName string, level templateIncludeLevel) ([]byte, error) {
+			return nil, nil
+		},
+	}
+
+	config := defaultConfig()
+	post := parsePost("test-post", postContent, config, resLoader)
+
+	// verify FeedContent does not contain YAML frontmatter
+	if strings.Contains(post.FeedContent, "---") {
+		t.Error("FeedContent should not contain YAML delimiters (---)")
+	}
+	if strings.Contains(post.FeedContent, "date: 2025-08-30") {
+		t.Error("FeedContent should not contain metadata field 'date: 2025-08-30'")
+	}
+	if strings.Contains(post.FeedContent, "title: Read a new book") {
+		t.Error("FeedContent should not contain metadata field 'title: Read a new book'")
+	}
+	if strings.Contains(post.FeedContent, "tags:") {
+		t.Error("FeedContent should not contain metadata field 'tags:'")
+	}
+	if strings.Contains(post.FeedContent, "- Books") {
+		t.Error("FeedContent should not contain metadata tag '- Books'")
+	}
+	if strings.Contains(post.FeedContent, "- Sci-Fi") {
+		t.Error("FeedContent should not contain metadata tag '- Sci-Fi'")
+	}
+
+	// verify FeedContent DOES contain the actual body
+	if !strings.Contains(post.FeedContent, "This is the actual post body content") {
+		t.Error("FeedContent should contain the post body text")
+	}
+	if !strings.Contains(post.FeedContent, "More content here with") {
+		t.Error("FeedContent should contain the rest of the post body")
+	}
+
+	// verify SearchData.Content does not contain YAML frontmatter
+	searchContent := post.SearchData.Content
+	if strings.Contains(searchContent, "date: 2025-08-30") {
+		t.Error("SearchData.Content should not contain metadata field 'date: 2025-08-30'")
+	}
+	if strings.Contains(searchContent, "title: read a new book") { // note: search content is lowercased
+		t.Error("SearchData.Content should not contain metadata field 'title: read a new book'")
+	}
+	if strings.Contains(searchContent, "tags:") {
+		t.Error("SearchData.Content should not contain metadata field 'tags:'")
+	}
+
+	// verify SearchData.Content DOES contain the actual body (lowercased)
+	if !strings.Contains(searchContent, "this is the actual post body content") {
+		t.Error("SearchData.Content should contain the post body text (lowercased)")
+	}
+}
+
+func TestHorizontalRulesInPostBody(t *testing.T) {
+	// test that horizontal rules (---) in post body are preserved
+	postContent := `---
+date: 2023-06-30
+title: Trek Travel - Glacier National Park
+tags:
+  - Cycling
+  - Glacier
+---
+
+I and my best friend Javie just returned from our very first Trek Travel trip.
+
+---
+
+Glacier National Park isn't just another protected wildlife site. It's one of Mother Nature's most prized possessions.
+
+---
+
+More content here.`
+
+	defaultThemeTemplatesDir := fmt.Sprintf("%s%c%s%c%s", "themes", os.PathSeparator, defaultThemeName, os.PathSeparator, "templates")
+	resLoader := resourceLoader{
+		config: defaultConfig(),
+		loadTemplate: func(templateFileName string) ([]byte, error) {
+			templateFilePath := fmt.Sprintf("%s%c%s", defaultThemeTemplatesDir, os.PathSeparator, templateFileName)
+			return os.ReadFile(templateFilePath)
+		},
+		loadInclude: func(includeFileName string, level templateIncludeLevel) ([]byte, error) {
+			return nil, nil
+		},
+	}
+
+	config := defaultConfig()
+	post := parsePost("test-post", postContent, config, resLoader)
+
+	// verify the Body contains horizontal rules (converted to <hr> tags by markdown processor)
+	if !strings.Contains(post.Body, "<hr") {
+		t.Error("Post Body should contain <hr> tags from markdown horizontal rules (---)")
+	}
+
+	// verify FeedContent contains the horizontal rule markers
+	if !strings.Contains(post.FeedContent, "---") {
+		t.Error("FeedContent should preserve horizontal rules (---) from post body")
+	}
+
+	// count how many --- appear in FeedContent (should be 2, not 0)
+	count := strings.Count(post.FeedContent, "---")
+	if count != 2 {
+		t.Errorf("FeedContent should contain exactly 2 horizontal rules (---), found %d", count)
+	}
+
+	// verify FeedContent does NOT contain metadata
+	if strings.Contains(post.FeedContent, "date: 2023-06-30") {
+		t.Error("FeedContent should not contain metadata field 'date: 2023-06-30'")
+	}
+	if strings.Contains(post.FeedContent, "title: Trek Travel") {
+		t.Error("FeedContent should not contain metadata field 'title: Trek Travel'")
+	}
+
+	// verify body content is present
+	if !strings.Contains(post.FeedContent, "I and my best friend Javie") {
+		t.Error("FeedContent should contain post body text")
+	}
+	if !strings.Contains(post.FeedContent, "Glacier National Park") {
+		t.Error("FeedContent should contain post body text")
+	}
+}

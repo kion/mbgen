@@ -437,17 +437,19 @@ func testFeedGeneration(t *testing.T, feedFormats []string) {
 	}
 
 	post1 := post{
-		Id:    "post-1",
-		Title: "Test Post 1 Title",
-		Body:  "Test Post 1 Body",
+		Id:          "post-1",
+		Title:       "Test Post 1 Title",
+		Body:        "Test Post 1 Body",
+		FeedContent: "Test Post 1 Body",
 	}
 	post1.Date, _ = civil.ParseDate("2023-08-01")
 	post1.Time, _ = civil.ParseTime("19:15:00")
 
 	post2 := post{
-		Id:    "post-2",
-		Title: "Test Post 2 Title",
-		Body:  "Test Post 2 Body",
+		Id:          "post-2",
+		Title:       "Test Post 2 Title",
+		Body:        "Test Post 2 Body",
+		FeedContent: "Test Post 2 Body",
 	}
 	post2.Date, _ = civil.ParseDate("2023-07-15")
 
@@ -488,5 +490,246 @@ func testFeedGeneration(t *testing.T, feedFormats []string) {
 				t.Errorf("Feed %s missing post date: %s", expectedFeedFile, post.FmtDate())
 			}
 		}
+	}
+}
+
+func TestFeedExcerptGeneration(t *testing.T) {
+	var pages []page
+	var posts []post
+
+	globalIncludes := map[string]string{
+		"header.html": globalIncludeHeaderContent,
+	}
+
+	themeIncludes := map[string]string{
+		"header.html": themeIncludeHeaderContent,
+	}
+
+	// test post with multiple sentences (should extract first 3)
+	post1 := post{
+		Id:          "post-1",
+		Title:       "Multi-Sentence Post",
+		Body:        "<p>Test body</p>",
+		FeedContent: "First sentence here. Second sentence here. Third sentence here. Fourth sentence should not appear. Fifth sentence also not.",
+	}
+	post1.Date, _ = civil.ParseDate("2023-08-01")
+
+	posts = []post{post1}
+
+	config := defaultConfig()
+	config.siteBaseURL = "https://example.com"
+	config.siteName = testSiteName
+	config.generateFeeds = []string{feedFormatRSS}
+	config.feedPostCnt = 1
+	config.enableSearch = false
+	config.feedPostContinueReadingText = "Read more"
+
+	output := processOutput(pages, posts, globalIncludes, themeIncludes, config)
+
+	feedFile := deployDirName + "/" + feedFileNameRSS
+	feedContent, ok := output[feedFile]
+	if !ok {
+		t.Fatal("Missing expected feed file")
+	}
+
+	// should contain first three sentences
+	if !strings.Contains(feedContent, "First sentence here") {
+		t.Error("Feed missing first sentence")
+	}
+	if !strings.Contains(feedContent, "Second sentence here") {
+		t.Error("Feed missing second sentence")
+	}
+	if !strings.Contains(feedContent, "Third sentence here") {
+		t.Error("Feed missing third sentence")
+	}
+
+	// should NOT contain fourth and fifth sentences
+	if strings.Contains(feedContent, "Fourth sentence should not appear") {
+		t.Error("Feed should not contain fourth sentence")
+	}
+	if strings.Contains(feedContent, "Fifth sentence also not") {
+		t.Error("Feed should not contain fifth sentence")
+	}
+
+	// should contain ellipsis for truncation
+	if !strings.Contains(feedContent, "...") {
+		t.Error("Feed should contain ellipsis for truncated content")
+	}
+
+	// should contain continue reading link
+	if !strings.Contains(feedContent, "Read more") {
+		t.Error("Feed missing continue reading text")
+	}
+	if !strings.Contains(feedContent, "https://example.com/post/post-1.html") {
+		t.Error("Feed missing continue reading link URL")
+	}
+}
+
+func TestFeedExcerptWordFallback(t *testing.T) {
+	var pages []page
+	var posts []post
+
+	globalIncludes := map[string]string{
+		"header.html": globalIncludeHeaderContent,
+	}
+
+	themeIncludes := map[string]string{
+		"header.html": themeIncludeHeaderContent,
+	}
+
+	// test post with very long single sentence - exceeds 3 sentence limit but tests word handling
+	longText := ""
+	for i := 1; i <= 100; i++ {
+		longText += "word" + strconv.Itoa(i) + " "
+	}
+	longText = strings.TrimSpace(longText) + "."
+
+	post1 := post{
+		Id:          "post-long-sentence",
+		Title:       "Post With Long Sentence",
+		Body:        "<p>Test body</p>",
+		FeedContent: longText,
+	}
+	post1.Date, _ = civil.ParseDate("2023-08-01")
+
+	posts = []post{post1}
+
+	config := defaultConfig()
+	config.siteBaseURL = "https://example.com"
+	config.siteName = testSiteName
+	config.generateFeeds = []string{feedFormatRSS}
+	config.feedPostCnt = 1
+	config.enableSearch = false
+
+	output := processOutput(pages, posts, globalIncludes, themeIncludes, config)
+
+	feedFile := deployDirName + "/" + feedFileNameRSS
+	feedContent, ok := output[feedFile]
+	if !ok {
+		t.Fatal("Missing expected feed file")
+	}
+
+	// should contain the single long sentence (treated as 1 of 3 allowed sentences)
+	if !strings.Contains(feedContent, "word1") {
+		t.Error("Feed missing first word")
+	}
+	if !strings.Contains(feedContent, "word100") {
+		t.Error("Feed missing last word of sentence")
+	}
+
+	// should NOT contain ellipsis since this is the complete content (1 sentence that is the entire post)
+	if strings.Contains(feedContent, "...") {
+		t.Error("Feed should not contain ellipsis when content is complete")
+	}
+}
+
+func TestFeedTitleWithTags(t *testing.T) {
+	var pages []page
+	var posts []post
+
+	globalIncludes := map[string]string{
+		"header.html": globalIncludeHeaderContent,
+	}
+
+	themeIncludes := map[string]string{
+		"header.html": themeIncludeHeaderContent,
+	}
+
+	// post without title but with tags
+	post1 := post{
+		Id:          "post-with-tags",
+		Title:       "", // no title
+		Body:        "<p>Test body</p>",
+		FeedContent: "Post content here.",
+		Tags:        []string{"Cycling", "Adventure", "Travel"},
+	}
+	post1.Date, _ = civil.ParseDate("2023-08-01")
+	post1.Time, _ = civil.ParseTime("14:30:00")
+
+	posts = []post{post1}
+
+	config := defaultConfig()
+	config.siteBaseURL = "https://example.com"
+	config.siteName = testSiteName
+	config.generateFeeds = []string{feedFormatRSS}
+	config.feedPostCnt = 1
+	config.enableSearch = false
+
+	output := processOutput(pages, posts, globalIncludes, themeIncludes, config)
+
+	feedFile := deployDirName + "/" + feedFileNameRSS
+	feedContent, ok := output[feedFile]
+	if !ok {
+		t.Fatal("Missing expected feed file")
+	}
+
+	// title should contain date, time, and tags with # prefix
+	if !strings.Contains(feedContent, "2023-08-01 14:30") {
+		t.Error("Feed title missing date and time")
+	}
+	if !strings.Contains(feedContent, "#Cycling") {
+		t.Error("Feed title missing #Cycling tag")
+	}
+	if !strings.Contains(feedContent, "#Adventure") {
+		t.Error("Feed title missing #Adventure tag")
+	}
+	if !strings.Contains(feedContent, "#Travel") {
+		t.Error("Feed title missing #Travel tag")
+	}
+}
+
+func TestFeedRelativeURLConversion(t *testing.T) {
+	var pages []page
+	var posts []post
+
+	globalIncludes := map[string]string{
+		"header.html": globalIncludeHeaderContent,
+	}
+
+	themeIncludes := map[string]string{
+		"header.html": themeIncludeHeaderContent,
+	}
+
+	// post with relative URLs in markdown (as it would be after parsing hashtags)
+	// hashtags are converted to markdown links during parsing: #Technology -> [#Technology](/tags/technology/)
+	post1 := post{
+		Id:          "post-with-links",
+		Title:       "Post With Links",
+		Body:        "<p>Test body</p>",
+		FeedContent: "Check out [my page](/page/about) and tags like [#Technology](/tags/technology/) and [#Programming](/tags/programming/).",
+	}
+	post1.Date, _ = civil.ParseDate("2023-08-01")
+
+	posts = []post{post1}
+
+	config := defaultConfig()
+	config.siteBaseURL = "https://example.com"
+	config.siteName = testSiteName
+	config.generateFeeds = []string{feedFormatRSS}
+	config.feedPostCnt = 1
+	config.enableSearch = false
+
+	output := processOutput(pages, posts, globalIncludes, themeIncludes, config)
+
+	feedFile := deployDirName + "/" + feedFileNameRSS
+	feedContent, ok := output[feedFile]
+	if !ok {
+		t.Fatal("Missing expected feed file")
+	}
+
+	// relative URLs should be converted to absolute
+	if !strings.Contains(feedContent, "https://example.com/page/about") {
+		t.Error("Feed should contain absolute URL for page link")
+	}
+	if !strings.Contains(feedContent, "https://example.com/tags/technology") {
+		t.Error("Feed should contain absolute URL for technology tag")
+	}
+	if !strings.Contains(feedContent, "https://example.com/tags/programming") {
+		t.Error("Feed should contain absolute URL for programming tag")
+	}
+
+	// should NOT contain relative URLs
+	if strings.Contains(feedContent, `href="/page/about"`) {
+		t.Error("Feed should not contain relative URL")
 	}
 }

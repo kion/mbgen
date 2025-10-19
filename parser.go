@@ -2,14 +2,7 @@ package main
 
 import (
 	"bytes"
-	"cloud.google.com/go/civil"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/yuin/goldmark"
-	meta "github.com/yuin/goldmark-meta"
-	"github.com/yuin/goldmark/extension"
-	"github.com/yuin/goldmark/parser"
-	"github.com/yuin/goldmark/renderer/html"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -17,6 +10,14 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"cloud.google.com/go/civil"
+	"github.com/google/uuid"
+	"github.com/yuin/goldmark"
+	meta "github.com/yuin/goldmark-meta"
+	"github.com/yuin/goldmark/extension"
+	"github.com/yuin/goldmark/parser"
+	"github.com/yuin/goldmark/renderer/html"
 )
 
 var mainTemplateMarkup /* const */ string
@@ -145,7 +146,7 @@ func parsePage(pageId string, content string, config appConfig, resLoader resour
 	metaData := meta.Get(context)
 	rawTitle := ""
 	if title, ok := metaData[metaDataKeyTitle].(string); ok {
-		rawTitle = strings.ToLower(title)
+		rawTitle = title
 		if strings.Contains(title, "\n") {
 			title = strings.Replace(title, "\n", "<br>", -1)
 		}
@@ -153,7 +154,7 @@ func parsePage(pageId string, content string, config appConfig, resLoader resour
 	}
 	page.SearchData = searchData{
 		TypeId:  "page/" + page.Id,
-		Content: rawTitle + " " + rawBodyContent,
+		Content: strings.ToLower(rawTitle) + " " + strings.ToLower(rawBodyContent),
 	}
 	return page
 }
@@ -170,6 +171,7 @@ func parsePost(postId string, content string, config appConfig, resLoader resour
 	}
 	// ================================================================================
 	content, rawBodyContent, cdPhReps, hashTags := parseContentDirectives(Post, postId, content, config, resLoader)
+	post.FeedContent = rawBodyContent // store cleaned markdown for feed generation
 	var buf bytes.Buffer
 	context := parser.NewContext()
 	err := markdown.Convert([]byte(content), &buf, parser.WithContext(context))
@@ -192,7 +194,7 @@ func parsePost(postId string, content string, config appConfig, resLoader resour
 	}
 	rawTitle := ""
 	if title, ok := metaData[metaDataKeyTitle].(string); ok {
-		rawTitle = strings.ToLower(title)
+		rawTitle = title
 		if strings.Contains(title, "\n") {
 			title = strings.Replace(title, "\n", "<br>", -1)
 		}
@@ -217,7 +219,7 @@ func parsePost(postId string, content string, config appConfig, resLoader resour
 	}
 	post.SearchData = searchData{
 		TypeId:  "post/" + post.Id,
-		Content: rawTitle + " " + rawBodyContent + " " + strings.ToLower(strings.Join(post.Tags[:], " ")),
+		Content: strings.ToLower(rawTitle) + " " + strings.ToLower(rawBodyContent) + " " + strings.ToLower(strings.Join(post.Tags[:], " ")),
 	}
 	return post
 }
@@ -232,7 +234,7 @@ func parseContentDirectives(ceType contentEntityType, ceId string, content strin
 	rawBodyContent := metaDataPlaceholderRegexp.ReplaceAllString(content, "")
 	rawBodyContent = contentDirectivePlaceholderRegexp.ReplaceAllString(rawBodyContent, "")
 	rawBodyContent = whitespacePlaceholderRegexp.ReplaceAllString(rawBodyContent, " ")
-	rawBodyContent = strings.ToLower(strings.TrimSpace(rawBodyContent))
+	rawBodyContent = strings.TrimSpace(rawBodyContent)
 	var phReps map[string]string
 	var tags []string
 	hashTagPlaceholders := hashTagRegex.FindAllStringSubmatch(content, -1)

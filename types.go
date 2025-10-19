@@ -56,29 +56,30 @@ func pngCompressionLevelStringValues() []string {
 }
 
 type appConfig struct {
-	siteBaseURL         string
-	siteName            string
-	siteDescription     string
-	theme               string
-	homePage            string
-	generateArchive     bool
-	generateTagIndex    bool
-	generateFeeds       []string
-	feedPostCnt         int
-	enableSearch        bool
-	pageSize            int
-	resizeOrigImages    bool
-	maxImgSize          int
-	useThumbs           bool
-	thumbSizes          []int
-	thumbThreshold      float64
-	jpegQuality         int
-	pngCompressionLevel pngCompressionLevel
-	serveHost           string
-	servePort           int
-	deployPath          string
-	deployHost          string
-	deployUsername      string
+	siteBaseURL                 string
+	siteName                    string
+	siteDescription             string
+	theme                       string
+	homePage                    string
+	generateArchive             bool
+	generateTagIndex            bool
+	generateFeeds               []string
+	feedPostCnt                 int
+	feedPostContinueReadingText string
+	enableSearch                bool
+	pageSize                    int
+	resizeOrigImages            bool
+	maxImgSize                  int
+	useThumbs                   bool
+	thumbSizes                  []int
+	thumbThreshold              float64
+	jpegQuality                 int
+	pngCompressionLevel         pngCompressionLevel
+	serveHost                   string
+	servePort                   int
+	deployPath                  string
+	deployHost                  string
+	deployUsername              string
 }
 
 type appCommandDescriptor struct {
@@ -342,6 +343,7 @@ type post struct {
 	Time           civil.Time
 	Title          string
 	Body           string
+	FeedContent    string // cleaned markdown content for feed generation (directives removed)
 	Tags           []string
 	SearchData     searchData
 	skipProcessing bool

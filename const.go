@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	appVersion                                  = "1.7.0"
+	appVersion                                  = "1.7.1"
 	defaultGitHubRepoUrl                        = "github.com/kion/mbgen"
 	defaultGitHubRepoThemesUrl                  = defaultGitHubRepoUrl + "/themes"
 	defaultGitHubRepoPageContentSamplesUrl      = defaultGitHubRepoUrl + "/content-samples/pages"
@@ -67,6 +67,9 @@ const (
 	defaultServeHost                            = "localhost"
 	defaultServePort                            = 8888
 	defaultFeedPostCnt                          = 20
+	defaultFeedPostContinueReadingText          = "Continue Reading ->"
+	feedExcerptSentenceCnt                      = 3
+	feedExcerptFallbackWordCnt                  = 20
 	feedFormatRSS                               = "rss"
 	feedFormatAtom                              = "atom"
 	feedFormatJSON                              = "json"
@@ -117,7 +120,7 @@ var (
 	imageFileExtensions                  = /* const */ []string{".jpg", ".jpeg", ".png", ".gif"}
 	thumbImageFileExtensions             = /* const */ []string{".jpg", ".jpeg", ".png"}
 	videoFileExtensions                  = /* const */ []string{".mp4", ".mkv", ".mov"}
-	metaDataPlaceholderRegexp            = /* const */ regexp.MustCompile(`---[\s\w-:"]*---`)
+	metaDataPlaceholderRegexp            = /* const */ regexp.MustCompile(`(?s)^---.*?---`)
 	contentDirectivePlaceholderRegexp    = /* const */ regexp.MustCompile(`{.*}`)
 	whitespacePlaceholderRegexp          = /* const */ regexp.MustCompile(`\s+`)
 	includeTemplateFilePlaceholderRegexp = /* const */ regexp.MustCompile(`{{@\s*([\w-_]+\.html)\s*@}}`)
@@ -129,14 +132,6 @@ var (
 	wrapPlaceholderRegexp                = /* const */ regexp.MustCompile(`\{\s*([\w-_.]+)\s*(\([\s\w=,]+\))?(\s*:\s*([\w\s-_.,*]+))?\s*}([^{}]*){/}`)
 	hashTagRegex                         = /* const */ regexp.MustCompile(`#(\p{L}+[_-]*\p{L}*)`)
 	relativeURLHrefRegexp                = /* const */ regexp.MustCompile(`href="(/[^"]*)"`)
-	relativeURLSrcRegexp                 = /* const */ regexp.MustCompile(`src="(/[^"]*)"`)
-	imgWithSrcsetRegexp                  = /* const */ regexp.MustCompile(`<img\s+src="([^"]+)"\s+srcset="([^"]+)"\s+([^>]*)>`)
-	srcsetAttrRegexp                     = /* const */ regexp.MustCompile(`srcset="([^"]+)"`)
-	srcsetFirstEntryRegexp               = /* const */ regexp.MustCompile(`([^\s,]+)\s+\d+w`)
-	srcAttrRegexp                        = /* const */ regexp.MustCompile(`src="([^"]+)"`)
-	thumbPatternRegexp                   = /* const */ regexp.MustCompile(`^(.+)_(\d+)_thumb(\.[^.]+)$`)
-	imgAttrsRegexp                       = /* const */ regexp.MustCompile(`<img\s+src="[^"]+"\s+srcset="[^"]+"\s+([^>]*)>`)
-	srcsetAttrRemovalRegexp              = /* const */ regexp.MustCompile(`\s+srcset="[^"]*"`)
 )
 
 //go:embed inject-js/admin.js
