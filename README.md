@@ -362,6 +362,8 @@ or can even be completely omitted from the config):
     * `feed.json` - JSON Feed
 * [optional] `feedPostCnt` - controls the maximum number of posts included in generated feeds
   - if not specified, the default value of `20` is used
+* [optional] `feedPostContinueReadingText` - controls the "continue reading" text appended to each post content in generated feeds
+  - if not specified, the default value of `Continue reading ->` is used
 * [optional] `enableSearch` - the built-in search functionality is enabled by default,
   unless this setting is set to `no`
   * `generate` command generates:
