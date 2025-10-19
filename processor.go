@@ -10,6 +10,9 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
+
+	"github.com/gorilla/feeds"
 )
 
 func process(pages []page, posts []post,
@@ -18,6 +21,9 @@ func process(pages []page, posts []post,
 	pageCnt := processPages(pages, &searchIndex, resLoader, handleOutput)
 	postCnt, tagCnt := processPosts(posts, &searchIndex, resLoader, handleOutput)
 	config := resLoader.config
+	if len(config.generateFeeds) > 0 {
+		generateFeeds(posts, config, handleOutput)
+	}
 	if config.enableSearch {
 		sprintln(" - generating search files ...")
 		searchIndexJson, err := json.Marshal(searchIndex)
@@ -27,7 +33,7 @@ func process(pages []page, posts []post,
 		searchTemplate := compileSearchTemplate(resLoader)
 		outputFilePath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, searchPageFileName)
 		var searchContentBuffer bytes.Buffer
-		err = searchTemplate.Execute(&searchContentBuffer, templateContent{EntityType: Page, Title: config.siteName + " - Search", Config: map[string]any{"PageSize": config.pageSize}})
+		err = searchTemplate.Execute(&searchContentBuffer, templateContent{EntityType: Page, Title: config.siteName + " - Search", Config: buildTemplateConfigMap(config)})
 		check(err)
 		if handleOutput != nil {
 			handleOutput(outputFilePath, searchContentBuffer.Bytes())
@@ -78,7 +84,7 @@ func processPages(pages []page, searchIndex *mapSlice,
 				}
 
 				var pageContentBuffer bytes.Buffer
-				err := pageTemplate.Execute(&pageContentBuffer, templateContent{EntityType: Page, Title: pTitle, FileName: outputFileName, Content: page})
+				err := pageTemplate.Execute(&pageContentBuffer, templateContent{EntityType: Page, Title: pTitle, FileName: outputFileName, Content: page, Config: buildTemplateConfigMap(resLoader.config)})
 				check(err)
 
 				if handleOutput != nil {
@@ -144,7 +150,7 @@ func processPosts(posts []post, searchIndex *mapSlice,
 			outputFileName := post.Id + contentFileExtension
 
 			var postContentBuffer bytes.Buffer
-			err := postContentTemplate.Execute(&postContentBuffer, templateContent{EntityType: Post, Title: pTitle, Content: post, FileName: outputFileName})
+			err := postContentTemplate.Execute(&postContentBuffer, templateContent{EntityType: Post, Title: pTitle, Content: post, FileName: outputFileName, Config: buildTemplateConfigMap(resLoader.config)})
 			check(err)
 
 			postContent := strings.TrimSpace(postContentBuffer.String())
@@ -153,13 +159,13 @@ func processPosts(posts []post, searchIndex *mapSlice,
 
 			if !post.skipProcessing {
 				var singlePostContentBuffer bytes.Buffer
-				err = postContentTemplate.Execute(&singlePostContentBuffer, templateContent{EntityType: Post, Title: pTitle, Content: post})
+				err = postContentTemplate.Execute(&singlePostContentBuffer, templateContent{EntityType: Post, Title: pTitle, Content: post, Config: buildTemplateConfigMap(resLoader.config)})
 				check(err)
 
 				fullTemplate := compileFullTemplate(outputFileName, singlePostContentBuffer.String(), nil, resLoader)
 
 				var singlePostFullContentBuffer bytes.Buffer
-				err = fullTemplate.Execute(&singlePostFullContentBuffer, templateContent{EntityType: Post, Title: pTitle, Content: post})
+				err = fullTemplate.Execute(&singlePostFullContentBuffer, templateContent{EntityType: Post, Title: pTitle, Content: post, Config: buildTemplateConfigMap(resLoader.config)})
 				check(err)
 
 				outputFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployPostDirName, os.PathSeparator, outputFileName)
@@ -262,7 +268,7 @@ func processPosts(posts []post, searchIndex *mapSlice,
 			archiveTemplate := compileArchiveTemplate(resLoader)
 			outputFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployArchiveDirName, os.PathSeparator, indexPageFileName)
 			var archiveContentBuffer bytes.Buffer
-			err := archiveTemplate.Execute(&archiveContentBuffer, templateContent{EntityType: Page, Title: config.siteName + " - Archive", Content: archIdxData})
+			err := archiveTemplate.Execute(&archiveContentBuffer, templateContent{EntityType: Page, Title: config.siteName + " - Archive", Content: archIdxData, Config: buildTemplateConfigMap(config)})
 			check(err)
 			if handleOutput != nil {
 				handleOutput(outputFilePath, archiveContentBuffer.Bytes())
@@ -293,14 +299,19 @@ func processPosts(posts []post, searchIndex *mapSlice,
 					sortedTags = append(sortedTags, tagData{Title: tt, Count: tc, Ratio: tr})
 				}
 				sort.Slice(sortedTags, func(i, j int) bool {
-					return sortedTags[i].Count > sortedTags[j].Count
+					iCnt := sortedTags[i].Count
+					jCnt := sortedTags[j].Count
+					if iCnt == jCnt {
+						return sortedTags[i].Title < sortedTags[j].Title
+					}
+					return iCnt > jCnt
 				})
 				// ======================================================================
 				sprintln(" - generating tag index ...")
 				tagIndexTemplate := compileTagIndexTemplate(resLoader)
 				outputFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployTagsDirName, os.PathSeparator, indexPageFileName)
 				var tagIndexContentBuffer bytes.Buffer
-				err := tagIndexTemplate.Execute(&tagIndexContentBuffer, templateContent{EntityType: Page, Title: config.siteName + " - Tag Index", Content: sortedTags})
+				err := tagIndexTemplate.Execute(&tagIndexContentBuffer, templateContent{EntityType: Page, Title: config.siteName + " - Tag Index", Content: sortedTags, Config: buildTemplateConfigMap(config)})
 				check(err)
 				if handleOutput != nil {
 					handleOutput(outputFilePath, tagIndexContentBuffer.Bytes())
@@ -376,7 +387,7 @@ func processPaginatedPostContent(postCnt map[string]int, content map[string][]st
 func processContent(templateName string, ceType contentEntityType, title string, content string, outputFilePath string, resLoader resourceLoader, handleOutput processorOutputHandler) {
 	tmplt := compileFullTemplate(templateName, content, nil, resLoader)
 	var contentBuffer bytes.Buffer
-	err := tmplt.Execute(&contentBuffer, templateContent{EntityType: ceType, Title: title})
+	err := tmplt.Execute(&contentBuffer, templateContent{EntityType: ceType, Title: title, Config: buildTemplateConfigMap(resLoader.config)})
 	check(err)
 	if handleOutput != nil {
 		handleOutput(outputFilePath, contentBuffer.Bytes())
@@ -404,4 +415,217 @@ func processAndHandleStats(config appConfig, resLoader resourceLoader, useCache 
 		})
 	stats.genCnt = generatedCnt
 	handleStats(stats)
+}
+
+// generateFeeds creates RSS, Atom, and/or JSON feeds based on configuration
+func generateFeeds(posts []post, config appConfig, handleOutput processorOutputHandler) {
+	if len(config.generateFeeds) == 0 || len(posts) == 0 {
+		return
+	}
+
+	sprintln(" - generating feeds ...")
+
+	feedTitle := config.siteBaseURL
+	if config.siteName != "" {
+		feedTitle = config.siteName
+	}
+
+	feedDescription := config.siteBaseURL
+	if config.siteDescription != "" {
+		feedDescription = config.siteDescription
+	} else if config.siteName != "" {
+		feedDescription = config.siteName
+	}
+
+	// feed created timestamp is based on the date/time of the very first post
+	feedCreated := getPostTimestamp(posts[len(posts)-1])
+
+	// feed updated timestamp is based on the date/time of the most recent post
+	feedUpdated := getPostTimestamp(posts[0])
+
+	feed := &feeds.Feed{
+		Title:       feedTitle,
+		Link:        &feeds.Link{Href: config.siteBaseURL},
+		Description: feedDescription,
+		Created:     feedCreated,
+		Updated:     feedUpdated,
+	}
+
+	// add posts to feed (limit by feedPostCnt)
+	postCount := config.feedPostCnt
+	if postCount > len(posts) {
+		postCount = len(posts)
+	}
+
+	for i := 0; i < postCount; i++ {
+		p := posts[i]
+
+		// check if post has a date
+		if p.Date.IsZero() {
+			exitWithError(fmt.Sprintf(errPostDateMissing, p.Id))
+		}
+
+		// build feed item title with date/time/title
+		itemTitle := p.FmtDate() // always starts with date: "2023-08-01"
+
+		if !p.Time.IsZero() {
+			itemTitle += " " + p.FmtTime() // add time if present: "2023-08-01 19:15"
+		}
+
+		if p.Title != "" {
+			itemTitle += " | " + p.Title // add title if present: "2023-08-01 19:15 | My Post"
+		}
+
+		// optimize images for feeds by replacing srcset with smallest thumbnails
+		itemContent := optimizeImagesForFeeds(p.Body, config.thumbSizes)
+		// convert relative URLs to absolute in post body
+		itemContent = convertRelativeURLsToAbsolute(itemContent, config.siteBaseURL)
+
+		// construct item URL (deployPostDirName is "post", not "deploy/post")
+		itemURL := fmt.Sprintf("%s/%s/%s%s", config.siteBaseURL, deployPostDirName, p.Id, contentFileExtension)
+
+		// create timestamp using date at noon UTC for better timezone compatibility
+		createdTime := time.Date(
+			p.Date.Year, p.Date.Month, p.Date.Day,
+			12, 0, 0, 0, // noon UTC
+			time.UTC,
+		)
+
+		feed.Items = append(feed.Items, &feeds.Item{
+			Title:   itemTitle,
+			Link:    &feeds.Link{Href: itemURL},
+			Id:      itemURL,
+			Content: itemContent,
+			Created: createdTime,
+		})
+	}
+
+	// generate requested feed formats
+	for _, format := range config.generateFeeds {
+		var feedContent string
+		var feedFileName string
+		var err error
+
+		switch format {
+		case feedFormatRSS:
+			feedContent, err = feed.ToRss()
+			feedFileName = feedFileNameRSS
+		case feedFormatAtom:
+			feedContent, err = feed.ToAtom()
+			feedFileName = feedFileNameAtom
+		case feedFormatJSON:
+			feedContent, err = feed.ToJSON()
+			feedFileName = feedFileNameJSON
+		}
+
+		if err != nil {
+			exitWithError(fmt.Sprintf("failed to generate %s feed: %s", format, err.Error()))
+		}
+
+		outputFilePath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, feedFileName)
+		if handleOutput != nil {
+			handleOutput(outputFilePath, []byte(feedContent))
+		}
+	}
+}
+
+func getPostTimestamp(post post) time.Time {
+	if post.Date.IsZero() {
+		exitWithError(fmt.Sprintf(errPostDateMissing, post.Id))
+	}
+
+	loc := time.Now().Location()
+	hour, minute, sec := 12, 0, 0
+	if !post.Time.IsZero() {
+		hour = post.Time.Hour
+		minute = post.Time.Minute
+		sec = post.Time.Second
+	}
+
+	return time.Date(post.Date.Year, post.Date.Month, post.Date.Day, hour, minute, sec, 0, loc).UTC()
+}
+
+// optimizeImagesForFeeds replaces srcset attributes with smallest thumbnail in src for better feed reader compatibility
+func optimizeImagesForFeeds(htmlContent string, thumbSizes []int) string {
+	if len(thumbSizes) == 0 {
+		return htmlContent
+	}
+
+	smallestThumbSize := thumbSizes[0]
+	for _, size := range thumbSizes {
+		if size < smallestThumbSize {
+			smallestThumbSize = size
+		}
+	}
+
+	htmlContent = imgWithSrcsetRegexp.ReplaceAllStringFunc(htmlContent, func(match string) string {
+		// extract the srcset value to find the smallest thumbnail URL
+		srcsetMatch := srcsetAttrRegexp.FindStringSubmatch(match)
+		if len(srcsetMatch) < 2 {
+			return match
+		}
+
+		srcset := srcsetMatch[1]
+
+		// find the smallest thumbnail URL from srcset (format: "url1 480w, url2 960w, url3 1680w")
+		// we want the first entry which should be the smallest
+		smallestThumbURL := ""
+		srcsetParts := srcsetFirstEntryRegexp.FindStringSubmatch(srcset)
+		if len(srcsetParts) >= 2 {
+			smallestThumbURL = srcsetParts[1]
+		}
+
+		if smallestThumbURL == "" {
+			// fallback: construct smallest thumb URL from src attribute
+			srcMatch := srcAttrRegexp.FindStringSubmatch(match)
+			if len(srcMatch) >= 2 {
+				srcURL := srcMatch[1]
+				// if src already points to a thumbnail, extract base name and reconstruct with smallest size
+				if thumbMatch := thumbPatternRegexp.FindStringSubmatch(srcURL); len(thumbMatch) >= 4 {
+					smallestThumbURL = fmt.Sprintf("%s_%d_thumb%s", thumbMatch[1], smallestThumbSize, thumbMatch[3])
+				} else {
+					// src points to original image, keep it
+					smallestThumbURL = srcURL
+				}
+			}
+		}
+
+		// extract other attributes (like alt, etc.)
+		attrsMatch := imgAttrsRegexp.FindStringSubmatch(match)
+		attrs := ""
+		if len(attrsMatch) >= 2 {
+			attrs = attrsMatch[1]
+		}
+
+		// rebuild img tag with smallest thumbnail in src and add inline styles for better feed reader layout
+		if smallestThumbURL != "" {
+			return fmt.Sprintf(`<img src="%s" width="%d" style="margin-bottom: 10px;" %s>`, smallestThumbURL, smallestThumbSize, attrs)
+		}
+
+		// fallback: just remove srcset
+		return srcsetAttrRemovalRegexp.ReplaceAllString(match, "")
+	})
+
+	return htmlContent
+}
+
+// convertRelativeURLsToAbsolute converts all relative URLs in HTML content to absolute URLs
+func convertRelativeURLsToAbsolute(htmlContent string, siteBaseURL string) string {
+	// convert `href` relative URLs
+	htmlContent = relativeURLHrefRegexp.ReplaceAllString(htmlContent, `href="`+siteBaseURL+`$1"`)
+	// convert `src` relative URLs
+	htmlContent = relativeURLSrcRegexp.ReplaceAllString(htmlContent, `src="`+siteBaseURL+`$1"`)
+	return htmlContent
+}
+
+func buildTemplateConfigMap(config appConfig) map[string]any {
+	configMap := map[string]any{
+		"PageSize": config.pageSize,
+	}
+	if len(config.generateFeeds) > 0 {
+		configMap["GenerateFeeds"] = config.generateFeeds
+		configMap["SiteBaseURL"] = config.siteBaseURL
+		configMap["SiteName"] = config.siteName
+	}
+	return configMap
 }

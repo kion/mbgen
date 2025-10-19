@@ -495,7 +495,7 @@ func parseMediaFileNames(mediaFileNames []string, contentEntityType contentEntit
 			for _, thSize := range config.thumbSizes {
 				thFileSuffix := "_" + strconv.Itoa(thSize) + thumbImgFileSuffix + imgFileExt
 				thumbFile := mediaFileName + thFileSuffix
-				thumbFilePath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, contentEntityId, os.PathSeparator, thumbFile)
+				thumbFilePath := fmt.Sprintf("%s%c%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, ceType, os.PathSeparator, contentEntityId, os.PathSeparator, thumbFile)
 				if fileExists(thumbFilePath) {
 					thumbUri := "/" + mediaDirName + "/" + ceType + "/" + contentEntityId + "/" + thumbFile
 					thumbs = append(thumbs, thumb{

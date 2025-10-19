@@ -2,16 +2,18 @@ package main
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"os"
 	"slices"
 	"sort"
 	"strconv"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 func defaultConfig() appConfig {
 	return appConfig{
+		feedPostCnt:         defaultFeedPostCnt,
 		generateArchive:     defaultGenerateArchive,
 		generateTagIndex:    defaultGenerateTagIndex,
 		enableSearch:        defaultEnableSearch,
@@ -40,7 +42,10 @@ func readConfig() appConfig {
 	err = yaml.Unmarshal(configFile, &cm)
 	check(err)
 
+	config.siteBaseURL = cm["siteBaseURL"]
+
 	config.siteName = cm["siteName"]
+	config.siteDescription = cm["siteDescription"]
 
 	config.theme = cm["theme"]
 
@@ -49,6 +54,49 @@ func readConfig() appConfig {
 	}
 
 	config.homePage = cm["homePage"]
+
+	generateFeedFormats := cm["generateFeeds"]
+	if generateFeedFormats != "" {
+		v := strings.ToLower(generateFeedFormats)
+		if v != "no" && v != "false" {
+			feedFormats := strings.Split(v, ",")
+			var validFormats []string
+			for _, format := range feedFormats {
+				format = strings.TrimSpace(format)
+				if format == feedFormatRSS || format == feedFormatAtom || format == feedFormatJSON {
+					if !slices.Contains(validFormats, format) {
+						validFormats = append(validFormats, format)
+					}
+				} else {
+					exitWithError(fmt.Sprintf("invalid feed format: '%s' (supported formats: %s, %s, %s)", format, feedFormatRSS, feedFormatAtom, feedFormatJSON))
+				}
+			}
+			config.generateFeeds = validFormats
+		}
+	}
+
+	if len(config.generateFeeds) > 0 {
+		if config.siteBaseURL == "" {
+			exitWithError("error: config `siteBaseURL` is required when `generateFeeds` is enabled")
+		}
+		if !strings.HasPrefix(config.siteBaseURL, httpProtocol) && !strings.HasPrefix(config.siteBaseURL, httpsProtocol) {
+			exitWithError("error: config `siteBaseURL` must start with `http://` or `https://`")
+		}
+		config.siteBaseURL = strings.TrimSuffix(config.siteBaseURL, "/")
+	}
+
+	feedPostCnt := cm["feedPostCnt"]
+	if feedPostCnt != "" {
+		fpc, err := strconv.Atoi(feedPostCnt)
+		if err != nil || fpc <= 0 {
+			println(
+				" - invalid config feed post count value: "+feedPostCnt,
+				" - will use the default value instead",
+			)
+		} else {
+			config.feedPostCnt = fpc
+		}
+	}
 
 	generateArchive := cm["generateArchive"]
 	if generateArchive != "" {
@@ -117,12 +165,12 @@ func readConfig() appConfig {
 		var sizes []int
 		tSizes := strings.Split(thumbSizes, ",")
 		for _, ts := range tSizes {
-			s, err := strconv.Atoi(strings.TrimSpace(ts))
-			if err != nil || s < minAllowedThumbWidth {
+			s, cErr := strconv.Atoi(strings.TrimSpace(ts))
+			if cErr != nil || s < minAllowedThumbWidth {
 				var errMsg string
-				if err != nil {
-					errMsg = err.Error()
-				} else if s < minAllowedThumbWidth {
+				if cErr != nil {
+					errMsg = cErr.Error()
+				} else {
 					errMsg += fmt.Sprintf(" (min allowed width value: %d)", minAllowedThumbWidth)
 				}
 				println(
@@ -142,12 +190,12 @@ func readConfig() appConfig {
 
 	thumbThreshold := cm["thumbThreshold"]
 	if thumbThreshold != "" {
-		tts, err := strconv.ParseFloat(thumbThreshold, 64)
-		if err != nil || tts < minAllowedThumbThreshold {
+		tts, cErr := strconv.ParseFloat(thumbThreshold, 64)
+		if cErr != nil || tts < minAllowedThumbThreshold {
 			var errMsg string
-			if err != nil {
-				errMsg = err.Error()
-			} else if tts < minAllowedThumbThreshold {
+			if cErr != nil {
+				errMsg = cErr.Error()
+			} else {
 				errMsg += fmt.Sprintf(" (min allowed value: %.2f)", minAllowedThumbThreshold)
 			}
 			println(
@@ -161,12 +209,12 @@ func readConfig() appConfig {
 
 	jpegQuality := cm["jpegQuality"]
 	if jpegQuality != "" {
-		jq, err := strconv.Atoi(jpegQuality)
-		if err != nil || jq < minAllowedJPEGQuality || jq > maxAllowedJPEGQuality {
+		jq, cErr := strconv.Atoi(jpegQuality)
+		if cErr != nil || jq < minAllowedJPEGQuality || jq > maxAllowedJPEGQuality {
 			var errMsg string
-			if err != nil {
-				errMsg = err.Error()
-			} else if jq < minAllowedJPEGQuality || jq > maxAllowedJPEGQuality {
+			if cErr != nil {
+				errMsg = cErr.Error()
+			} else {
 				errMsg += fmt.Sprintf(" (allowed range: %d - %d)", minAllowedJPEGQuality, maxAllowedJPEGQuality)
 			}
 			println(
@@ -221,12 +269,33 @@ func readConfig() appConfig {
 }
 
 func writeConfig(config appConfig) {
-	yml := "siteName: "
+	yml := ""
+
+	if config.siteBaseURL != "" {
+		yml += "siteBaseURL: " + config.siteBaseURL
+	} else {
+		yml += "#siteBaseURL: https://example.com"
+	}
+
+	yml += "\n"
+	yml += "siteName: "
 	escapeSiteName := strings.Contains(config.siteName, ":")
 	if escapeSiteName {
 		yml += "\"" + config.siteName + "\""
 	} else {
 		yml += config.siteName
+	}
+
+	yml += "\n"
+	if config.siteDescription != "" {
+		escapeSiteDescription := strings.Contains(config.siteDescription, ":")
+		if escapeSiteDescription {
+			yml += "siteDescription: \"" + config.siteDescription + "\""
+		} else {
+			yml += "siteDescription: " + config.siteDescription
+		}
+	} else {
+		yml += "#siteDescription: Site Description"
 	}
 
 	yml += "\n"
@@ -268,6 +337,20 @@ func writeConfig(config appConfig) {
 		yml += "yes"
 	} else {
 		yml += "no"
+	}
+
+	yml += "\n"
+	if len(config.generateFeeds) > 0 {
+		yml += "generateFeeds: " + strings.Join(config.generateFeeds, ", ")
+	} else {
+		yml += "#generateFeeds: rss, atom, json"
+	}
+
+	yml += "\n"
+	if config.feedPostCnt != defaultFeedPostCnt {
+		yml += "feedPostCnt: " + strconv.Itoa(config.feedPostCnt)
+	} else {
+		yml += "#feedPostCnt: " + strconv.Itoa(defaultFeedPostCnt)
 	}
 
 	yml += "\n"
@@ -400,13 +483,25 @@ func writeConfig(config appConfig) {
 
 func printConfig(config appConfig) {
 	sprintln("[ ------ config ------ ]\n")
+
+	if config.siteBaseURL != "" {
+		println(" - site base URL: " + config.siteBaseURL)
+	}
+
 	if config.siteName != "" {
 		println(" - site name: " + config.siteName)
 	}
+
+	if config.siteDescription != "" {
+		println(" - site description: " + config.siteDescription)
+	}
+
 	println(" - theme: " + config.theme)
+
 	if config.homePage != "" {
 		println(" - home page: " + config.homePage)
 	}
+
 	var generateArchive string
 	if config.generateArchive {
 		generateArchive = "yes"
@@ -414,6 +509,22 @@ func printConfig(config appConfig) {
 		generateArchive = "no"
 	}
 	println(" - generate archive: " + generateArchive)
+
+	var generateTagIndex string
+	if config.generateTagIndex {
+		generateTagIndex = "yes"
+	} else {
+		generateTagIndex = "no"
+	}
+	println(" - generate tag index: " + generateTagIndex)
+
+	if len(config.generateFeeds) > 0 {
+		println(" - generate feeds: " + strings.Join(config.generateFeeds, ", "))
+		println(fmt.Sprintf(" - feed post count: %d", config.feedPostCnt))
+	} else {
+		println(" - generate feeds: no")
+	}
+
 	var enableSearch string
 	if config.enableSearch {
 		enableSearch = "yes"
@@ -421,7 +532,9 @@ func printConfig(config appConfig) {
 		enableSearch = "no"
 	}
 	println(" - enable search: " + enableSearch)
+
 	println(fmt.Sprintf(" - page size: %d", config.pageSize))
+
 	var resizeOrigImages string
 	if config.resizeOrigImages {
 		resizeOrigImages = "yes"
@@ -429,6 +542,7 @@ func printConfig(config appConfig) {
 		resizeOrigImages = "no"
 	}
 	println(" - resize original images: " + resizeOrigImages)
+
 	println(fmt.Sprintf(" - max image size: %d", config.maxImgSize))
 	var usingThumbs string
 	if config.useThumbs {
@@ -436,21 +550,32 @@ func printConfig(config appConfig) {
 	} else {
 		usingThumbs = "no"
 	}
+
 	println(" - use thumbs: " + usingThumbs)
+
 	println(" - thumb sizes: " + strings.Trim(strings.Join(strings.Fields(fmt.Sprint(config.thumbSizes)), ", "), "[]"))
+
 	println(fmt.Sprintf(" - thumb threshold: %.2f", config.thumbThreshold))
+
 	println(fmt.Sprintf(" - jpeg quality: %d", config.jpegQuality))
+
 	println(" - png compression level: " + config.pngCompressionLevel.String())
+
 	println(" - serve host: " + config.serveHost)
+
 	println(fmt.Sprintf(" - serve port: %d", config.servePort))
+
 	if config.deployPath != "" {
 		println(" - deploy path: " + config.deployPath)
 	}
+
 	if config.deployHost != "" {
 		println(" - deploy host: " + config.deployHost)
 	}
+
 	if config.deployUsername != "" {
 		println(" - deploy username: " + config.deployUsername)
 	}
+
 	sprintln("[----------------------]")
 }

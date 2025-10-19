@@ -407,3 +407,86 @@ func getExpectedPostFileContent(p post) []string {
 func missingExpectedContentError(t *testing.T, fileName string, expectedContent string) {
 	t.Errorf("Processed file - %s - is missing expected content: %s", fileName, expectedContent)
 }
+
+func TestFeedGenerationRSS(t *testing.T) {
+	testFeedGeneration(t, []string{feedFormatRSS})
+}
+
+func TestFeedGenerationAtom(t *testing.T) {
+	testFeedGeneration(t, []string{feedFormatAtom})
+}
+
+func TestFeedGenerationJSON(t *testing.T) {
+	testFeedGeneration(t, []string{feedFormatJSON})
+}
+
+func TestFeedGenerationAll(t *testing.T) {
+	testFeedGeneration(t, []string{feedFormatRSS, feedFormatAtom, feedFormatJSON})
+}
+
+func testFeedGeneration(t *testing.T, feedFormats []string) {
+	var pages []page
+	var posts []post
+
+	globalIncludes := map[string]string{
+		"header.html": globalIncludeHeaderContent,
+	}
+
+	themeIncludes := map[string]string{
+		"header.html": themeIncludeHeaderContent,
+	}
+
+	post1 := post{
+		Id:    "post-1",
+		Title: "Test Post 1 Title",
+		Body:  "Test Post 1 Body",
+	}
+	post1.Date, _ = civil.ParseDate("2023-08-01")
+	post1.Time, _ = civil.ParseTime("19:15:00")
+
+	post2 := post{
+		Id:    "post-2",
+		Title: "Test Post 2 Title",
+		Body:  "Test Post 2 Body",
+	}
+	post2.Date, _ = civil.ParseDate("2023-07-15")
+
+	posts = []post{post1, post2}
+
+	config := defaultConfig()
+	config.siteBaseURL = "https://example.com"
+	config.siteName = testSiteName
+	config.generateFeeds = feedFormats
+	config.feedPostCnt = 2
+	config.enableSearch = false
+
+	output := processOutput(pages, posts, globalIncludes, themeIncludes, config)
+
+	for _, format := range feedFormats {
+		var expectedFeedFile string
+		switch format {
+		case feedFormatRSS:
+			expectedFeedFile = deployDirName + "/" + feedFileNameRSS
+		case feedFormatAtom:
+			expectedFeedFile = deployDirName + "/" + feedFileNameAtom
+		case feedFormatJSON:
+			expectedFeedFile = deployDirName + "/" + feedFileNameJSON
+		}
+
+		feedContent, ok := output[expectedFeedFile]
+		if !ok {
+			t.Error("Missing expected feed file: " + expectedFeedFile)
+			continue
+		}
+
+		if !strings.Contains(feedContent, config.siteBaseURL) {
+			t.Errorf("Feed %s missing siteBaseURL", expectedFeedFile)
+		}
+
+		for _, post := range posts {
+			if !strings.Contains(feedContent, post.FmtDate()) {
+				t.Errorf("Feed %s missing post date: %s", expectedFeedFile, post.FmtDate())
+			}
+		}
+	}
+}

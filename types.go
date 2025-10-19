@@ -2,13 +2,14 @@ package main
 
 import (
 	"bytes"
-	"cloud.google.com/go/civil"
 	"encoding/json"
 	"fmt"
 	"image/png"
 	"regexp"
 	"strings"
 	"time"
+
+	"cloud.google.com/go/civil"
 )
 
 type pngCompressionLevel string
@@ -55,11 +56,15 @@ func pngCompressionLevelStringValues() []string {
 }
 
 type appConfig struct {
+	siteBaseURL         string
 	siteName            string
+	siteDescription     string
 	theme               string
 	homePage            string
 	generateArchive     bool
 	generateTagIndex    bool
+	generateFeeds       []string
+	feedPostCnt         int
 	enableSearch        bool
 	pageSize            int
 	resizeOrigImages    bool

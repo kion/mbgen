@@ -7,8 +7,23 @@
     <link rel="stylesheet" href="/resources/styles.css">
     {{# head.html #}}
     {{ if .EntityType.Page }}
-    {{# page-head.html #}}
-    {{@ page-head @}}
+        {{# page-head.html #}}
+        {{@ page-head @}}
+    {{ end }}
+    {{ if .Config.GenerateFeeds }}
+        {{ $siteBaseURL := .Config.SiteBaseURL }}
+        {{ $siteName := .Config.SiteName }}
+        {{ range .Config.GenerateFeeds }}
+            {{ if eq . "rss" }}
+            <link type="application/rss+xml" rel="alternate" href="{{ $siteBaseURL }}/rss.xml" title="{{ if $siteName }}{{ $siteName }} - RSS Feed{{ else }}RSS Feed{{ end }}" />
+            {{ end }}
+            {{ if eq . "atom" }}
+            <link type="application/atom+xml" rel="alternate" href="{{ $siteBaseURL }}/atom.xml" title="{{ if $siteName }}{{ $siteName }} - Atom Feed{{ else }}Atom Feed{{ end }}" />
+            {{ end }}
+            {{ if eq . "json" }}
+            <link type="application/feed+json" rel="alternate" href="{{ $siteBaseURL }}/feed.json" title="{{ if $siteName }}{{ $siteName }} - JSON Feed{{ else }}JSON Feed{{ end }}" />
+            {{ end }}
+        {{ end }}
     {{ end }}
     <title>{{ .Title }}</title>
 </head>

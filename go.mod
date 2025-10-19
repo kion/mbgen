@@ -7,8 +7,9 @@ require (
 	github.com/disintegration/imaging v1.6.2
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/google/uuid v1.6.0
+	github.com/gorilla/feeds v1.2.0
 	github.com/gorilla/websocket v1.5.3
-	github.com/hashicorp/go-getter v1.7.8
+	github.com/hashicorp/go-getter v1.7.9
 	github.com/yuin/goldmark v1.7.8
 	github.com/yuin/goldmark-meta v1.1.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -43,7 +44,6 @@ require (
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
-	github.com/mitchellh/go-testing-interface v1.14.1 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/ulikunitz/xz v0.5.12 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
