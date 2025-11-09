@@ -1,7 +1,6 @@
 package main
 
 import (
-	"cloud.google.com/go/civil"
 	"fmt"
 	"os"
 	"regexp"
@@ -9,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"cloud.google.com/go/civil"
 )
 
 const testSiteName = "[TEST SITE]"
@@ -522,7 +523,7 @@ func TestFeedExcerptGeneration(t *testing.T) {
 	config.generateFeeds = []string{feedFormatRSS}
 	config.feedPostCnt = 1
 	config.enableSearch = false
-	config.feedPostContinueReadingText = "Read more"
+	config.feedPostViewOnWebsiteLinkText = "Read more"
 
 	output := processOutput(pages, posts, globalIncludes, themeIncludes, config)
 
@@ -556,12 +557,12 @@ func TestFeedExcerptGeneration(t *testing.T) {
 		t.Error("Feed should contain ellipsis for truncated content")
 	}
 
-	// should contain continue reading link
+	// should contain view on website link
 	if !strings.Contains(feedContent, "Read more") {
-		t.Error("Feed missing continue reading text")
+		t.Error("Feed missing view on website link text")
 	}
 	if !strings.Contains(feedContent, "https://example.com/post/post-1.html") {
-		t.Error("Feed missing continue reading link URL")
+		t.Error("Feed missing view on website link URL")
 	}
 }
 
@@ -731,5 +732,378 @@ func TestFeedRelativeURLConversion(t *testing.T) {
 	// should NOT contain relative URLs
 	if strings.Contains(feedContent, `href="/page/about"`) {
 		t.Error("Feed should not contain relative URL")
+	}
+}
+
+func TestFeedExcerptNoDoublePeriods(t *testing.T) {
+	var pages []page
+	var posts []post
+
+	globalIncludes := map[string]string{
+		"header.html": globalIncludeHeaderContent,
+	}
+
+	themeIncludes := map[string]string{
+		"header.html": themeIncludeHeaderContent,
+	}
+
+	// test post with multiple sentences - verify no double periods
+	post1 := post{
+		Id:          "post-periods",
+		Title:       "Test Periods",
+		Body:        "<p>Test body</p>",
+		FeedContent: "First sentence. Second sentence. Third sentence. Fourth sentence.",
+	}
+	post1.Date, _ = civil.ParseDate("2023-08-01")
+
+	posts = []post{post1}
+
+	config := defaultConfig()
+	config.siteBaseURL = "https://example.com"
+	config.siteName = testSiteName
+	config.generateFeeds = []string{feedFormatRSS}
+	config.feedPostCnt = 1
+	config.enableSearch = false
+
+	output := processOutput(pages, posts, globalIncludes, themeIncludes, config)
+
+	feedFile := deployDirName + "/" + feedFileNameRSS
+	feedContent, ok := output[feedFile]
+	if !ok {
+		t.Fatal("Missing expected feed file")
+	}
+
+	// should NOT contain double periods
+	if strings.Contains(feedContent, "sentence.. ") {
+		t.Error("Feed should not contain double periods")
+	}
+
+	// should contain properly spaced sentences
+	if !strings.Contains(feedContent, "First sentence.") {
+		t.Error("Feed missing first sentence with period")
+	}
+	if !strings.Contains(feedContent, "Second sentence.") {
+		t.Error("Feed missing second sentence with period")
+	}
+	if !strings.Contains(feedContent, "Third sentence.") {
+		t.Error("Feed missing third sentence with period")
+	}
+}
+
+func TestFeedExcerptEllipsisOnlyWhenTruncated(t *testing.T) {
+	var pages []page
+	var posts []post
+
+	globalIncludes := map[string]string{
+		"header.html": globalIncludeHeaderContent,
+	}
+
+	themeIncludes := map[string]string{
+		"header.html": themeIncludeHeaderContent,
+	}
+
+	// test post with exactly 3 sentences - should NOT have ellipsis
+	post1 := post{
+		Id:          "post-exact-three",
+		Title:       "Exact Three Sentences",
+		Body:        "<p>Test body</p>",
+		FeedContent: "First sentence here. Second sentence here. Third sentence here.",
+	}
+	post1.Date, _ = civil.ParseDate("2023-08-01")
+
+	// test post with less than 3 sentences - should NOT have ellipsis
+	post2 := post{
+		Id:          "post-two-sentences",
+		Title:       "Two Sentences",
+		Body:        "<p>Test body</p>",
+		FeedContent: "First sentence. Second sentence.",
+	}
+	post2.Date, _ = civil.ParseDate("2023-08-02")
+
+	// test post with more than 3 sentences - SHOULD have ellipsis
+	post3 := post{
+		Id:          "post-four-sentences",
+		Title:       "Four Sentences",
+		Body:        "<p>Test body</p>",
+		FeedContent: "First sentence. Second sentence. Third sentence. Fourth sentence.",
+	}
+	post3.Date, _ = civil.ParseDate("2023-08-03")
+
+	posts = []post{post1, post2, post3}
+
+	config := defaultConfig()
+	config.siteBaseURL = "https://example.com"
+	config.siteName = testSiteName
+	config.generateFeeds = []string{feedFormatRSS}
+	config.feedPostCnt = 3
+	config.enableSearch = false
+
+	output := processOutput(pages, posts, globalIncludes, themeIncludes, config)
+
+	feedFile := deployDirName + "/" + feedFileNameRSS
+	feedContent, ok := output[feedFile]
+	if !ok {
+		t.Fatal("Missing expected feed file")
+	}
+
+	// Extract individual feed items for each post
+	// For post1 (exactly 3 sentences): should NOT have ellipsis
+	if strings.Contains(feedContent, "Exact Three Sentences") {
+		// Check that this post's content doesn't have ellipsis
+		// This is tricky to verify in the full feed, but we can check that
+		// "Third sentence here..." doesn't appear (would be double periods + ellipsis)
+		if strings.Contains(feedContent, "Third sentence here...") {
+			t.Error("Post with exactly 3 sentences should not have ellipsis")
+		}
+	}
+
+	// For post3 (4 sentences): SHOULD have ellipsis after third sentence
+	if strings.Contains(feedContent, "Four Sentences") {
+		if !strings.Contains(feedContent, "Third sentence...") {
+			t.Error("Post with more than 3 sentences should have ellipsis")
+		}
+		if strings.Contains(feedContent, "Fourth sentence") {
+			t.Error("Fourth sentence should not appear in truncated excerpt")
+		}
+	}
+}
+
+func TestFeedExcerptAbbreviations(t *testing.T) {
+	var pages []page
+	var posts []post
+
+	globalIncludes := map[string]string{
+		"header.html": globalIncludeHeaderContent,
+	}
+
+	themeIncludes := map[string]string{
+		"header.html": themeIncludeHeaderContent,
+	}
+
+	// test post with abbreviations - should not break on "i.e." or "e.g."
+	post1 := post{
+		Id:          "post-abbreviations",
+		Title:       "Post With Abbreviations",
+		Body:        "<p>Test body</p>",
+		FeedContent: "This is about microblogging, i.e. short form content. You can use it for notes, e.g. daily observations. There are many benefits to this approach.",
+	}
+	post1.Date, _ = civil.ParseDate("2023-08-01")
+
+	posts = []post{post1}
+
+	config := defaultConfig()
+	config.siteBaseURL = "https://example.com"
+	config.siteName = testSiteName
+	config.generateFeeds = []string{feedFormatRSS}
+	config.feedPostCnt = 1
+	config.enableSearch = false
+
+	output := processOutput(pages, posts, globalIncludes, themeIncludes, config)
+
+	feedFile := deployDirName + "/" + feedFileNameRSS
+	feedContent, ok := output[feedFile]
+	if !ok {
+		t.Fatal("Missing expected feed file")
+	}
+
+	// should contain full sentences with abbreviations intact
+	if !strings.Contains(feedContent, "i.e. short form content") {
+		t.Error("Feed should preserve 'i.e.' abbreviation within sentence")
+	}
+	if !strings.Contains(feedContent, "e.g. daily observations") {
+		t.Error("Feed should preserve 'e.g.' abbreviation within sentence")
+	}
+
+	// should extract all 3 sentences (not break on abbreviations)
+	if !strings.Contains(feedContent, "This is about microblogging") {
+		t.Error("Feed missing first sentence")
+	}
+	if !strings.Contains(feedContent, "You can use it for notes") {
+		t.Error("Feed missing second sentence")
+	}
+	if !strings.Contains(feedContent, "There are many benefits") {
+		t.Error("Feed missing third sentence")
+	}
+}
+
+func TestFeedExcerptExclamationAndQuestionMarks(t *testing.T) {
+	var pages []page
+	var posts []post
+
+	globalIncludes := map[string]string{
+		"header.html": globalIncludeHeaderContent,
+	}
+
+	themeIncludes := map[string]string{
+		"header.html": themeIncludeHeaderContent,
+	}
+
+	// test post with sentences ending in !, ?, and .
+	post1 := post{
+		Id:          "post-mixed-punctuation",
+		Title:       "Post With Mixed Punctuation",
+		Body:        "<p>Test body</p>",
+		FeedContent: "This is exciting! Can you believe it? Yes, I can. This fourth sentence should not appear.",
+	}
+	post1.Date, _ = civil.ParseDate("2023-08-01")
+
+	// test post with only exclamation marks
+	post2 := post{
+		Id:          "post-exclamations",
+		Title:       "Post With Exclamations",
+		Body:        "<p>Test body</p>",
+		FeedContent: "First exciting thing! Second exciting thing! Third exciting thing! Fourth should not appear!",
+	}
+	post2.Date, _ = civil.ParseDate("2023-08-02")
+
+	// test post with only question marks
+	post3 := post{
+		Id:          "post-questions",
+		Title:       "Post With Questions",
+		Body:        "<p>Test body</p>",
+		FeedContent: "What is this? How does it work? Why does it matter? When will it happen?",
+	}
+	post3.Date, _ = civil.ParseDate("2023-08-03")
+
+	posts = []post{post1, post2, post3}
+
+	config := defaultConfig()
+	config.siteBaseURL = "https://example.com"
+	config.siteName = testSiteName
+	config.generateFeeds = []string{feedFormatRSS}
+	config.feedPostCnt = 3
+	config.enableSearch = false
+
+	output := processOutput(pages, posts, globalIncludes, themeIncludes, config)
+
+	feedFile := deployDirName + "/" + feedFileNameRSS
+	feedContent, ok := output[feedFile]
+	if !ok {
+		t.Fatal("Missing expected feed file")
+	}
+
+	// Post 1: mixed punctuation
+	if !strings.Contains(feedContent, "This is exciting!") {
+		t.Error("Feed should contain sentence ending with exclamation mark")
+	}
+	if !strings.Contains(feedContent, "Can you believe it?") {
+		t.Error("Feed should contain sentence ending with question mark")
+	}
+	if !strings.Contains(feedContent, "Yes, I can.") {
+		t.Error("Feed should contain sentence ending with period")
+	}
+	if strings.Contains(feedContent, "This fourth sentence should not appear") {
+		t.Error("Fourth sentence should not appear in excerpt")
+	}
+
+	// Post 2: only exclamations - should extract 3 sentences
+	// Since content is truncated, final punctuation will be replaced with ...
+	if !strings.Contains(feedContent, "First exciting thing!") {
+		t.Error("Feed should contain first exclamation sentence")
+	}
+	if !strings.Contains(feedContent, "Second exciting thing!") {
+		t.Error("Feed should contain second exclamation sentence")
+	}
+	if !strings.Contains(feedContent, "Third exciting thing...") {
+		t.Error("Feed should contain third exclamation sentence with ellipsis (truncated)")
+	}
+	if strings.Contains(feedContent, "Fourth should not appear") {
+		t.Error("Fourth exclamation sentence should not appear in excerpt")
+	}
+
+	// Post 3: only questions - should extract 3 sentences
+	// Since content is truncated, final punctuation will be replaced with ...
+	if !strings.Contains(feedContent, "What is this?") {
+		t.Error("Feed should contain first question")
+	}
+	if !strings.Contains(feedContent, "How does it work?") {
+		t.Error("Feed should contain second question")
+	}
+	if !strings.Contains(feedContent, "Why does it matter...") {
+		t.Error("Feed should contain third question with ellipsis (truncated)")
+	}
+	if strings.Contains(feedContent, "When will it happen") {
+		t.Error("Fourth question should not appear in excerpt")
+	}
+}
+
+func TestFeedExcerptEllipsisReplacementForAllPunctuation(t *testing.T) {
+	var pages []page
+	var posts []post
+
+	globalIncludes := map[string]string{
+		"header.html": globalIncludeHeaderContent,
+	}
+
+	themeIncludes := map[string]string{
+		"header.html": themeIncludeHeaderContent,
+	}
+
+	// test truncated content ending with period - should become ...
+	post1 := post{
+		Id:          "post-truncated-period",
+		Title:       "Truncated Period",
+		Body:        "<p>Test body</p>",
+		FeedContent: "First sentence. Second sentence. Third sentence. Fourth sentence not shown.",
+	}
+	post1.Date, _ = civil.ParseDate("2023-08-01")
+
+	// test truncated content ending with exclamation - should become ...
+	post2 := post{
+		Id:          "post-truncated-exclamation",
+		Title:       "Truncated Exclamation",
+		Body:        "<p>Test body</p>",
+		FeedContent: "First sentence! Second sentence! Third sentence! Fourth not shown!",
+	}
+	post2.Date, _ = civil.ParseDate("2023-08-02")
+
+	// test truncated content ending with question - should become ...
+	post3 := post{
+		Id:          "post-truncated-question",
+		Title:       "Truncated Question",
+		Body:        "<p>Test body</p>",
+		FeedContent: "First sentence? Second sentence? Third sentence? Fourth not shown?",
+	}
+	post3.Date, _ = civil.ParseDate("2023-08-03")
+
+	posts = []post{post1, post2, post3}
+
+	config := defaultConfig()
+	config.siteBaseURL = "https://example.com"
+	config.siteName = testSiteName
+	config.generateFeeds = []string{feedFormatRSS}
+	config.feedPostCnt = 3
+	config.enableSearch = false
+
+	output := processOutput(pages, posts, globalIncludes, themeIncludes, config)
+
+	feedFile := deployDirName + "/" + feedFileNameRSS
+	feedContent, ok := output[feedFile]
+	if !ok {
+		t.Fatal("Missing expected feed file")
+	}
+
+	// Post 1: truncated with period - should have "..." not "...."
+	if strings.Contains(feedContent, "Third sentence....") {
+		t.Error("Should not have quadruple periods (period + ellipsis)")
+	}
+	if !strings.Contains(feedContent, "Third sentence...") {
+		t.Error("Truncated content ending with period should show ellipsis")
+	}
+
+	// Post 2: truncated with exclamation - should replace ! with ...
+	if strings.Contains(feedContent, "Third sentence!...") {
+		t.Error("Should not have exclamation + ellipsis, should replace ! with ...")
+	}
+	if !strings.Contains(feedContent, "Third sentence...") {
+		t.Error("Truncated content ending with exclamation should replace with ellipsis")
+	}
+
+	// Post 3: truncated with question - should replace ? with ...
+	if strings.Contains(feedContent, "Third sentence?...") {
+		t.Error("Should not have question mark + ellipsis, should replace ? with ...")
+	}
+	if !strings.Contains(feedContent, "Third sentence...") {
+		t.Error("Truncated content ending with question should replace with ellipsis")
 	}
 }

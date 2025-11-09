@@ -13,21 +13,21 @@ import (
 
 func defaultConfig() appConfig {
 	return appConfig{
-		feedPostCnt:                 defaultFeedPostCnt,
-		feedPostContinueReadingText: defaultFeedPostContinueReadingText,
-		generateArchive:             defaultGenerateArchive,
-		generateTagIndex:            defaultGenerateTagIndex,
-		enableSearch:                defaultEnableSearch,
-		pageSize:                    defaultPageSize,
-		resizeOrigImages:            defaultResizeOrigImages,
-		maxImgSize:                  defaultMaxImgSize,
-		useThumbs:                   defaultUseThumbs,
-		thumbSizes:                  defaultThumbSizes,
-		thumbThreshold:              defaultThumbThreshold,
-		jpegQuality:                 defaultJPEGQuality,
-		pngCompressionLevel:         DefaultCompression,
-		serveHost:                   defaultServeHost,
-		servePort:                   defaultServePort,
+		feedPostCnt:                   defaultFeedPostCnt,
+		feedPostViewOnWebsiteLinkText: defaultFeedPostViewOnWebsiteLinkText,
+		generateArchive:               defaultGenerateArchive,
+		generateTagIndex:              defaultGenerateTagIndex,
+		enableSearch:                  defaultEnableSearch,
+		pageSize:                      defaultPageSize,
+		resizeOrigImages:              defaultResizeOrigImages,
+		maxImgSize:                    defaultMaxImgSize,
+		useThumbs:                     defaultUseThumbs,
+		thumbSizes:                    defaultThumbSizes,
+		thumbThreshold:                defaultThumbThreshold,
+		jpegQuality:                   defaultJPEGQuality,
+		pngCompressionLevel:           DefaultCompression,
+		serveHost:                     defaultServeHost,
+		servePort:                     defaultServePort,
 	}
 }
 
@@ -99,8 +99,8 @@ func readConfig() appConfig {
 		}
 	}
 
-	if feedPostContinueReadingText, ok := cm["feedPostContinueReadingText"]; ok && feedPostContinueReadingText != "" {
-		config.feedPostContinueReadingText = feedPostContinueReadingText
+	if feedPostViewOnWebsiteLinkText, ok := cm["feedPostViewOnWebsiteLinkText"]; ok && feedPostViewOnWebsiteLinkText != "" {
+		config.feedPostViewOnWebsiteLinkText = feedPostViewOnWebsiteLinkText
 	}
 
 	generateArchive := cm["generateArchive"]
@@ -359,10 +359,10 @@ func writeConfig(config appConfig) {
 	}
 
 	yml += "\n"
-	if config.feedPostContinueReadingText != defaultFeedPostContinueReadingText {
-		yml += "feedPostContinueReadingText: " + config.feedPostContinueReadingText
+	if config.feedPostViewOnWebsiteLinkText != defaultFeedPostViewOnWebsiteLinkText {
+		yml += "feedPostViewOnWebsiteLinkText: " + config.feedPostViewOnWebsiteLinkText
 	} else {
-		yml += "#feedPostContinueReadingText: " + defaultFeedPostContinueReadingText
+		yml += "#feedPostViewOnWebsiteLinkText: " + defaultFeedPostViewOnWebsiteLinkText
 	}
 
 	yml += "\n"
@@ -533,7 +533,7 @@ func printConfig(config appConfig) {
 	if len(config.generateFeeds) > 0 {
 		println(" - generate feeds: " + strings.Join(config.generateFeeds, ", "))
 		println(fmt.Sprintf(" - feed post count: %d", config.feedPostCnt))
-		println(" - feed post continue reading text: " + config.feedPostContinueReadingText)
+		println(" - feed post view on website link text: " + config.feedPostViewOnWebsiteLinkText)
 	} else {
 		println(" - generate feeds: no")
 	}

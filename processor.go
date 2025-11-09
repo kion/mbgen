@@ -12,6 +12,7 @@ import (
 	"strings"
 	"text/template"
 	"time"
+	"unicode"
 
 	"github.com/gorilla/feeds"
 )
@@ -566,18 +567,27 @@ func buildFeedItemTitle(p post) string {
 	return itemTitle
 }
 
-// buildFeedItemExcerpt creates an HTML excerpt from the post's cleaned markdown content
-// extracts up to 3 sentences, converts to HTML, and adds a "continue reading" link
+// buildFeedItemExcerpt creates an HTML excerpt from the post's cleaned markdown content,
+// converts to HTML, and adds a "view on website" link
 func buildFeedItemExcerpt(p post, config appConfig) string {
 	// extract first N sentences from the cleaned markdown
 	sentences := extractSentences(p.FeedContent, feedExcerptSentenceCnt)
 
 	var excerptMarkdown string
 	if len(sentences) > 0 {
-		excerptMarkdown = strings.Join(sentences, ". ")
-		// add ellipsis if we truncated
-		if len(sentences) == feedExcerptSentenceCnt || !strings.HasSuffix(p.FeedContent, sentences[len(sentences)-1]) {
-			excerptMarkdown += "..."
+		excerptMarkdown = strings.Join(sentences, " ")
+		// add ellipsis only if content was actually truncated
+		lastSentence := sentences[len(sentences)-1]
+		wasTruncated := !strings.HasSuffix(strings.TrimSpace(p.FeedContent), lastSentence)
+		if wasTruncated {
+			// replace final punctuation (., !, or ?) with ellipsis
+			if strings.HasSuffix(excerptMarkdown, ".") ||
+				strings.HasSuffix(excerptMarkdown, "!") ||
+				strings.HasSuffix(excerptMarkdown, "?") {
+				excerptMarkdown = excerptMarkdown[:len(excerptMarkdown)-1] + "..."
+			} else {
+				excerptMarkdown += "..."
+			}
 		}
 	} else {
 		// fallback: use first N words if no sentences found
@@ -596,9 +606,9 @@ func buildFeedItemExcerpt(p post, config appConfig) string {
 	// convert relative URLs to absolute (for hashtag links, etc.)
 	htmlExcerpt = convertRelativeURLsToAbsolute(htmlExcerpt, config.siteBaseURL)
 
-	// build the "continue reading" link
+	// build the "view on website" link
 	postURL := fmt.Sprintf("%s/%s/%s%s", config.siteBaseURL, deployPostDirName, p.Id, contentFileExtension)
-	continueLink := fmt.Sprintf(`<p><a href="%s">%s</a></p>`, postURL, config.feedPostContinueReadingText)
+	continueLink := fmt.Sprintf(`<p><a href="%s">%s</a></p>`, postURL, config.feedPostViewOnWebsiteLinkText)
 
 	return htmlExcerpt + continueLink
 }
@@ -612,9 +622,12 @@ func extractSentences(text string, maxSentences int) []string {
 	for i := 0; i < len(runes); i++ {
 		current.WriteRune(runes[i])
 
-		// check if we hit a sentence boundary (period followed by space/end, or end of text)
-		if runes[i] == '.' {
-			if i+1 >= len(runes) || runes[i+1] == ' ' || runes[i+1] == '\n' {
+		// check if we hit a sentence boundary (., !, or ? followed by space/end)
+		isSentenceEnding := runes[i] == '.' || runes[i] == '!' || runes[i] == '?'
+
+		if isSentenceEnding {
+			if i+1 >= len(runes) {
+				// end of text - definitely a sentence boundary
 				sentence := strings.TrimSpace(current.String())
 				if sentence != "" {
 					sentences = append(sentences, sentence)
@@ -623,6 +636,34 @@ func extractSentences(text string, maxSentences int) []string {
 					}
 				}
 				current.Reset()
+			} else if runes[i+1] == ' ' || runes[i+1] == '\n' {
+				// punctuation followed by whitespace - check if it's a sentence boundary
+				isSentenceBoundary := true
+
+				// for periods, check if next non-whitespace char is uppercase
+				// to avoid treating abbreviations (i.e., e.g., etc.) as sentence boundaries
+				if runes[i] == '.' {
+					nextCharIdx := i + 1
+					for nextCharIdx < len(runes) && (runes[nextCharIdx] == ' ' || runes[nextCharIdx] == '\n' || runes[nextCharIdx] == '\t') {
+						nextCharIdx++
+					}
+
+					// only treat as sentence boundary if next char is uppercase or end of text
+					if nextCharIdx < len(runes) && !unicode.IsUpper(runes[nextCharIdx]) {
+						isSentenceBoundary = false
+					}
+				}
+
+				if isSentenceBoundary {
+					sentence := strings.TrimSpace(current.String())
+					if sentence != "" {
+						sentences = append(sentences, sentence)
+						if len(sentences) >= maxSentences {
+							break
+						}
+					}
+					current.Reset()
+				}
 			}
 		}
 	}

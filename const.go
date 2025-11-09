@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	appVersion                                  = "1.7.2"
+	appVersion                                  = "1.7.3"
 	defaultGitHubRepoUrl                        = "github.com/kion/mbgen"
 	defaultGitHubRepoThemesUrl                  = defaultGitHubRepoUrl + "/themes"
 	defaultGitHubRepoPageContentSamplesUrl      = defaultGitHubRepoUrl + "/content-samples/pages"
@@ -67,7 +67,7 @@ const (
 	defaultServeHost                            = "localhost"
 	defaultServePort                            = 8888
 	defaultFeedPostCnt                          = 20
-	defaultFeedPostContinueReadingText          = "Continue Reading ->"
+	defaultFeedPostViewOnWebsiteLinkText        = "View on website ⮵"
 	feedExcerptSentenceCnt                      = 3
 	feedExcerptFallbackWordCnt                  = 20
 	feedFormatRSS                               = "rss"
