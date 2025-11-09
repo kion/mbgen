@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 	"sort"
 	"strconv"
@@ -481,13 +482,37 @@ func generateFeeds(posts []post, config appConfig, handleOutput processorOutputH
 			time.UTC,
 		)
 
-		feed.Items = append(feed.Items, &feeds.Item{
+		// prepend image to content if post has images
+		mediaFileNames := listAllMedia(Post, p.Id, nil)
+		if len(mediaFileNames) > 0 {
+			mediaList := parseMediaFileNames(mediaFileNames, Post, p.Id, config)
+
+			// read original markdown content to find first image reference
+			rawContent := getRawPostContent(p.Id)
+			if rawContent != "" {
+				firstImage := getFirstImageFromContent(rawContent, mediaList)
+				if firstImage != nil {
+					// prefer smallest thumbnail over original
+					imageUri := getSmallestThumbnailOrOriginal(*firstImage)
+					imageAbsoluteUrl := config.siteBaseURL + imageUri
+
+					// prepend image tag to content
+					imageTag := fmt.Sprintf(`<img src="%s" />`, imageAbsoluteUrl)
+					itemContent = imageTag + itemContent
+				}
+			}
+		}
+
+		// create feed item
+		item := &feeds.Item{
 			Title:   itemTitle,
 			Link:    &feeds.Link{Href: itemURL},
 			Id:      itemURL,
 			Content: itemContent,
 			Created: createdTime,
-		})
+		}
+
+		feed.Items = append(feed.Items, item)
 	}
 
 	// generate requested feed formats
@@ -641,6 +666,86 @@ func getPostTimestamp(post post) time.Time {
 // convertRelativeURLsToAbsolute converts relative URLs in href attributes to absolute URLs
 func convertRelativeURLsToAbsolute(htmlContent string, siteBaseURL string) string {
 	return relativeURLHrefRegexp.ReplaceAllString(htmlContent, `href="`+siteBaseURL+`$1"`)
+}
+
+// getSmallestThumbnailOrOriginal returns the URI of the smallest thumbnail if available, otherwise the original media URI
+func getSmallestThumbnailOrOriginal(m media) string {
+	if len(m.thumbs) > 0 {
+		// find smallest thumbnail by size
+		smallest := m.thumbs[0]
+		for _, thumb := range m.thumbs[1:] {
+			if thumb.Size < smallest.Size {
+				smallest = thumb
+			}
+		}
+		return smallest.Uri
+	}
+	return m.Uri
+}
+
+// getFirstImageFromContent parses post content for media directives and returns the first referenced image
+func getFirstImageFromContent(content string, mediaList []media) *media {
+	if len(mediaList) == 0 {
+		return nil
+	}
+
+	// check for {media:filename} or {media(props):filename} directives
+	mediaMatches := mediaPlaceholderRegexp.FindAllStringSubmatch(content, -1)
+	for _, match := range mediaMatches {
+		if len(match) > 3 && match[3] != "" {
+			// has file specification (group 3 is the filename part)
+			files := strings.Split(match[3], ",")
+			if len(files) > 0 {
+				filename := strings.TrimSpace(files[0])
+				// find this file in mediaList
+				for i := range mediaList {
+					if mediaList[i].Type == Image && strings.Contains(mediaList[i].Uri, filename) {
+						return &mediaList[i]
+					}
+				}
+			}
+		}
+	}
+
+	// check for {with-media:filename} style wrap directives
+	wrapMatches := wrapPlaceholderOpeningRegexp.FindAllStringSubmatch(content, -1)
+	for _, match := range wrapMatches {
+		if len(match) > 4 && match[1] == "with-media" && match[4] != "" {
+			// match[1] is the directive name, match[4] is the filename part
+			files := strings.Split(match[4], ",")
+			if len(files) > 0 {
+				filename := strings.TrimSpace(files[0])
+				// find this file in mediaList
+				for i := range mediaList {
+					if mediaList[i].Type == Image && strings.Contains(mediaList[i].Uri, filename) {
+						return &mediaList[i]
+					}
+				}
+			}
+		}
+	}
+
+	// if no specific file reference, check for generic {media} directive
+	if strings.Contains(content, "{media}") {
+		// return first image from mediaList
+		for i := range mediaList {
+			if mediaList[i].Type == Image {
+				return &mediaList[i]
+			}
+		}
+	}
+
+	return nil
+}
+
+// getRawPostContent reads the original markdown content of a post file
+func getRawPostContent(postId string) string {
+	postFilePath := filepath.Join(markdownPostsDirName, postId+markdownFileExtension)
+	data, err := os.ReadFile(postFilePath)
+	if err != nil {
+		return ""
+	}
+	return string(data)
 }
 
 func buildTemplateConfigMap(config appConfig) map[string]any {

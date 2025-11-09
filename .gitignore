@@ -21,6 +21,7 @@
 # Go workspace file
 go.work
 
-# IDE specific
+# IDE/tool specific
+.claude
 .idea
 .iml
