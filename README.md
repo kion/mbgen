@@ -54,11 +54,11 @@ This creates the following working dir structure:
 │   ├── deploy ☜ dir to be deployed to server
 │   │   ├── favicon.ico ☜ sample favicon
 │   │   ├── media ☜ media content dir
-│   │   │   │   ├── page
-│   │   │   │   │   ├── sample-page
-│   │   │   │   ├── post
-│   │   │   │   │   ├── sample-post-1
-│   │   │   │   │   ├── ...
+│   │   │   ├── page
+│   │   │   │   ├── sample-page
+│   │   │   ├── post
+│   │   │   │   ├── sample-post-1
+│   │   │   │   ├── ...
 │   ├── include ☜ include files dir
 │   │   ├── pretty-dark ☜ default theme include files dir
 │   ├── pages ☜ page content markdown files dir
@@ -184,17 +184,17 @@ $ mbgen help [command]
   ```
   ├── deploy
   │   ├── media
-  │   │   │   ├── page
-  │   │   │   │   ├── sample-page
-  │   │   │   │   │   ├── img-1.jpg
-  │   │   │   │   │   ├── vid-1.mp4
-  │   │   │   ├── post
-  │   │   │   │   ├── sample-post-1
-  │   │   │   │   │   ├── img-1.jpg
-  │   │   │   │   │   ├── img-2.jpg
-  │   │   │   │   │   ├── vid-1.mp4
-  │   │   │   │   ├── sample-post-2
-  │   │   │   │   │   ├── cover.png
+  │   │   ├── page
+  │   │   │   ├── sample-page
+  │   │   │   │   ├── img-1.jpg
+  │   │   │   │   ├── vid-1.mp4
+  │   │   ├── post
+  │   │   │   ├── sample-post-1
+  │   │   │   │   ├── img-1.jpg
+  │   │   │   │   ├── img-2.jpg
+  │   │   │   │   ├── vid-1.mp4
+  │   │   │   ├── sample-post-2
+  │   │   │   │   ├── cover.png
   ├── pages
   │   ├── sample-page.md
   ├── posts
