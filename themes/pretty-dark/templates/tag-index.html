@@ -1,7 +1,7 @@
 <section class="tag-index">
     <div class="tags">
         {{ range $tagData := .Content }}
-            <a class="tag" href="/tags/{{ $tagData.Title | toLowerCase }}/" style="font-size:{{ $tagData.Ratio }}em">
+            <a class="tag" href="/tags/{{ $tagData.Title | normalizeTagURI }}/" style="font-size:{{ $tagData.Ratio }}em">
                 <span class="tag-title">{{ $tagData.Title }}</span><span class="tag-cnt">({{ $tagData.Count }})</span>
             </a>
         {{ end }}

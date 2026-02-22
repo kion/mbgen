@@ -203,6 +203,12 @@ $ mbgen help [command]
   ```
 * Content files are a combination of the content body in the Markdown format
   along with Yaml formatted metadata in the beginning of the file
+  * A post's tag list is exclusively controlled by the YAML metadata `tags` section —
+    tag link directives in the body (`#<tag>`, `{%tag%}`, `{%tag:<tag>%}`) render links only
+    and do **not** affect the tag list
+  * Tag display names in YAML metadata may contain spaces and special characters (stored as-is for display);
+    tag URIs are automatically normalized: non-alphanumeric/non-hyphen/non-underscore characters replaced with `_`,
+    surrounding separators trimmed, lowercased (e.g. `Multi Word Tag` → `/tags/multi_word_tag/`)
   * Post content file example:
     ```
     ---
@@ -212,7 +218,7 @@ $ mbgen help [command]
     tags:
       - Tag1
       - Tag2
-      - Tag3
+      - Multi Word Tag
     ---
 
     Post body in the markdown format
@@ -237,12 +243,20 @@ $ mbgen help [command]
     {embed:youtu.be/A_bCdEfGhIj-X}
     ```
   * The following content directives are supported:
-    * `#<tag>` - renders a hashtag link
-      * _there's no need to add hashtags to the metadata `tags` section,
-        i.e. hashtags are automatically included in the post's tag list_
     * `{%<entry-type>:<entry-id>%}` - renders a URI to the given `<entry-id>` of the given `<entry-type>`, e.g.:
       * `[Sample Page]({%page:sample-page%})` - would render a link with title `Sample Page` to the page defined in the `pages/sample-project.md`
       * `[Sample Post 1]({%post:sample-post-1%})` - would render a link with title `Sample Post 1` to the post defined in the `posts/sample-post-1.md`
+    * `#<tag>` - renders a hashtag link to the corresponding tag page
+      * if you need to render custom / multi-word link text, use one of the following alternatives:
+        * `{%tag%}` (used as a Markdown link URL) - renders a URI to the tag page, auto-deriving the tag from the link text, e.g.:
+          * `[Multi Word Tag]({%tag%})` - renders a link to `/tags/multi_word_tag/` with `Multi Word Tag` as link text
+          * The tag URI is auto-derived from the link text using the same normalization rules (non-alphanumeric/hyphen/underscore characters replaced with `_`, surrounding separators trimmed, lowercased)
+        * `{%tag:<tag>%}` - renders a URI to the tag page for the given `<tag>`, e.g.:
+          * `[My Custom Text]({%tag:multi_word_tag%})` - renders a link to `/tags/multi_word_tag/` with `My Custom Text` as link text
+          * `[My Custom Text]({%tag:Multi Word Tag%})` - also renders a link to `/tags/multi_word_tag/` (spaces normalized)
+          * `<tag>` supports alphanumeric characters, hyphens (`-`), underscores (`_`), and spaces
+      * _note: tag content directives are purely a link rendering convenience — they do **not** add tags to the post's tag list;
+        to have a tag appear on the post's tag list, it must be explicitly listed in the YAML metadata `tags` section_
     * `{%search:<search query>%}` - renders a URI to the search page with the given `<search query>`
       (_note: this content directive would work as expected only if
       the `enableSearch` configuration option was not disabled - see more details in the corresponding section below)_, e.g.:

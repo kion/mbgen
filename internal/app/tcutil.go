@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+	"unicode"
 )
 
 var (
@@ -41,6 +42,7 @@ var (
 		},
 		"fmtYearAndMonth": formatYearAndMonth,
 		"toLowerCase":     strings.ToLower,
+		"normalizeTagURI": normalizeTagURI,
 	}
 )
 
@@ -221,6 +223,19 @@ func processDirectives(templateMarkup string, resLoader resourceLoader) string {
 	}
 
 	return templateMarkup
+}
+
+func normalizeTagURI(tag string) string {
+	var sb strings.Builder
+	for _, r := range tag {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-' || r == '_' {
+			sb.WriteRune(r)
+		} else {
+			sb.WriteRune('_')
+		}
+	}
+	result := strings.Trim(sb.String(), "_-")
+	return strings.ToLower(result)
 }
 
 func readTemplateFile(templateFileName string, resLoader resourceLoader) (string, error) {

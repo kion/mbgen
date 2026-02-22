@@ -1,7 +1,7 @@
 {{ if $post.Tags }}
 <span class="tags">
     {{ range $tag := $post.Tags }}
-    <a class="tag" href="/tags/{{ $tag | toLowerCase }}/">{{ $tag }}</a>
+    <a class="tag" href="/tags/{{ $tag | normalizeTagURI }}/">{{ $tag }}</a>
     {{ end }}
 </span>
 {{ end }}

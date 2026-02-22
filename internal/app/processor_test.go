@@ -107,7 +107,7 @@ func basicTest(t *testing.T, customHomePage bool) {
 	}
 
 	for _, tag := range tags {
-		expectedFiles = append(expectedFiles, deployDirName+"/"+deployTagsDirName+"/"+strings.ToLower(tag)+"/"+indexPageFileName)
+		expectedFiles = append(expectedFiles, deployDirName+"/"+deployTagsDirName+"/"+normalizeTagURI(tag)+"/"+indexPageFileName)
 	}
 
 	if !customHomePage {
@@ -162,7 +162,7 @@ func basicTest(t *testing.T, customHomePage bool) {
 					}
 				}
 				for _, tag := range tags {
-					if strings.Contains(ef, strings.ToLower(tag)+contentFileExtension) {
+					if strings.Contains(ef, normalizeTagURI(tag)+contentFileExtension) {
 						for _, post := range posts {
 							if slices.Contains(post.Tags, tag) {
 								verifyExpectedNonIndexOutputFileContentContainsPostContent(ef, outputFileContent, post, t)
@@ -234,7 +234,7 @@ func testPagination(t *testing.T, postCnt int) {
 	}
 
 	unexpectedFiles := []string{
-		deployDirName + "/" + deployTagsDirName + "/" + strings.ToLower(tag2) + "/2" + contentFileExtension,
+		deployDirName + "/" + deployTagsDirName + "/" + normalizeTagURI(tag2) + "/2" + contentFileExtension,
 	}
 
 	totalPageCnt := postCnt / defaultPageSize
@@ -247,14 +247,14 @@ func testPagination(t *testing.T, postCnt int) {
 	}
 
 	for tag, cnt := range tagCnt {
-		expectedFiles = append(expectedFiles, deployDirName+"/"+deployTagsDirName+"/"+strings.ToLower(tag)+"/"+indexPageFileName)
+		expectedFiles = append(expectedFiles, deployDirName+"/"+deployTagsDirName+"/"+normalizeTagURI(tag)+"/"+indexPageFileName)
 		if cnt > defaultPageSize {
 			tagPageCnt := cnt / defaultPageSize
 			if cnt%defaultPageSize > 0 {
 				tagPageCnt++
 			}
 			for i := 2; i <= tagPageCnt; i++ {
-				expectedFiles = append(expectedFiles, deployDirName+"/"+deployTagsDirName+"/"+strings.ToLower(tag)+"/"+strconv.Itoa(i)+contentFileExtension)
+				expectedFiles = append(expectedFiles, deployDirName+"/"+deployTagsDirName+"/"+normalizeTagURI(tag)+"/"+strconv.Itoa(i)+contentFileExtension)
 			}
 		}
 	}
@@ -290,9 +290,9 @@ func testPagination(t *testing.T, postCnt int) {
 		for i := 1; i <= cnt; i++ {
 			var outputFile string
 			if i == 1 {
-				outputFile = deployDirName + "/" + deployTagsDirName + "/" + strings.ToLower(tag) + "/" + indexPageFileName
+				outputFile = deployDirName + "/" + deployTagsDirName + "/" + normalizeTagURI(tag) + "/" + indexPageFileName
 			} else {
-				outputFile = deployDirName + "/" + deployTagsDirName + "/" + strings.ToLower(tag) + "/" + strconv.Itoa(i) + contentFileExtension
+				outputFile = deployDirName + "/" + deployTagsDirName + "/" + normalizeTagURI(tag) + "/" + strconv.Itoa(i) + contentFileExtension
 			}
 			outputFileContent := output[outputFile]
 			for j := (i - 1) * defaultPageSize; j < i*defaultPageSize && j < cnt; j++ {
@@ -397,7 +397,7 @@ func getExpectedPostFileContent(p post) []string {
 	if len(p.Tags) > 0 {
 		expectedTagsContent := "<span class=\"tags\">"
 		for _, tag := range p.Tags {
-			expectedTagsContent += fmt.Sprintf("<a class=\"tag\" href=\"/tags/%s/\">%s</a>", strings.ToLower(tag), tag)
+			expectedTagsContent += fmt.Sprintf("<a class=\"tag\" href=\"/tags/%s/\">%s</a>", normalizeTagURI(tag), tag)
 		}
 		expectedTagsContent += "</span>"
 		expectedContent = append(expectedContent, expectedTagsContent)

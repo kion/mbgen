@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	appVersion                                  = "1.7.4"
+	appVersion                                  = "1.7.5"
 	defaultGitHubRepoUrl                        = "github.com/kion/mbgen"
 	defaultGitHubRepoThemesUrl                  = defaultGitHubRepoUrl + "/themes"
 	defaultGitHubRepoPageContentSamplesUrl      = defaultGitHubRepoUrl + "/content-samples/pages"
@@ -125,6 +125,8 @@ var (
 	whitespacePlaceholderRegexp          = /* const */ regexp.MustCompile(`\s+`)
 	includeTemplateFilePlaceholderRegexp = /* const */ regexp.MustCompile(`{{@\s*([\w-_]+\.html)\s*@}}`)
 	includeContentFilePlaceholderRegexp  = /* const */ regexp.MustCompile(`{{#\s*([\w-_]+\.html)\s*#}}`)
+	tagAutoLinkPlaceholderRegexp         = /* const */ regexp.MustCompile(`\[([^\]]+)\]\(\{%\s*tag\s*%\}\)`)
+	tagLinkPlaceholderRegexp             = /* const */ regexp.MustCompile(`{%\s*tag\s*:\s*([\w\s-]+)\s*%}`)
 	searchLinkPlaceholderRegexp          = /* const */ regexp.MustCompile(`{%\s*search\s*:\s*([^{}%]+)\s*%}`)
 	contentLinkPlaceholderRegexp         = /* const */ regexp.MustCompile(`{%\s*([\w-_]+)\s*:\s*([\w-_]+)\s*%}`)
 	mediaPlaceholderRegexp               = /* const */ regexp.MustCompile(`{\s*media(\([\s\w=,]+\))?(\s*:\s*([\w\s-_.,*]+))?\s*}`)

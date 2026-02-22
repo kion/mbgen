@@ -136,7 +136,7 @@ func parsePosts(config appConfig, resLoader resourceLoader, thumbHandler imageTh
 
 func parsePage(pageId string, content string, config appConfig, resLoader resourceLoader) page {
 	page := page{Id: pageId}
-	content, rawBodyContent, cdPhReps, _ := parseContentDirectives(Page, pageId, content, config, resLoader)
+	content, rawBodyContent, cdPhReps := parseContentDirectives(Page, pageId, content, config, resLoader)
 	var buf bytes.Buffer
 	context := parser.NewContext()
 	err := markdown.Convert([]byte(content), &buf, parser.WithContext(context))
@@ -170,7 +170,7 @@ func parsePost(postId string, content string, config appConfig, resLoader resour
 		content = metaDataPlaceholderRegexp.ReplaceAllString(content, metadataContent)
 	}
 	// ================================================================================
-	content, rawBodyContent, cdPhReps, hashTags := parseContentDirectives(Post, postId, content, config, resLoader)
+	content, rawBodyContent, cdPhReps := parseContentDirectives(Post, postId, content, config, resLoader)
 	post.FeedContent = rawBodyContent // store cleaned markdown for feed generation
 	var buf bytes.Buffer
 	context := parser.NewContext()
@@ -210,13 +210,6 @@ func parsePost(postId string, content string, config appConfig, resLoader resour
 			}
 		}
 	}
-	if hashTags != nil {
-		for _, tag := range hashTags {
-			if !slices.Contains(post.Tags, tag) {
-				post.Tags = append(post.Tags, tag)
-			}
-		}
-	}
 	post.SearchData = searchData{
 		TypeId:  "post/" + post.Id,
 		Content: strings.ToLower(rawTitle) + " " + strings.ToLower(rawBodyContent) + " " + strings.ToLower(strings.Join(post.Tags[:], " ")),
@@ -230,21 +223,38 @@ func handleThumbnails(mediaDirPath string, config appConfig, thumbHandler imageT
 	}
 }
 
-func parseContentDirectives(ceType contentEntityType, ceId string, content string, config appConfig, resLoader resourceLoader) (string, string, map[string]string, []string) {
+func parseContentDirectives(ceType contentEntityType, ceId string, content string, config appConfig, resLoader resourceLoader) (string, string, map[string]string) {
 	rawBodyContent := metaDataPlaceholderRegexp.ReplaceAllString(content, "")
 	rawBodyContent = contentDirectivePlaceholderRegexp.ReplaceAllString(rawBodyContent, "")
 	rawBodyContent = whitespacePlaceholderRegexp.ReplaceAllString(rawBodyContent, " ")
 	rawBodyContent = strings.TrimSpace(rawBodyContent)
 	var phReps map[string]string
-	var tags []string
 	hashTagPlaceholders := hashTagRegex.FindAllStringSubmatch(content, -1)
 	if hashTagPlaceholders != nil {
 		for _, htp := range hashTagPlaceholders {
 			placeholder := htp[0]
 			tag := htp[1]
-			replacement := fmt.Sprintf(hashTagMarkdownReplacementFormat, tag, strings.ToLower(tag))
+			replacement := fmt.Sprintf(hashTagMarkdownReplacementFormat, tag, normalizeTagURI(tag))
 			content = strings.Replace(content, placeholder, replacement, 1)
-			tags = append(tags, tag)
+		}
+	}
+	tagAutoLinkPlaceholders := tagAutoLinkPlaceholderRegexp.FindAllStringSubmatch(content, -1)
+	if tagAutoLinkPlaceholders != nil {
+		for _, talp := range tagAutoLinkPlaceholders {
+			placeholder := talp[0]
+			linkText := talp[1]
+			tagURI := normalizeTagURI(linkText)
+			replacement := fmt.Sprintf("[%s](/%s/%s/)", linkText, deployTagsDirName, tagURI)
+			content = strings.Replace(content, placeholder, replacement, 1)
+		}
+	}
+	tagLinkPlaceholders := tagLinkPlaceholderRegexp.FindAllStringSubmatch(content, -1)
+	if tagLinkPlaceholders != nil {
+		for _, tlp := range tagLinkPlaceholders {
+			placeholder := tlp[0]
+			tagText := strings.TrimSpace(tlp[1])
+			link := "/" + deployTagsDirName + "/" + normalizeTagURI(tagText) + "/"
+			content = strings.Replace(content, placeholder, link, 1)
 		}
 	}
 	contentLinkPlaceholders := contentLinkPlaceholderRegexp.FindAllStringSubmatch(content, -1)
@@ -402,9 +412,9 @@ func parseContentDirectives(ceType contentEntityType, ceId string, content strin
 		for _, emp := range embedMediaPlaceholders {
 			var em *embeddedMedia
 			placeholder := emp[0]
-			url := emp[1]
+			emUrl := emp[1]
 			for _, emt := range embeddedMediaTypes {
-				code := emt.getCode(url)
+				code := emt.getCode(emUrl)
 				if code != "" {
 					em = &embeddedMedia{
 						MediaType: emt,
@@ -431,7 +441,7 @@ func parseContentDirectives(ceType contentEntityType, ceId string, content strin
 			}
 		}
 	}
-	return content, rawBodyContent, phReps, tags
+	return content, rawBodyContent, phReps
 }
 
 func sortContentDirectivePlaceholders(cdPlaceholders [][]string) {

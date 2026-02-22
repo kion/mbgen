@@ -237,7 +237,7 @@ func processPosts(posts []post, searchIndex *mapSlice,
 			if len(post.Tags) > 0 {
 				for _, tag := range post.Tags {
 					tagTitleCnt[tag]++
-					t := strings.ToLower(tag)
+					t := normalizeTagURI(tag)
 					tagPostCnt[t]++
 					tagContent[t] = append(tagContent[t], postContent)
 				}
@@ -337,8 +337,7 @@ func processPaginatedPostContent(postCnt map[string]int, content map[string][]st
 			if cnt%pageSize > 0 {
 				totalPageCnt++
 			}
-			subDirName := strings.ToLower(key)
-			pdIndexUri := "/" + contentDeployDirName + "/" + subDirName
+			pdIndexUri := "/" + contentDeployDirName + "/" + key
 			pd := pagerData{
 				CurrPageNum:   1,
 				TotalPageCnt:  totalPageCnt,
@@ -361,7 +360,7 @@ func processPaginatedPostContent(postCnt map[string]int, content map[string][]st
 					} else {
 						fileName = strconv.Itoa(pd.CurrPageNum) + contentFileExtension
 					}
-					outputFilePath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, contentDeployDirName, os.PathSeparator, subDirName, os.PathSeparator, fileName)
+					outputFilePath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, contentDeployDirName, os.PathSeparator, key, os.PathSeparator, fileName)
 					processContent(fileName, Post, resLoader.config.siteName+" - "+key, pageContent, outputFilePath, resLoader, handleOutput)
 					pagePostCnt = 0
 					pageContent = ""
@@ -379,7 +378,7 @@ func processPaginatedPostContent(postCnt map[string]int, content map[string][]st
 					check(err)
 					pageContent += pagerBuffer.String()
 				}
-				outputFilePath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, contentDeployDirName, os.PathSeparator, subDirName, os.PathSeparator, fileName)
+				outputFilePath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, contentDeployDirName, os.PathSeparator, key, os.PathSeparator, fileName)
 				processContent(fileName, Post, resLoader.config.siteName+" - "+key, pageContent, outputFilePath, resLoader, handleOutput)
 			}
 		}
