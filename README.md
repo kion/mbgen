@@ -206,9 +206,11 @@ $ mbgen help [command]
   * A post's tag list is exclusively controlled by the YAML metadata `tags` section —
     tag link directives in the body (`#<tag>`, `{%tag%}`, `{%tag:<tag>%}`) render links only
     and do **not** affect the tag list
-  * Tag display names in YAML metadata may contain spaces and special characters (stored as-is for display);
-    tag URIs are automatically normalized: non-alphanumeric/non-hyphen/non-underscore characters replaced with `_`,
-    surrounding separators trimmed, lowercased (e.g. `Multi Word Tag` → `/tags/multi_word_tag/`)
+  * Tags in YAML metadata are automatically normalized (non-alphanumeric/non-hyphen/non-underscore
+    characters replaced with `_`, surrounding separators trimmed, lowercased) —
+    e.g. `Multi Word Tag` is stored and displayed as `multi_word_tag`;
+    tags with different casing are treated as the same tag
+    (e.g. `ExampleTag`, `Exampletag`, and `exampleTag` would all normalize to `exampletag`)
   * Post content file example:
     ```
     ---

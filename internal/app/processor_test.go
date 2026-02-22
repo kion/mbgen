@@ -48,9 +48,9 @@ func basicTest(t *testing.T, customHomePage bool) {
 
 	pages := []page{page1, page2}
 
-	tag1 := "Tag1"
-	tag2 := "Tag2"
-	tag3 := "Tag3"
+	tag1 := "tag1"
+	tag2 := "tag2"
+	tag3 := "tag3"
 
 	tags := []string{tag1, tag2, tag3}
 
@@ -202,8 +202,8 @@ func testPagination(t *testing.T, postCnt int) {
 		"header.html": themeIncludeHeaderContent,
 	}
 
-	tag1 := "Tag1"
-	tag2 := "Tag2"
+	tag1 := "tag1"
+	tag2 := "tag2"
 
 	tagCnt := map[string]int{tag1: 0, tag2: 0}
 

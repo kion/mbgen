@@ -204,7 +204,7 @@ func parsePost(postId string, content string, config appConfig, resLoader resour
 	if tags != nil {
 		ti := tags.([]interface{})
 		for _, v := range ti {
-			tag := v.(string)
+			tag := normalizeTagURI(v.(string))
 			if !slices.Contains(post.Tags, tag) {
 				post.Tags = append(post.Tags, tag)
 			}

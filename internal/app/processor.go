@@ -140,7 +140,6 @@ func processPosts(posts []post, searchIndex *mapSlice,
 		archiveContent := make(map[string][]string)
 
 		tagPostCnt := make(map[string]int)
-		tagTitleCnt := make(map[string]int)
 		tagContent := make(map[string][]string)
 
 		for _, post := range posts {
@@ -236,10 +235,8 @@ func processPosts(posts []post, searchIndex *mapSlice,
 
 			if len(post.Tags) > 0 {
 				for _, tag := range post.Tags {
-					tagTitleCnt[tag]++
-					t := normalizeTagURI(tag)
-					tagPostCnt[t]++
-					tagContent[t] = append(tagContent[t], postContent)
+					tagPostCnt[tag]++
+					tagContent[tag] = append(tagContent[tag], postContent)
 				}
 			}
 
@@ -295,7 +292,7 @@ func processPosts(posts []post, searchIndex *mapSlice,
 				// sort the tags by post count
 				// ======================================================================
 				var sortedTags []tagData
-				for tt, tc := range tagTitleCnt {
+				for tt, tc := range tagPostCnt {
 					tr := float64(tc-minTagPostCnt) / float64(maxTagPostCnt-minTagPostCnt)
 					tr = float64(int(tr*100))/100 + 1
 					sortedTags = append(sortedTags, tagData{Title: tt, Count: tc, Ratio: tr})
