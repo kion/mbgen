@@ -35,13 +35,13 @@ const tag3 = "TAG3"
 
 const testTagAutoLinkText = "Multi Word Tag"
 const testTagAutoLinkPlaceholder = "[" + testTagAutoLinkText + "]({%tag%})"
-const testTagAutoLinkExpected = `href="/tags/multi_word_tag/">` + testTagAutoLinkText + `</a>`
+const testTagAutoLinkExpected = `href="/tags/multi-word-tag/">` + testTagAutoLinkText + `</a>`
 
-const testTagExplicitPlaceholder = "{%tag:multi_word_tag%}"
-const testTagExplicitURI = "/tags/multi_word_tag/"
+const testTagExplicitPlaceholder = "{%tag:multi-word-tag%}"
+const testTagExplicitURI = "/tags/multi-word-tag/"
 
 const testTagMultiWordMetadata = "Multi Word Tag"
-const testTagMultiWordNormalized = "multi_word_tag"
+const testTagMultiWordNormalized = "multi-word-tag"
 
 const pageContentTemplate = `---
 title: %s
@@ -177,9 +177,9 @@ func TestNormalizeTagURI(t *testing.T) {
 		{"tag1", "tag1"},
 		{"Tag2", "tag2"},
 		{"TAG3", "tag3"},
-		{"Multi Word Tag", "multi_word_tag"},
+		{"Multi Word Tag", "multi-word-tag"},
 		{"Sci-Fi", "sci-fi"},
-		{"🚴 Multi Tag", "multi_tag"},
+		{"🚴 Multi Tag", "multi-tag"},
 		{"TourDeZwift", "tourdezwift"},
 	}
 	for _, c := range cases {

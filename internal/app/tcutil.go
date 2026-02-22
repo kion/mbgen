@@ -228,13 +228,13 @@ func processDirectives(templateMarkup string, resLoader resourceLoader) string {
 func normalizeTagURI(tag string) string {
 	var sb strings.Builder
 	for _, r := range tag {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-' || r == '_' {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-' {
 			sb.WriteRune(r)
 		} else {
-			sb.WriteRune('_')
+			sb.WriteRune('-')
 		}
 	}
-	result := strings.Trim(sb.String(), "_-")
+	result := strings.Trim(sb.String(), "-")
 	return strings.ToLower(result)
 }
 
