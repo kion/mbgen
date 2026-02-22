@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	appVersion                                  = "1.7.6"
+	appVersion                                  = "1.7.7"
 	defaultGitHubRepoUrl                        = "github.com/kion/mbgen"
 	defaultGitHubRepoThemesUrl                  = defaultGitHubRepoUrl + "/themes"
 	defaultGitHubRepoPageContentSamplesUrl      = defaultGitHubRepoUrl + "/content-samples/pages"
@@ -133,7 +133,7 @@ var (
 	embedMediaPlaceholderRegexp          = /* const */ regexp.MustCompile(`{\s*embed\s*:\s*([^}]+)\s*}`)
 	wrapPlaceholderOpeningRegexp         = /* const */ regexp.MustCompile(`\{\s*([\w-_.]+)\s*(\([\s\w=,]+\))?(\s*:\s*([\w\s-_.,*]+))?\s*}`)
 	wrapPlaceholderRegexp                = /* const */ regexp.MustCompile(`\{\s*([\w-_.]+)\s*(\([\s\w=,]+\))?(\s*:\s*([\w\s-_.,*]+))?\s*}([^{}]*){/}`)
-	hashTagRegex                         = /* const */ regexp.MustCompile(`#(\p{L}+[_-]*\p{L}*)`)
+	hashTagRegex                         = /* const */ regexp.MustCompile(`#([\p{L}\d][\p{L}\d_-]*)`)
 	relativeURLHrefRegexp                = /* const */ regexp.MustCompile(`href="(/[^"]*)"`)
 )
 
