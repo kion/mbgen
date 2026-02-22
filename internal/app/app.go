@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"os"
@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func main() {
+func Run() {
 	var err, usageHelp string
 	var command string
 	var commandFn appCommand

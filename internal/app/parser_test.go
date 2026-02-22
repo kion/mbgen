@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"fmt"
@@ -113,7 +113,7 @@ func TestParser(t *testing.T) {
 
 	expectedTags := []string{tag1, tag2, tag3}
 
-	defaultThemeTemplatesDir := fmt.Sprintf("%s%c%s%c%s", "themes", os.PathSeparator, defaultThemeName, os.PathSeparator, "templates")
+	defaultThemeTemplatesDir := fmt.Sprintf("%s%c%s%c%s", "../../themes", os.PathSeparator, defaultThemeName, os.PathSeparator, "templates")
 	resLoader := resourceLoader{
 		config: defaultConfig(),
 		loadTemplate: func(templateFileName string) ([]byte, error) {
@@ -197,7 +197,7 @@ This is the actual post body content. It should appear in feeds and search.
 
 More content here with **formatting** and [links](http://example.com).`
 
-	defaultThemeTemplatesDir := fmt.Sprintf("%s%c%s%c%s", "themes", os.PathSeparator, defaultThemeName, os.PathSeparator, "templates")
+	defaultThemeTemplatesDir := fmt.Sprintf("%s%c%s%c%s", "../../themes", os.PathSeparator, defaultThemeName, os.PathSeparator, "templates")
 	resLoader := resourceLoader{
 		config: defaultConfig(),
 		loadTemplate: func(templateFileName string) ([]byte, error) {
@@ -278,7 +278,7 @@ Glacier National Park isn't just another protected wildlife site. It's one of Mo
 
 More content here.`
 
-	defaultThemeTemplatesDir := fmt.Sprintf("%s%c%s%c%s", "themes", os.PathSeparator, defaultThemeName, os.PathSeparator, "templates")
+	defaultThemeTemplatesDir := fmt.Sprintf("%s%c%s%c%s", "../../themes", os.PathSeparator, defaultThemeName, os.PathSeparator, "templates")
 	resLoader := resourceLoader{
 		config: defaultConfig(),
 		loadTemplate: func(templateFileName string) ([]byte, error) {

@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"fmt"
@@ -308,7 +308,7 @@ func processOutput(pages []page, posts []post,
 	themeIncludes map[string]string,
 	config appConfig) map[string]string {
 	output := make(map[string]string)
-	defaultThemeTemplatesDir := fmt.Sprintf("%s%c%s%c%s", "themes", os.PathSeparator, defaultThemeName, os.PathSeparator, "templates")
+	defaultThemeTemplatesDir := fmt.Sprintf("%s%c%s%c%s", "../../themes", os.PathSeparator, defaultThemeName, os.PathSeparator, "templates")
 	process(pages, posts,
 		resourceLoader{
 			config: config,
