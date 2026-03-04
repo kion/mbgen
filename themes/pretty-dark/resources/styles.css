@@ -460,7 +460,7 @@ button {
 
 /*
 ==============================
-    Admin Edit Styles
+    Admin Styles
 ==============================
 */
 
@@ -473,6 +473,64 @@ button {
 .admin-controls .admin-btn {
     flex-grow: 1;
     border-color: #cc0000;
+}
+
+#admin-shared-media-panel {
+    font-family: SourceCodePro, monospace;
+    margin-top: 1em;
+    border: 2px solid #555;
+    border-radius: 4px;
+    box-shadow: 0 4px 8px 0 rgba(0,0,0,0.5);
+}
+
+#admin-shared-media-panel > header {
+    color: #777;
+    font-weight: bold;
+    padding: 1em;
+    border-bottom: 2px dashed #555;
+    display: flex;
+    align-items: center;
+}
+
+#admin-shared-media-panel > header .title {
+    flex: 1;
+    color: #999;
+}
+
+#admin-shared-media-panel .content {
+    padding: 1em;
+}
+
+.admin-media-drop-zone {
+    border: 2px dashed #555;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3em 1em;
+    text-align: center;
+    color: #555;
+    cursor: pointer;
+    margin-bottom: 1em;
+    &:hover {
+        border-color: #777;
+        color: #777;
+    }
+}
+
+.admin-media-drop-zone .no-media {
+    font-size: 1.1em;
+    margin-bottom: 0.5em;
+}
+
+.admin-media-drop-zone.compact {
+    margin-top: 1em;
+    padding: 0.8em 1em;
+}
+
+.admin-media-drop-zone .drop-hint {
+    font-size: 0.85em;
 }
 
 .admin-media-controls {
@@ -520,7 +578,7 @@ header .links a.admin-link {
     font-size: 1.2rem;
 }
 
-/* markdown editor dark mode */
+/* Markdown Editor Dark Mode */
 
 .EasyMDEContainer .CodeMirror {
     color: #ccc !important;

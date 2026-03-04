@@ -35,11 +35,16 @@ function renderAdminButtons(headerEl) {
             (deployCommandAvailable
                 ? '<button class="admin-btn" id="admin-deploy"><i class="fa-solid fa-upload"></i>Deploy</button>'
                 : '') +
+            '<button class="admin-btn" id="admin-shared-media"><i class="fa-solid fa-images"></i>Shared Media</button>' +
             '<button class="admin-btn" id="admin-create-page"><i class="fa-solid fa-square-plus"></i>Create New Page</button>' +
             '<button class="admin-btn" id="admin-create-post"><i class="fa-solid fa-calendar-plus"></i>Create New Post</button>' +
             '</section>' +
             '</section>';
         headerEl.outerHTML += adminCreateHtml;
+        const adminSharedMediaBtn = document.getElementById('admin-shared-media');
+        adminSharedMediaBtn.onclick = function() {
+            adminSharedMedia();
+        }
         const adminCreatePageBtn = document.getElementById('admin-create-page');
         adminCreatePageBtn.onclick = function() {
             adminCreatePage();
@@ -250,9 +255,15 @@ function adminMedia(entryType, entryId, contentEntryEl) {
                         '</section>' +
                     '</section>';
                 let mediaEditorEl = document.getElementById(entryMediaElId);
-                mediaEditorEl.outerHTML = xhr.responseText;
+                const hasMedia = xhr.responseText && xhr.responseText.trim() !== '';
+                const dropZoneHtml =
+                    '<div class="admin-media-drop-zone' + (hasMedia ? ' compact' : '') + '" id="' + entryMediaElId + '-drop-zone">' +
+                        (!hasMedia ? '<div class="no-media">No Media</div>' : '') +
+                        '<div class="drop-hint">Drag-&-Drop Media Files Here</div>' +
+                    '</div>';
+                mediaEditorEl.outerHTML = (hasMedia ? xhr.responseText : '') + dropZoneHtml;
                 const handleMediaFormData = function(entryType, entryId, mediaUploadFormData) {
-                    uploadMediaFormData(entryType, entryId, mediaUploadFormData,
+                    uploadMediaFormData('/admin-media?type=' + entryType + '&id=' + entryId, mediaUploadFormData,
                         function(responseText){
                             mediaEditorEl = contentEl.getElementsByClassName('admin-media')[0];
                             mediaEditorEl.outerHTML = responseText;
@@ -274,13 +285,13 @@ function adminMedia(entryType, entryId, contentEntryEl) {
                 entryMediaAddEl.onclick = function() {
                     entryMediaUploadFile.click();
                 }
-                entryMediaAddEl.ondragover = function(ev) {
+                const dropZoneEl = document.getElementById(entryMediaElId + '-drop-zone');
+                dropZoneEl.ondragover = function(ev) {
                     ev.preventDefault();
                 }
-                entryMediaAddEl.ondrop = function(ev) {
+                dropZoneEl.ondrop = function(ev) {
                     ev.preventDefault();
-                    const dt = ev.dataTransfer;
-                    const files = dt.files;
+                    const files = ev.dataTransfer.files;
                     for (let i = 0; i < files.length; i++) {
                         const file = files[i];
                         if (supportedMediaFileExt.includes(file.name.substring(file.name.lastIndexOf('.')))) {
@@ -353,9 +364,128 @@ function adminMedia(entryType, entryId, contentEntryEl) {
     }
 }
 
-function uploadMediaFormData(entryType, entryId, mediaUploadFormData, successCallbackFn, failureCallbackFn) {
+function adminSharedMedia() {
+    const panelId = 'admin-shared-media-panel';
+    const existingPanel = document.getElementById(panelId);
+    if (existingPanel) {
+        existingPanel.remove();
+    }
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', '/admin-media?type='+ entryType + '&id=' + entryId, false);
+    xhr.open('GET', '/admin-media?type=shared', false);
+    xhr.send();
+    if (xhr.readyState === XMLHttpRequest.DONE) {
+        if (xhr.status === 200) {
+            const headerEl = document.getElementsByTagName('header')[0];
+            const adminCreateEl = headerEl.parentElement.getElementsByClassName('admin-create')[0];
+            const hasMedia = xhr.responseText && xhr.responseText.trim() !== '';
+            const panelHtml =
+                '<section id="' + panelId + '">' +
+                    '<header><span class="title">Shared Media</span></header>' +
+                    '<div class="content">' +
+                        '<section class="admin-media">' +
+                            '<section id="' + panelId + '-media"></section>' +
+                            '<form enctype="multipart/form-data" id="' + panelId + '-upload-form">' +
+                                '<input type="file" multiple accept="' + supportedMediaFileExtStr + '" name="admin-media-upload-files" id="' + panelId + '-upload-file" style="display:none">' +
+                            '</form>' +
+                            '<section class="admin-controls">' +
+                                '<button id="' + panelId + '-add" class="admin-btn"><i class="fa-solid fa-folder-plus"></i>Add Shared Media</button>' +
+                                '<button id="' + panelId + '-close" class="admin-btn"><i class="fa-solid fa-circle-xmark"></i>Close</button>' +
+                            '</section>' +
+                        '</section>' +
+                    '</div>' +
+                '</section>';
+            adminCreateEl.insertAdjacentHTML('afterend', panelHtml);
+            let mediaEl = document.getElementById(panelId + '-media');
+            const dropZoneHtml =
+                '<div class="admin-media-drop-zone' + (hasMedia ? ' compact' : '') + '" id="' + panelId + '-drop-zone">' +
+                    (!hasMedia ? '<div class="no-media">No Media</div>' : '') +
+                    '<div class="drop-hint">Drag-&-Drop Media Files Here</div>' +
+                '</div>';
+            mediaEl.outerHTML = (hasMedia ? xhr.responseText : '') + dropZoneHtml;
+            const refreshPanel = function() {
+                adminSharedMedia();
+            };
+            const handleSharedMediaFormData = function(mediaUploadFormData) {
+                uploadMediaFormData('/admin-media?type=shared', mediaUploadFormData,
+                    function(){ refreshPanel(); },
+                    function(responseText){
+                        alert('failed to upload shared media');
+                        console.error('failed to upload shared media: ' + responseText);
+                    }
+                );
+            };
+            const uploadFileEl = document.getElementById(panelId + '-upload-file');
+            uploadFileEl.onchange = function() {
+                const uploadForm = document.getElementById(panelId + '-upload-form');
+                handleSharedMediaFormData(new FormData(uploadForm));
+            };
+            const addBtn = document.getElementById(panelId + '-add');
+            addBtn.onclick = function() {
+                uploadFileEl.click();
+            };
+            const dropZoneEl = document.getElementById(panelId + '-drop-zone');
+            dropZoneEl.ondragover = function(ev) {
+                ev.preventDefault();
+            };
+            dropZoneEl.ondrop = function(ev) {
+                ev.preventDefault();
+                const files = ev.dataTransfer.files;
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    if (supportedMediaFileExt.includes(file.name.substring(file.name.lastIndexOf('.')))) {
+                        const uploadForm = document.getElementById(panelId + '-upload-form');
+                        const fd = new FormData(uploadForm);
+                        fd.append('admin-media-upload-files', file);
+                        handleSharedMediaFormData(fd);
+                    }
+                }
+            };
+            const currentPanelEl = document.getElementById(panelId);
+            const imageEls = currentPanelEl.getElementsByClassName('image');
+            const videoEls = currentPanelEl.getElementsByClassName('video');
+            const mediaEls = [...imageEls, ...videoEls];
+            for (let i = 0; i < mediaEls.length; i++) {
+                const mediaEl = mediaEls[i];
+                const fileName = mediaEl.classList.contains('video')
+                    ? mediaEl.getElementsByTagName('video')[0].getAttribute('src').split('/').pop()
+                    : mediaEl.getElementsByTagName('a')[0].getAttribute('href').split('/').pop();
+                mediaEl.innerHTML +=
+                    '<span class="admin-media-controls">' +
+                        '<span class="admin-media-file-name">' + fileName + '</span>' +
+                        '<span class="admin-media-delete" data-fn="' + fileName + '">' +
+                            '<i class="fa-solid fa-trash-can"></i>' +
+                        '</span>' +
+                    '</span>';
+                const deleteEl = mediaEl.getElementsByClassName('admin-media-delete')[0];
+                deleteEl.onclick = function() {
+                    if (confirm('Are you sure you want to delete shared/' + fileName + '?')) {
+                        const delXhr = new XMLHttpRequest();
+                        delXhr.open('DELETE', '/admin-media?type=shared&fileName=' + fileName, false);
+                        delXhr.send();
+                        if (delXhr.readyState === XMLHttpRequest.DONE) {
+                            if (delXhr.status === 205) {
+                                refreshPanel();
+                            } else {
+                                alert('failed to delete shared media');
+                                console.error('failed to delete shared media ' + fileName + ': ' + delXhr.responseText);
+                            }
+                        }
+                    }
+                };
+            }
+            document.getElementById(panelId + '-close').onclick = function() {
+                document.getElementById(panelId).remove();
+            };
+        } else {
+            alert('failed to load shared media');
+            console.error('failed to load shared media: ' + xhr.responseText);
+        }
+    }
+}
+
+function uploadMediaFormData(url, mediaUploadFormData, successCallbackFn, failureCallbackFn) {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url, false);
     xhr.send(mediaUploadFormData);
     if (xhr.readyState === XMLHttpRequest.DONE) {
         if (xhr.status === 201) {
@@ -385,17 +515,17 @@ function adminDeploy(beforeFn, afterFn) {
         };
         xhr.send();
     })
-    .then(message => {
-        alert(message);
-    })
-    .catch(error => {
-        alert(error);
-    })
-    .finally(() => {
-        if (afterFn && typeof afterFn === 'function') {
-            afterFn();
-        }
-    });
+        .then(message => {
+            alert(message);
+        })
+        .catch(error => {
+            alert(error);
+        })
+        .finally(() => {
+            if (afterFn && typeof afterFn === 'function') {
+                afterFn();
+            }
+        });
 }
 
 function hideAdminControls(contentEntryEl) {

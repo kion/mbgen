@@ -181,6 +181,13 @@ $ mbgen help [command]
 * All the images/videos are stored inside the `deploy/media` dir
   and should be placed into the sub-dirs with names matching
   the names of the corresponding content files, e.g.:
+  * Media files that are referenced from multiple posts or pages can be placed in `deploy/media/shared`
+    to avoid duplication — this is the **shared media** directory
+    * Shared media files can be referenced from any post or page using explicit file name directives
+      (e.g. `{media:shared-1.jpg}` or `{with-media:shared-1.jpg}`)
+    * Media resolution logic first looks for the file in the post/page specific directory (`deploy/media/<type>/<id>`);
+      if not found there, it falls back to `deploy/media/shared` directory
+    * The implicit `{media}`/`{with-media}` directives (without file arguments) **never** list files from the shared media directory
   ```
   ├── deploy
   │   ├── media
@@ -195,6 +202,8 @@ $ mbgen help [command]
   │   │   │   │   ├── vid-1.mp4
   │   │   │   ├── sample-post-2
   │   │   │   │   ├── cover.png
+  │   │   ├── shared
+  │   │   │   ├── shared-1.jpg
   ├── pages
   │   ├── sample-page.md
   ├── posts

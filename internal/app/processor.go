@@ -482,7 +482,7 @@ func generateFeeds(posts []post, config appConfig, handleOutput processorOutputH
 		// prepend image to content if post has images
 		mediaFileNames := listAllMedia(Post, p.Id, nil)
 		if len(mediaFileNames) > 0 {
-			mediaList := parseMediaFileNames(mediaFileNames, Post, p.Id, config)
+			mediaList := parseMediaFileNames(mediaFileNames, Post, p.Id, config, false)
 
 			// read original markdown content to find first image reference
 			rawContent := getRawPostContent(p.Id)

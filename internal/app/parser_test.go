@@ -436,3 +436,76 @@ More content here.`
 		t.Error("FeedContent should contain post body text")
 	}
 }
+
+func TestSharedMediaResolution(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "mbgen-shared-media-test-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(origDir)
+
+	// Create content-specific media dir with specific.jpg
+	contentSpecificDir := fmt.Sprintf("%s/%s/%s/%s", deployDirName, mediaDirName, "post", "test-post")
+	if err := os.MkdirAll(contentSpecificDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(contentSpecificDir+"/specific.jpg", []byte("fake jpg"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create shared media dir with shared.jpg
+	sharedDir := fmt.Sprintf("%s/%s/%s", deployDirName, mediaDirName, sharedMediaDirName)
+	if err := os.MkdirAll(sharedDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(sharedDir+"/shared.jpg", []byte("fake jpg"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	config := defaultConfig()
+
+	// content-specific file: should use content-specific URI (takes precedence)
+	result := parseMediaFileNames([]string{"specific.jpg"}, Post, "test-post", config, true)
+	if len(result) != 1 {
+		t.Fatalf("expected 1 media item, got %d", len(result))
+	}
+	if result[0].Uri != "/media/post/test-post/specific.jpg" {
+		t.Errorf("expected /media/post/test-post/specific.jpg, got %s", result[0].Uri)
+	}
+
+	// shared file (not in content-specific dir): should fall back to shared URI
+	result = parseMediaFileNames([]string{"shared.jpg"}, Post, "test-post", config, true)
+	if len(result) != 1 {
+		t.Fatalf("expected 1 media item, got %d", len(result))
+	}
+	if result[0].Uri != "/media/shared/shared.jpg" {
+		t.Errorf("expected /media/shared/shared.jpg, got %s", result[0].Uri)
+	}
+
+	// missing file (not in either dir): should use content-specific URI (no fallback)
+	result = parseMediaFileNames([]string{"missing.jpg"}, Post, "test-post", config, true)
+	if len(result) != 1 {
+		t.Fatalf("expected 1 media item, got %d", len(result))
+	}
+	if result[0].Uri != "/media/post/test-post/missing.jpg" {
+		t.Errorf("expected /media/post/test-post/missing.jpg, got %s", result[0].Uri)
+	}
+
+	// non-explicit call: shared.jpg exists in shared dir but isExplicit=false, so no fallback
+	result = parseMediaFileNames([]string{"shared.jpg"}, Post, "test-post", config, false)
+	if len(result) != 1 {
+		t.Fatalf("expected 1 media item, got %d", len(result))
+	}
+	if result[0].Uri != "/media/post/test-post/shared.jpg" {
+		t.Errorf("expected /media/post/test-post/shared.jpg, got %s", result[0].Uri)
+	}
+}

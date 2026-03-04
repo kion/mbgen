@@ -347,7 +347,7 @@ func parseContentDirectives(ceType contentEntityType, ceId string, content strin
 						mediaFileNames = append(mediaFileNames, m)
 					}
 				}
-				allMedia := parseMediaFileNames(mediaFileNames, ceType, ceId, config)
+				allMedia := parseMediaFileNames(mediaFileNames, ceType, ceId, config, mediaArg != "")
 				var contentDirectiveMarkupBuffer bytes.Buffer
 				err = contentDirectiveTemplate.Execute(&contentDirectiveMarkupBuffer, contentDirectiveData{
 					Text:  text,
@@ -387,7 +387,7 @@ func parseContentDirectives(ceType contentEntityType, ceId string, content strin
 					mediaFileNames = append(mediaFileNames, m)
 				}
 			}
-			allMedia := parseMediaFileNames(mediaFileNames, ceType, ceId, config)
+			allMedia := parseMediaFileNames(mediaFileNames, ceType, ceId, config, mediaArg != "")
 			if allMedia != nil {
 				inlineMediaTemplate := compileMediaTemplate(resLoader)
 				var inlineMediaMarkupBuffer bytes.Buffer
@@ -490,48 +490,90 @@ func listAllMedia(contentEntityType contentEntityType, contentEntityId string, s
 	return allMedia
 }
 
-func parseMediaFileNames(mediaFileNames []string, contentEntityType contentEntityType, contentEntityId string, config appConfig) []media {
+func listSharedMedia() []string {
+	mediaDirPath := fmt.Sprintf("%s%c%s%c%s",
+		deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, sharedMediaDirName)
+	var allMedia []string
+	if dirExists(mediaDirPath) {
+		videoFiles, err := listFilesByExt(mediaDirPath, videoFileExtensions...)
+		check(err)
+		allMedia = append(allMedia, videoFiles...)
+		imageFiles, err := listFilesByExt(mediaDirPath, imageFileExtensions...)
+		check(err)
+		for _, image := range imageFiles {
+			if !strings.Contains(image, thumbImgFileSuffix) {
+				allMedia = append(allMedia, image)
+			}
+		}
+	}
+	return allMedia
+}
+
+func buildMediaItem(mediaFileName string, uriSubPath string, dirSubPath string, config appConfig) *media {
+	mediaUri := "/" + mediaDirName + "/" + uriSubPath + "/" + mediaFileName
+	mediaFileExt := filepath.Ext(mediaFileName)
+	if slices.Contains(imageFileExtensions, mediaFileExt) {
+		var thumbs []thumb
+		for _, thSize := range config.thumbSizes {
+			thFileSuffix := "_" + strconv.Itoa(thSize) + thumbImgFileSuffix + mediaFileExt
+			thumbFile := mediaFileName + thFileSuffix
+			thumbFilePath := fmt.Sprintf("%s%c%s%c%s%c%s",
+				deployDirName, os.PathSeparator,
+				mediaDirName, os.PathSeparator,
+				dirSubPath, os.PathSeparator, thumbFile)
+			if fileExists(thumbFilePath) {
+				thumbs = append(thumbs, thumb{Uri: "/" + mediaDirName + "/" + uriSubPath + "/" + thumbFile, Size: thSize})
+			} else {
+				thumbs = append(thumbs, thumb{Uri: mediaUri, Size: thSize})
+			}
+		}
+		return &media{Type: Image, Uri: mediaUri, thumbs: thumbs}
+	} else if slices.Contains(videoFileExtensions, mediaFileExt) {
+		return &media{Type: Video, Uri: mediaUri}
+	}
+	return nil
+}
+
+func parseMediaFileNames(mediaFileNames []string, contentEntityType contentEntityType, contentEntityId string, config appConfig, isExplicit bool) []media {
 	var allMedia []media
 	ceType := strings.ToLower(contentEntityType.String())
 	for _, mediaFileName := range mediaFileNames {
 		if strings.Contains(mediaFileName, thumbImgFileSuffix) {
 			continue
 		}
-		mediaUri := "/" + mediaDirName + "/" + ceType + "/" + contentEntityId + "/" + mediaFileName
-		mediaFileExt := filepath.Ext(mediaFileName)
-		var mType mediaType
-		if slices.Contains(imageFileExtensions, mediaFileExt) {
-			mType = Image
-			imgFileExt := filepath.Ext(mediaFileName)
-			var thumbs []thumb
-			for _, thSize := range config.thumbSizes {
-				thFileSuffix := "_" + strconv.Itoa(thSize) + thumbImgFileSuffix + imgFileExt
-				thumbFile := mediaFileName + thFileSuffix
-				thumbFilePath := fmt.Sprintf("%s%c%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, ceType, os.PathSeparator, contentEntityId, os.PathSeparator, thumbFile)
-				if fileExists(thumbFilePath) {
-					thumbUri := "/" + mediaDirName + "/" + ceType + "/" + contentEntityId + "/" + thumbFile
-					thumbs = append(thumbs, thumb{
-						Uri:  thumbUri,
-						Size: thSize,
-					})
-				} else {
-					thumbs = append(thumbs, thumb{
-						Uri:  mediaUri,
-						Size: thSize,
-					})
+		uriSubPath := ceType + "/" + contentEntityId
+		dirSubPath := ceType + string(os.PathSeparator) + contentEntityId
+		if isExplicit {
+			contentSpecificFilePath := fmt.Sprintf("%s%c%s%c%s%c%s",
+				deployDirName, os.PathSeparator,
+				mediaDirName, os.PathSeparator,
+				dirSubPath, os.PathSeparator, mediaFileName)
+			if !fileExists(contentSpecificFilePath) {
+				sharedFilePath := fmt.Sprintf("%s%c%s%c%s%c%s",
+					deployDirName, os.PathSeparator,
+					mediaDirName, os.PathSeparator,
+					sharedMediaDirName, os.PathSeparator, mediaFileName)
+				if fileExists(sharedFilePath) {
+					uriSubPath = sharedMediaDirName
+					dirSubPath = sharedMediaDirName
 				}
 			}
-			allMedia = append(allMedia, media{
-				Type:   mType,
-				Uri:    mediaUri,
-				thumbs: thumbs,
-			})
-		} else if slices.Contains(videoFileExtensions, mediaFileExt) {
-			mType = Video
-			allMedia = append(allMedia, media{
-				Type: mType,
-				Uri:  mediaUri,
-			})
+		}
+		if m := buildMediaItem(mediaFileName, uriSubPath, dirSubPath, config); m != nil {
+			allMedia = append(allMedia, *m)
+		}
+	}
+	return allMedia
+}
+
+func parseSharedMediaFileNames(mediaFileNames []string, config appConfig) []media {
+	var allMedia []media
+	for _, mediaFileName := range mediaFileNames {
+		if strings.Contains(mediaFileName, thumbImgFileSuffix) {
+			continue
+		}
+		if m := buildMediaItem(mediaFileName, sharedMediaDirName, sharedMediaDirName, config); m != nil {
+			allMedia = append(allMedia, *m)
 		}
 	}
 	return allMedia

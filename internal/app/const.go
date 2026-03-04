@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	appVersion                                  = "1.7.8"
+	appVersion                                  = "1.8.0"
 	defaultGitHubRepoUrl                        = "github.com/kion/mbgen"
 	defaultGitHubRepoThemesUrl                  = defaultGitHubRepoUrl + "/themes"
 	defaultGitHubRepoPageContentSamplesUrl      = defaultGitHubRepoUrl + "/content-samples/pages"
@@ -38,6 +38,7 @@ const (
 	markdownPostsDirName                        = "posts"
 	markdownFileExtension                       = ".md"
 	mediaDirName                                = "media"
+	sharedMediaDirName                          = "shared"
 	deployDirName                               = "deploy"
 	deployPostDirName                           = "post"
 	deployPostsDirName                          = "posts"
