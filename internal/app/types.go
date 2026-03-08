@@ -442,9 +442,9 @@ type stats struct {
 }
 
 type watchReloadData struct {
-	Type contentEntityType `json:"type"`
-	Id   string            `json:"id"`
-	Op   dirWatchOp        `json:"op"`
+	Type *contentEntityType `json:"type,omitempty"`
+	Id   string             `json:"id,omitempty"`
+	Op   dirWatchOp         `json:"op"`
 }
 
 type processorOutputHandler func(outputFilePath string, data []byte) bool

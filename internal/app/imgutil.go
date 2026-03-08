@@ -2,12 +2,13 @@ package app
 
 import (
 	"fmt"
-	"github.com/disintegration/imaging"
 	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/disintegration/imaging"
 )
 
 func processImgThumbnails(mediaDirPath string, config appConfig) {
@@ -104,7 +105,7 @@ func processImgThumbnails(mediaDirPath string, config appConfig) {
 }
 
 func deleteImgThumbnails(imgDirPath string, config appConfig) {
-	if dirExists(imgDirPath) && !config.useThumbs {
+	if dirExists(imgDirPath) {
 		imgFiles, err := listFilesByExt(imgDirPath, thumbImageFileExtensions...)
 		check(err)
 		if len(imgFiles) > 0 {
@@ -167,6 +168,19 @@ func processOriginalMediaFiles(config appConfig, dryRun bool) bool {
 					}
 				}
 			}
+			sharedMediaDir := fmt.Sprintf("%s%c%s", deployMediaDir, os.PathSeparator, sharedMediaDirName)
+			if dirExists(sharedMediaDir) {
+				imgFiles, err := listFilesByExt(sharedMediaDir, thumbImageFileExtensions...)
+				check(err)
+				for _, imgFile := range imgFiles {
+					if !strings.Contains(imgFile, thumbImgFileSuffix) {
+						imgFilePath := fmt.Sprintf("%s%c%s", sharedMediaDir, os.PathSeparator, imgFile)
+						if processOriginalMediaFile(imgFilePath, config, dryRun) {
+							resizeCnt++
+						}
+					}
+				}
+			}
 		}
 	}
 	return resizeCnt > 0
@@ -180,7 +194,7 @@ func processOriginalMediaFile(mediaFilePath string, config appConfig, dryRun boo
 			if maxImgSize > 0 {
 				origImg, err := imaging.Open(mediaFilePath)
 				if err != nil {
-					sprintln(" - error opening image file for resizing: "+mediaFilePath, err)
+					sprintln(" - error opening file to check image dimensions: "+mediaFilePath, err)
 				} else {
 					ow := origImg.Bounds().Dx()
 					oh := origImg.Bounds().Dy()

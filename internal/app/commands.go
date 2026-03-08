@@ -284,6 +284,9 @@ func _cleanup(config appConfig, commandArgs ...string) {
 		resLoader := getResourceLoader(config)
 		parsePages(config, resLoader, deleteImgThumbnails, false)
 		parsePosts(config, resLoader, deleteImgThumbnails, false)
+		sharedMediaDirPath := fmt.Sprintf("%s%c%s%c%s",
+			deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, sharedMediaDirName)
+		deleteImgThumbnails(sharedMediaDirPath, config)
 	}
 	if cleanupTags {
 		deployTagsDirPath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, deployTagsDirName)
@@ -424,9 +427,13 @@ func _serve(config appConfig, commandArgs ...string) {
 				mediaDir := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, mediaDirName)
 				go watchDirForChanges(mediaDir, thumbImageFileExtensions, true, func(dwEvent dirWatchEvent) {
 					filePath := strings.Split(dwEvent.filePath, string(os.PathSeparator))
-					ceType := contentEntityTypeFromString(filePath[len(filePath)-3])
-					ceId := filePath[len(filePath)-2]
-					handleMediaDirWatchEvent(dwEvent, ceType, ceId, config, resLoader, wChan)
+					if filePath[len(filePath)-2] == sharedMediaDirName {
+						handleSharedMediaDirWatchEvent(dwEvent, config, resLoader, wChan)
+					} else {
+						ceType := contentEntityTypeFromString(filePath[len(filePath)-3])
+						ceId := filePath[len(filePath)-2]
+						handleContentEntityMediaDirWatchEvent(dwEvent, ceType, ceId, config, resLoader, wChan)
+					}
 				})
 			} else {
 				sprintln("error: invalid serve command argument: " + commandArgs[0])
@@ -493,13 +500,13 @@ func handleMdContentDirWatchEvent(dwEvent dirWatchEvent, contentEntityType conte
 	removeContentEntityFromCache(contentEntityType, contentEntityId+markdownFileExtension)
 	processAndHandleStats(config, resLoader, true)
 	wChan <- watchReloadData{
-		Type: contentEntityType,
+		Type: &contentEntityType,
 		Id:   contentEntityId,
 		Op:   dwEvent.op,
 	}
 }
 
-func handleMediaDirWatchEvent(dwEvent dirWatchEvent, contentEntityType contentEntityType, contentEntityId string, config appConfig, resLoader resourceLoader, wChan chan watchReloadData) {
+func handleContentEntityMediaDirWatchEvent(dwEvent dirWatchEvent, contentEntityType contentEntityType, contentEntityId string, config appConfig, resLoader resourceLoader, wChan chan watchReloadData) {
 	ceType := strings.ToLower(contentEntityType.String())
 	var removedImageFileName *string
 	switch dwEvent.op {
@@ -526,26 +533,7 @@ func handleMediaDirWatchEvent(dwEvent dirWatchEvent, contentEntityType contentEn
 	}
 	if removedImageFileName != nil {
 		mediaDirPath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, ceType, os.PathSeparator, contentEntityId)
-		if dirExists(mediaDirPath) {
-			// ==================================================
-			// remove the original/old image file thumbnails
-			// ==================================================
-			imageFileNames, err := listFilesByExt(mediaDirPath, thumbImageFileExtensions...)
-			if err == nil && len(imageFileNames) > 0 {
-				for _, imageFileName := range imageFileNames {
-					if strings.HasPrefix(imageFileName, *removedImageFileName) {
-						oldThumbFilePath := fmt.Sprintf("%s%c%s", mediaDirPath, os.PathSeparator, imageFileName)
-						err = os.Remove(oldThumbFilePath)
-						if err != nil {
-							sprintln(" - error deleting old thumbnail file: "+oldThumbFilePath, err)
-						} else {
-							sprintln(" - deleted old thumbnail file: " + oldThumbFilePath)
-						}
-					}
-				}
-			}
-			// ==================================================
-		}
+		removeOldImageFileThumbnails(mediaDirPath, *removedImageFileName)
 	}
 	mdContentFileName := contentEntityId + markdownFileExtension
 	mdContentFilePath := fmt.Sprintf("%s%c%s", ceType+"s", os.PathSeparator, mdContentFileName)
@@ -553,7 +541,7 @@ func handleMediaDirWatchEvent(dwEvent dirWatchEvent, contentEntityType contentEn
 		removeContentEntityFromCache(contentEntityType, mdContentFileName)
 		processAndHandleStats(config, resLoader, true)
 		wChan <- watchReloadData{
-			Type: contentEntityType,
+			Type: &contentEntityType,
 			Id:   contentEntityId,
 			Op:   dirWatchOpUpdate,
 		}
@@ -561,6 +549,61 @@ func handleMediaDirWatchEvent(dwEvent dirWatchEvent, contentEntityType contentEn
 		processOriginalMediaFile(dwEvent.filePath, config, false)
 		mediaDirPath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, ceType, os.PathSeparator, contentEntityId)
 		processImgThumbnails(mediaDirPath, config)
+	}
+}
+
+func handleSharedMediaDirWatchEvent(dwEvent dirWatchEvent, config appConfig, resLoader resourceLoader, wChan chan watchReloadData) {
+	sharedMediaDirPath := fmt.Sprintf("%s%c%s%c%s",
+		deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, sharedMediaDirName)
+	var removedImageFileName *string
+	switch dwEvent.op {
+	case dirWatchOpCreate:
+		sprintln(" - [watch] shared media file created: ", dwEvent.filePath)
+	case dirWatchOpUpdate:
+		sprintln(" - [watch] shared media file updated: ", dwEvent.filePath)
+	case dirWatchOpRename:
+		sprintln(" - [watch] shared media file renamed: ",
+			"   original file: "+*dwEvent.originalFilePath,
+			"   renamed to: "+dwEvent.filePath)
+		originalMediaFileName := filepath.Base(*dwEvent.originalFilePath)
+		originalMediaFileNameExt := filepath.Ext(originalMediaFileName)
+		if slices.Contains(thumbImageFileExtensions, originalMediaFileNameExt) {
+			removedImageFileName = &originalMediaFileName
+		}
+	case dirWatchOpDelete:
+		sprintln(" - [watch] shared media file deleted: ", dwEvent.filePath)
+		removedMediaFileName := filepath.Base(dwEvent.filePath)
+		removedMediaFileNameExt := filepath.Ext(removedMediaFileName)
+		if slices.Contains(thumbImageFileExtensions, removedMediaFileNameExt) {
+			removedImageFileName = &removedMediaFileName
+		}
+	}
+	if removedImageFileName != nil {
+		removeOldImageFileThumbnails(sharedMediaDirPath, *removedImageFileName)
+	}
+	processOriginalMediaFile(dwEvent.filePath, config, false)
+	processImgThumbnails(sharedMediaDirPath, config)
+	processAndHandleStats(config, resLoader, true)
+	wChan <- watchReloadData{Op: dwEvent.op}
+}
+
+func removeOldImageFileThumbnails(mediaDirPath string, removedImageFileName string) {
+	if !dirExists(mediaDirPath) {
+		return
+	}
+	imageFileNames, err := listFilesByExt(mediaDirPath, thumbImageFileExtensions...)
+	if err == nil && len(imageFileNames) > 0 {
+		for _, imageFileName := range imageFileNames {
+			if strings.HasPrefix(imageFileName, removedImageFileName) {
+				oldThumbFilePath := fmt.Sprintf("%s%c%s", mediaDirPath, os.PathSeparator, imageFileName)
+				err = os.Remove(oldThumbFilePath)
+				if err != nil {
+					sprintln(" - error deleting old thumbnail file: "+oldThumbFilePath, err)
+				} else {
+					sprintln(" - deleted old thumbnail file: " + oldThumbFilePath)
+				}
+			}
+		}
 	}
 }
 

@@ -394,7 +394,7 @@ func processContent(templateName string, ceType contentEntityType, title string,
 
 func processAndHandleStats(config appConfig, resLoader resourceLoader, useCache bool) {
 	generatedCnt := 0
-	stats := process(
+	pStats := process(
 		parsePages(config, resLoader, processImgThumbnails, useCache),
 		parsePosts(config, resLoader, processImgThumbnails, useCache),
 		resLoader,
@@ -411,8 +411,11 @@ func processAndHandleStats(config appConfig, resLoader resourceLoader, useCache 
 			}
 			return generated
 		})
-	stats.genCnt = generatedCnt
-	handleStats(stats)
+	pStats.genCnt = generatedCnt
+	sharedMediaDirPath := fmt.Sprintf("%s%c%s%c%s",
+		deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, sharedMediaDirName)
+	processImgThumbnails(sharedMediaDirPath, config)
+	handleStats(pStats)
 }
 
 // generateFeeds creates RSS, Atom, and/or JSON feeds based on configuration

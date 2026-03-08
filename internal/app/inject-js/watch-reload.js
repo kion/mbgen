@@ -41,17 +41,21 @@ function initWebSocket() {
         const tags = !home && !archive && uri === '/tags/';
         if (!archive && !tags) {
             const msg = JSON.parse(evt.data);
-            const single = !home && !archive && !tags && (uri.startsWith('/post/') || uri.startsWith('/page/'));
-            if (!single && msg.op === 'create') {
+            if (!msg.type || !msg.id) { // shared media change
                 location.reload();
             } else {
-                const exactSingle = single && uri.startsWith('/' + msg.type + '/' + msg.id);
-                const removed = msg.op === 'delete' || msg.op === 'rename';
-                if (exactSingle && removed) {
-                    location.href = '/';
-                } else if (!single || (exactSingle && msg.op === 'update')) {
-                    const ceEl = document.getElementById(msg.id);
-                    reloadEntry(msg.type, msg.id, removed, exactSingle, ceEl);
+                const single = !home && !archive && !tags && (uri.startsWith('/post/') || uri.startsWith('/page/'));
+                if (!single && msg.op === 'create') {
+                    location.reload();
+                } else {
+                    const exactSingle = single && uri.startsWith('/' + msg.type + '/' + msg.id);
+                    const removed = msg.op === 'delete' || msg.op === 'rename';
+                    if (exactSingle && removed) {
+                        location.href = '/';
+                    } else if (!single || (exactSingle && msg.op === 'update')) {
+                        const ceEl = document.getElementById(msg.id);
+                        reloadEntry(msg.type, msg.id, removed, exactSingle, ceEl);
+                    }
                 }
             }
         }
