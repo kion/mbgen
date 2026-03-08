@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strings"
 )
 
 func listFilesByExt(dir string, extensions ...string) ([]string, error) {
@@ -18,7 +19,7 @@ func listFilesByExt(dir string, extensions ...string) ([]string, error) {
 		extSet[v] = true
 	}
 	err := filepath.Walk(dir, func(path string, f os.FileInfo, _ error) error {
-		if !f.IsDir() && extSet[filepath.Ext(path)] {
+		if !f.IsDir() && extSet[strings.ToLower(filepath.Ext(path))] {
 			files = append(files, f.Name())
 		}
 		return nil
@@ -215,7 +216,7 @@ func watchDirForChanges(dir string, fileExt []string, recursive bool, handler di
 					return
 				}
 				fName := filepath.Base(event.Name)
-				fExt := filepath.Ext(fName)
+				fExt := strings.ToLower(filepath.Ext(fName))
 				fileMatch := slices.Contains(fileExt, fExt) && thumbImgFileNameRegexp.FindStringSubmatch(fName) == nil
 				if recursive || fileMatch {
 					filePath := event.Name

@@ -294,7 +294,7 @@ function adminMedia(entryType, entryId, contentEntryEl) {
                     const files = ev.dataTransfer.files;
                     for (let i = 0; i < files.length; i++) {
                         const file = files[i];
-                        if (supportedMediaFileExt.includes(file.name.substring(file.name.lastIndexOf('.')))) {
+                        if (supportedMediaFileExt.includes(file.name.substring(file.name.lastIndexOf('.')).toLowerCase())) {
                             const mediaUploadForm = document.getElementById(entryMediaElId + '-upload-form');
                             const mediaUploadFormData = new FormData(mediaUploadForm);
                             mediaUploadFormData.append('admin-media-upload-files', file);
@@ -432,7 +432,7 @@ function adminSharedMedia() {
                 const files = ev.dataTransfer.files;
                 for (let i = 0; i < files.length; i++) {
                     const file = files[i];
-                    if (supportedMediaFileExt.includes(file.name.substring(file.name.lastIndexOf('.')))) {
+                    if (supportedMediaFileExt.includes(file.name.substring(file.name.lastIndexOf('.')).toLowerCase())) {
                         const uploadForm = document.getElementById(panelId + '-upload-form');
                         const fd = new FormData(uploadForm);
                         fd.append('admin-media-upload-files', file);

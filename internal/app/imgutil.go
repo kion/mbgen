@@ -42,7 +42,7 @@ func processImgThumbnails(mediaDirPath string, config appConfig) {
 				continue
 			}
 			imgFilePath := fmt.Sprintf("%s%c%s", mediaDirPath, os.PathSeparator, imgFile)
-			imgFileExt := filepath.Ext(imgFilePath)
+			imgFileExt := strings.ToLower(filepath.Ext(imgFilePath))
 			imgFileSizeInMb := -1.0
 			for _, thSize := range config.thumbSizes {
 				thumbFilePath := imgFilePath + "_" + strconv.Itoa(thSize) + thumbImgFileSuffix + imgFileExt

@@ -519,14 +519,14 @@ func handleContentEntityMediaDirWatchEvent(dwEvent dirWatchEvent, contentEntityT
 			"   original file: "+*dwEvent.originalFilePath,
 			"   renamed to: "+dwEvent.filePath)
 		originalMediaFileName := filepath.Base(*dwEvent.originalFilePath)
-		originalMediaFileNameExt := filepath.Ext(originalMediaFileName)
+		originalMediaFileNameExt := strings.ToLower(filepath.Ext(originalMediaFileName))
 		if slices.Contains(thumbImageFileExtensions, originalMediaFileNameExt) {
 			removedImageFileName = &originalMediaFileName
 		}
 	case dirWatchOpDelete:
 		sprintln(" - [watch] "+ceType+" media file deleted: ", dwEvent.filePath)
 		removedMediaFileName := filepath.Base(dwEvent.filePath)
-		removedMediaFileNameExt := filepath.Ext(removedMediaFileName)
+		removedMediaFileNameExt := strings.ToLower(filepath.Ext(removedMediaFileName))
 		if slices.Contains(thumbImageFileExtensions, removedMediaFileNameExt) {
 			removedImageFileName = &removedMediaFileName
 		}
@@ -566,14 +566,14 @@ func handleSharedMediaDirWatchEvent(dwEvent dirWatchEvent, config appConfig, res
 			"   original file: "+*dwEvent.originalFilePath,
 			"   renamed to: "+dwEvent.filePath)
 		originalMediaFileName := filepath.Base(*dwEvent.originalFilePath)
-		originalMediaFileNameExt := filepath.Ext(originalMediaFileName)
+		originalMediaFileNameExt := strings.ToLower(filepath.Ext(originalMediaFileName))
 		if slices.Contains(thumbImageFileExtensions, originalMediaFileNameExt) {
 			removedImageFileName = &originalMediaFileName
 		}
 	case dirWatchOpDelete:
 		sprintln(" - [watch] shared media file deleted: ", dwEvent.filePath)
 		removedMediaFileName := filepath.Base(dwEvent.filePath)
-		removedMediaFileNameExt := filepath.Ext(removedMediaFileName)
+		removedMediaFileNameExt := strings.ToLower(filepath.Ext(removedMediaFileName))
 		if slices.Contains(thumbImageFileExtensions, removedMediaFileNameExt) {
 			removedImageFileName = &removedMediaFileName
 		}

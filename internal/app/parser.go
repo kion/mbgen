@@ -511,7 +511,7 @@ func listSharedMedia() []string {
 
 func buildMediaItem(mediaFileName string, uriSubPath string, dirSubPath string, config appConfig) *media {
 	mediaUri := "/" + mediaDirName + "/" + uriSubPath + "/" + mediaFileName
-	mediaFileExt := filepath.Ext(mediaFileName)
+	mediaFileExt := strings.ToLower(filepath.Ext(mediaFileName))
 	if slices.Contains(imageFileExtensions, mediaFileExt) {
 		var thumbs []thumb
 		for _, thSize := range config.thumbSizes {
