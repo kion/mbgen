@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	appVersion                                  = "1.8.2"
+	appVersion                                  = "1.8.3"
 	defaultGitHubRepoUrl                        = "github.com/kion/mbgen"
 	defaultGitHubRepoThemesUrl                  = defaultGitHubRepoUrl + "/themes"
 	defaultGitHubRepoPageContentSamplesUrl      = defaultGitHubRepoUrl + "/content-samples/pages"
@@ -91,6 +91,8 @@ const (
 	commandCleanupTargetTagIndex                = "tag-index"
 	commandCleanupTargetArchive                 = "archive"
 	commandCleanupTargetSearch                  = "search"
+	commandCleanupTargetMedia                   = "media"
+	commandCleanupOptionDryRun                  = "--dry-run"
 	commandServeOptionAdmin                     = "--admin"
 	commandServeOptionWatchReload               = "--watch-reload"
 	commandThemeActionActivate                  = "activate"

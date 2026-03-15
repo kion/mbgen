@@ -38,7 +38,7 @@ var (
 	commandCleanup = /* const */ appCommandDescriptor{
 		command:     "cleanup",
 		description: "perform a cleanup",
-		usage: "mbgen cleanup <target>\n\n" +
+		usage: "mbgen cleanup [<target>] [" + commandCleanupOptionDryRun + "]\n\n" +
 			" - <target> (optional) is one of the following:\n\n" +
 			"   - " + commandCleanupTargetContent + ": deletes all previously generated content (" + contentFileExtension + ") files\n" +
 			"     for which markdown (" + markdownFileExtension + ") content files no longer exist\n\n" +
@@ -48,15 +48,21 @@ var (
 			"   - " + commandCleanupTargetTagIndex + ": deletes the previously generated tag index file\n\n" +
 			"   - " + commandCleanupTargetArchive + ": deletes the previously generated archive files\n\n" +
 			"   - " + commandCleanupTargetSearch + ": deletes all previously generated search files\n\n" +
+			"   - " + commandCleanupTargetMedia + ": deletes all previously generated media directories\n" +
+			"     in deploy/media/page/ and deploy/media/post/ for which the corresponding\n" +
+			"     markdown (" + markdownFileExtension + ") content files no longer exist\n\n" +
 			" - if no <target> is specified, each target is performed based on the following conditions:\n\n" +
 			"   - " + commandCleanupTargetContent + ": always\n\n" +
 			"   - " + commandCleanupTargetTags + ": always\n\n" +
 			"   - " + commandCleanupTargetThumbs + ": if `useThumbs` config option is disabled\n\n" +
 			"   - " + commandCleanupTargetTagIndex + ": if `generateTagIndex` config option is disabled\n\n" +
 			"   - " + commandCleanupTargetArchive + ": if `generateArchive` config option is disabled\n\n" +
-			"   - " + commandCleanupTargetSearch + ": if `enableSearch` config option is disabled\n\n",
+			"   - " + commandCleanupTargetSearch + ": if `enableSearch` config option is disabled\n\n" +
+			"   - " + commandCleanupTargetMedia + ": never (must be specified explicitly)\n\n" +
+			" - optional flags:\n\n" +
+			"   " + commandCleanupOptionDryRun + ": lists files that would be deleted without actually deleting them\n\n",
 		reqConfig: true,
-		optArgCnt: 1,
+		optArgCnt: 2,
 	}
 	commandGenerate = /* const */ appCommandDescriptor{
 		command:     "generate",
@@ -68,8 +74,8 @@ var (
 		command:     "inspect",
 		description: "inspect content and report/fix any issues found",
 		usage: "mbgen inspect [" + commandInspectOptionFix + "]\n\n" +
-			"the following flags can be specified:\n" +
-			" " + commandInspectOptionFix + " - to automatically fix all detected issues; namely:\n" +
+			"optional flags:\n" +
+			" " + commandInspectOptionFix + ": automatically fixes all detected issues; namely:\n" +
 			"   - resize and replace the original images that exceed the `maxImgSize` config option value\n\n",
 		reqConfig: true,
 		optArgCnt: 1,
@@ -204,21 +210,35 @@ func _init(config appConfig, commandArgs ...string) {
 }
 
 func _cleanup(config appConfig, commandArgs ...string) {
-	cleanupContent := false
-	cleanupThumbs := false
-	cleanupTags := false
-	cleanupTagIndex := false
-	cleanupArchive := false
-	cleanupSearch := false
-	if commandArgs == nil || len(commandArgs) == 0 {
+	dryRun := false
+	target := ""
+	for _, arg := range commandArgs {
+		switch arg {
+		case commandCleanupOptionDryRun:
+			dryRun = true
+		case commandCleanupTargetContent, commandCleanupTargetThumbs,
+			commandCleanupTargetTags, commandCleanupTargetTagIndex,
+			commandCleanupTargetArchive, commandCleanupTargetSearch,
+			commandCleanupTargetMedia:
+			target = arg
+		default:
+			sprintln("error: invalid cleanup command argument: " + arg)
+			usage("usage:\n\n"+commandCleanup.usage, 1)
+		}
+	}
+
+	cleanupContent, cleanupThumbs, cleanupTags := false, false, false
+	cleanupTagIndex, cleanupArchive, cleanupSearch, cleanupMedia := false, false, false, false
+
+	if target == "" {
 		cleanupContent = true
 		cleanupTags = true
 		cleanupThumbs = !config.useThumbs
 		cleanupArchive = !config.generateArchive
 		cleanupTagIndex = !config.generateTagIndex
 		cleanupSearch = !config.enableSearch
+		// cleanupMedia intentionally stays false
 	} else {
-		target := commandArgs[0]
 		switch target {
 		case commandCleanupTargetContent:
 			cleanupContent = true
@@ -232,12 +252,21 @@ func _cleanup(config appConfig, commandArgs ...string) {
 			cleanupArchive = true
 		case commandCleanupTargetSearch:
 			cleanupSearch = true
-		default:
-			sprintln("error: invalid cleanup command <target> argument: " + target)
-			usageHelp := "usage:\n\n" + commandCleanup.usage
-			usage(usageHelp, 1)
+		case commandCleanupTargetMedia:
+			cleanupMedia = true
 		}
 	}
+
+	targetCnt := map[string]int{
+		commandCleanupTargetContent:  0,
+		commandCleanupTargetThumbs:   0,
+		commandCleanupTargetTags:     0,
+		commandCleanupTargetTagIndex: 0,
+		commandCleanupTargetArchive:  0,
+		commandCleanupTargetSearch:   0,
+		commandCleanupTargetMedia:    0,
+	}
+
 	if cleanupContent {
 		deployPageDirPath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, deployPageDirName)
 		deployPageDirEntries, err := os.ReadDir(deployPageDirPath)
@@ -251,10 +280,15 @@ func _cleanup(config appConfig, commandArgs ...string) {
 					pageId := deployPageEntryFileName[:len(deployPageEntryFileName)-len(filepath.Ext(deployPageEntryFileName))]
 					markdownPageFilePath := fmt.Sprintf("%s%c%s", markdownPagesDirName, os.PathSeparator, pageId+markdownFileExtension)
 					if !fileExists(markdownPageFilePath) {
-						sprintln(" - page markdown file no longer exists: " + markdownPageFilePath)
 						deployPageFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployPageDirName, os.PathSeparator, deployPageEntryFileName)
-						deleteFile(deployPageFilePath)
-						sprintln(" - deleted page content file: " + deployPageFilePath)
+						if dryRun {
+							sprintln(" - [dry-run] delete page content file: " + deployPageFilePath)
+						} else {
+							sprintln(" - page markdown file no longer exists: " + markdownPageFilePath)
+							deleteFile(deployPageFilePath)
+							sprintln(" - deleted page content file: " + deployPageFilePath)
+						}
+						targetCnt[commandCleanupTargetContent]++
 					}
 				}
 			}
@@ -271,10 +305,15 @@ func _cleanup(config appConfig, commandArgs ...string) {
 					postId := deployPostEntryFileName[:len(deployPostEntryFileName)-len(filepath.Ext(deployPostEntryFileName))]
 					markdownPostFilePath := fmt.Sprintf("%s%c%s", markdownPostsDirName, os.PathSeparator, postId+markdownFileExtension)
 					if !fileExists(markdownPostFilePath) {
-						sprintln(" - post markdown file no longer exists: " + markdownPostFilePath)
 						deployPostFilePath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployPostDirName, os.PathSeparator, deployPostEntryFileName)
-						deleteFile(deployPostFilePath)
-						sprintln(" - deleted post content file: " + deployPostFilePath)
+						if dryRun {
+							sprintln(" - [dry-run] delete post content file: " + deployPostFilePath)
+						} else {
+							sprintln(" - post markdown file no longer exists: " + markdownPostFilePath)
+							deleteFile(deployPostFilePath)
+							sprintln(" - deleted post content file: " + deployPostFilePath)
+						}
+						targetCnt[commandCleanupTargetContent]++
 					}
 				}
 			}
@@ -282,11 +321,32 @@ func _cleanup(config appConfig, commandArgs ...string) {
 	}
 	if cleanupThumbs {
 		resLoader := getResourceLoader(config)
-		parsePages(config, resLoader, deleteImgThumbnails, false)
-		parsePosts(config, resLoader, deleteImgThumbnails, false)
-		sharedMediaDirPath := fmt.Sprintf("%s%c%s%c%s",
-			deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, sharedMediaDirName)
-		deleteImgThumbnails(sharedMediaDirPath, config)
+		if dryRun {
+			thumbHandler := func(imgDirPath string, cfg appConfig) {
+				if dirExists(imgDirPath) {
+					imgFiles, err := listFilesByExt(imgDirPath, thumbImageFileExtensions...)
+					check(err)
+					for _, imgFile := range imgFiles {
+						if thumbImgFileNameRegexp.FindStringSubmatch(imgFile) != nil {
+							thumbFilePath := fmt.Sprintf("%s%c%s", imgDirPath, os.PathSeparator, imgFile)
+							sprintln(" - [dry-run] delete thumbnail: " + thumbFilePath)
+							targetCnt[commandCleanupTargetThumbs]++
+						}
+					}
+				}
+			}
+			parsePages(config, resLoader, thumbHandler, false)
+			parsePosts(config, resLoader, thumbHandler, false)
+			sharedMediaDirPath := fmt.Sprintf("%s%c%s%c%s",
+				deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, sharedMediaDirName)
+			thumbHandler(sharedMediaDirPath, config)
+		} else {
+			parsePages(config, resLoader, deleteImgThumbnails, false)
+			parsePosts(config, resLoader, deleteImgThumbnails, false)
+			sharedMediaDirPath := fmt.Sprintf("%s%c%s%c%s",
+				deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, sharedMediaDirName)
+			deleteImgThumbnails(sharedMediaDirPath, config)
+		}
 	}
 	if cleanupTags {
 		deployTagsDirPath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, deployTagsDirName)
@@ -309,10 +369,15 @@ func _cleanup(config appConfig, commandArgs ...string) {
 				if deployTagDirEntryInfo.IsDir() {
 					deployTagDirName := deployTagDirEntryInfo.Name()
 					if !slices.Contains(tags, deployTagDirName) {
-						sprintln(" - tag no longer referenced: " + deployTagDirName)
 						deployTagDirPath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployTagsDirName, os.PathSeparator, deployTagDirName)
-						deleteIfExists(deployTagDirPath)
-						sprintln(" - deleted tag dir: " + deployTagDirPath)
+						if dryRun {
+							sprintln(" - [dry-run] delete tag dir: " + deployTagDirPath)
+						} else {
+							sprintln(" - tag no longer referenced: " + deployTagDirName)
+							deleteIfExists(deployTagDirPath)
+							sprintln(" - deleted tag dir: " + deployTagDirPath)
+						}
+						targetCnt[commandCleanupTargetTags]++
 					}
 				}
 			}
@@ -320,31 +385,112 @@ func _cleanup(config appConfig, commandArgs ...string) {
 	}
 	if cleanupTagIndex {
 		deployTagIndexPath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployTagsDirName, os.PathSeparator, indexPageFileName)
-		if deleteIfExists(deployTagIndexPath) {
-			sprintln(" - deleted tag index file: " + deployTagIndexPath)
+		if dryRun {
+			if fileExists(deployTagIndexPath) {
+				sprintln(" - [dry-run] delete tag index file: " + deployTagIndexPath)
+				targetCnt[commandCleanupTargetTagIndex]++
+			}
+		} else {
+			if deleteIfExists(deployTagIndexPath) {
+				sprintln(" - deleted tag index file: " + deployTagIndexPath)
+				targetCnt[commandCleanupTargetTagIndex]++
+			}
 		}
 	}
 	if cleanupArchive {
 		deployArchivePath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, deployArchiveDirName)
-		if deleteIfExists(deployArchivePath) {
-			sprintln(" - deleted archive dir: " + deployArchivePath)
+		if dryRun {
+			if dirExists(deployArchivePath) {
+				sprintln(" - [dry-run] delete archive dir: " + deployArchivePath)
+				targetCnt[commandCleanupTargetArchive]++
+			}
+		} else {
+			if deleteIfExists(deployArchivePath) {
+				sprintln(" - deleted archive dir: " + deployArchivePath)
+				targetCnt[commandCleanupTargetArchive]++
+			}
 		}
 	}
 	if cleanupSearch {
 		deploySearchIndexPath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, searchIndexFileName)
-		if deleteIfExists(deploySearchIndexPath) {
-			sprintln(" - deleted search index file: " + deploySearchIndexPath)
-		}
 		deploySearchPath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, searchPageFileName)
-		if deleteIfExists(deploySearchPath) {
-			sprintln(" - deleted search page file: " + deploySearchPath)
-		}
 		deployResourcesDirPath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, resourcesDirName)
 		searchJSFilePath := fmt.Sprintf("%s%c%s", deployResourcesDirPath, os.PathSeparator, searchJSFileName)
-		if deleteIfExists(searchJSFilePath) {
-			sprintln(" - deleted search JS file: " + searchJSFilePath)
+		if dryRun {
+			if fileExists(deploySearchIndexPath) {
+				sprintln(" - [dry-run] delete search index file: " + deploySearchIndexPath)
+				targetCnt[commandCleanupTargetSearch]++
+			}
+			if fileExists(deploySearchPath) {
+				sprintln(" - [dry-run] delete search page file: " + deploySearchPath)
+				targetCnt[commandCleanupTargetSearch]++
+			}
+			if fileExists(searchJSFilePath) {
+				sprintln(" - [dry-run] delete search JS file: " + searchJSFilePath)
+				targetCnt[commandCleanupTargetSearch]++
+			}
+		} else {
+			if deleteIfExists(deploySearchIndexPath) {
+				sprintln(" - deleted search index file: " + deploySearchIndexPath)
+				targetCnt[commandCleanupTargetSearch]++
+			}
+			if deleteIfExists(deploySearchPath) {
+				sprintln(" - deleted search page file: " + deploySearchPath)
+				targetCnt[commandCleanupTargetSearch]++
+			}
+			if deleteIfExists(searchJSFilePath) {
+				sprintln(" - deleted search JS file: " + searchJSFilePath)
+				targetCnt[commandCleanupTargetSearch]++
+			}
 		}
 	}
+	if cleanupMedia {
+		for _, ceType := range []struct{ mediaSubDir, markdownDir string }{
+			{deployPageDirName, markdownPagesDirName},
+			{deployPostDirName, markdownPostsDirName},
+		} {
+			ceMediaDirPath := fmt.Sprintf("%s%c%s%c%s",
+				deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, ceType.mediaSubDir)
+			if !dirExists(ceMediaDirPath) {
+				continue
+			}
+			entries, err := os.ReadDir(ceMediaDirPath)
+			check(err)
+			for _, entry := range entries {
+				info, err := entry.Info()
+				check(err)
+				if info.IsDir() {
+					contentId := info.Name()
+					mdFilePath := fmt.Sprintf("%s%c%s", ceType.markdownDir, os.PathSeparator, contentId+markdownFileExtension)
+					if !fileExists(mdFilePath) {
+						orphanPath := fmt.Sprintf("%s%c%s", ceMediaDirPath, os.PathSeparator, contentId)
+						if dryRun {
+							sprintln(" - [dry-run] delete orphaned media dir: " + orphanPath)
+						} else {
+							sprintln(" - markdown file no longer exists: " + mdFilePath)
+							deleteIfExists(orphanPath)
+							sprintln(" - deleted orphaned media dir: " + orphanPath)
+						}
+						targetCnt[commandCleanupTargetMedia]++
+					}
+				}
+			}
+		}
+	}
+	orderedTargets := []string{
+		commandCleanupTargetContent,
+		commandCleanupTargetMedia,
+		commandCleanupTargetThumbs,
+		commandCleanupTargetTags,
+		commandCleanupTargetTagIndex,
+		commandCleanupTargetArchive,
+		commandCleanupTargetSearch,
+	}
+	lines := []interface{}{"[------ cleanup -------]\n"}
+	for _, t := range orderedTargets {
+		lines = append(lines, fmt.Sprintf(" - %s: %d", t, targetCnt[t]))
+	}
+	sprintln(lines...)
 }
 
 func _generate(config appConfig, commandArgs ...string) {
