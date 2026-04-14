@@ -215,11 +215,10 @@ $ mbgen help [command]
   * A post's tag list is exclusively controlled by the YAML metadata `tags` section —
     tag link directives in the body (`#<tag>`, `{%tag%}`, `{%tag:<tag>%}`) render links only
     and do **not** affect the tag list
-  * Tags in YAML metadata are automatically normalized (non-alphanumeric/non-hyphen/non-underscore
-    characters replaced with `_`, surrounding separators trimmed, lowercased) —
-    e.g. `Multi Word Tag` is stored and displayed as `multi_word_tag`;
-    tags with different casing are treated as the same tag
-    (e.g. `ExampleTag`, `Exampletag`, and `exampleTag` would all normalize to `exampletag`)
+  * Tag titles are rendered as-is (preserving the original letter case and whitespace from the YAML `tags` section),
+    while the corresponding tag page URIs are automatically normalized
+    (non-alphanumeric characters replaced with `-`, surrounding separators trimmed, lowercased) —
+    e.g. `Multi Word Tag` renders as `Multi Word Tag` in tag links, but points to `/tags/multi-word-tag/`
   * Post content file example:
     ```
     ---
@@ -260,12 +259,12 @@ $ mbgen help [command]
     * `#<tag>` - renders a hashtag link to the corresponding tag page
       * if you need to render custom / multi-word link text, use one of the following alternatives:
         * `{%tag%}` (used as a Markdown link URL) - renders a URI to the tag page, auto-deriving the tag from the link text, e.g.:
-          * `[Multi Word Tag]({%tag%})` - renders a link to `/tags/multi_word_tag/` with `Multi Word Tag` as link text
-          * The tag URI is auto-derived from the link text using the same normalization rules (non-alphanumeric/hyphen/underscore characters replaced with `_`, surrounding separators trimmed, lowercased)
+          * `[Multi Word Tag]({%tag%})` - renders a link to `/tags/multi-word-tag/` with `Multi Word Tag` as link text
+          * The tag URI is auto-derived from the link text using the same normalization rules (non-alphanumeric characters replaced with `-`, surrounding separators trimmed, lowercased)
         * `{%tag:<tag>%}` - renders a URI to the tag page for the given `<tag>`, e.g.:
-          * `[My Custom Text]({%tag:multi_word_tag%})` - renders a link to `/tags/multi_word_tag/` with `My Custom Text` as link text
-          * `[My Custom Text]({%tag:Multi Word Tag%})` - also renders a link to `/tags/multi_word_tag/` (spaces normalized)
-          * `<tag>` supports alphanumeric characters, hyphens (`-`), underscores (`_`), and spaces
+          * `[My Custom Text]({%tag:multi-word-tag%})` - renders a link to `/tags/multi-word-tag/` with `My Custom Text` as link text
+          * `[My Custom Text]({%tag:Multi Word Tag%})` - also renders a link to `/tags/multi-word-tag/` (spaces normalized)
+          * `<tag>` supports alphanumeric characters, hyphens (`-`), and spaces
       * _note: tag content directives are purely a link rendering convenience — they do **not** add tags to the post's tag list;
         to have a tag appear on the post's tag list, it must be explicitly listed in the YAML metadata `tags` section_
     * `{%search:<search query>%}` - renders a URI to the search page with the given `<search query>`
