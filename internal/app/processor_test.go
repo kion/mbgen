@@ -624,7 +624,7 @@ func TestFeedExcerptWordFallback(t *testing.T) {
 	}
 }
 
-func TestFeedTitleWithTags(t *testing.T) {
+func TestFeedTitleWithoutPostTitle(t *testing.T) {
 	var pages []page
 	var posts []post
 
@@ -636,7 +636,7 @@ func TestFeedTitleWithTags(t *testing.T) {
 		"header.html": themeIncludeHeaderContent,
 	}
 
-	// post without title but with tags
+	// post without title but with tags: tags should NOT be added to the feed title
 	post1 := post{
 		Id:          "post-with-tags",
 		Title:       "", // no title
@@ -664,18 +664,20 @@ func TestFeedTitleWithTags(t *testing.T) {
 		t.Fatal("Missing expected feed file")
 	}
 
-	// title should contain date, time, and tags with # prefix
 	if !strings.Contains(feedContent, "2023-08-01 14:30") {
 		t.Error("Feed title missing date and time")
 	}
-	if !strings.Contains(feedContent, "#Cycling") {
-		t.Error("Feed title missing #Cycling tag")
+	// tags must NOT appear in the feed item title
+	for _, forbidden := range []string{"#Cycling", "#Adventure", "#Travel"} {
+		if strings.Contains(feedContent, forbidden) {
+			t.Errorf("Feed item title should not contain tag %q", forbidden)
+		}
 	}
-	if !strings.Contains(feedContent, "#Adventure") {
-		t.Error("Feed title missing #Adventure tag")
-	}
-	if !strings.Contains(feedContent, "#Travel") {
-		t.Error("Feed title missing #Travel tag")
+
+	// also verify at the function level
+	title := buildFeedItemTitle(post1)
+	if title != "2023-08-01 14:30" {
+		t.Errorf("buildFeedItemTitle = %q, want %q", title, "2023-08-01 14:30")
 	}
 }
 
@@ -1105,5 +1107,75 @@ func TestFeedExcerptEllipsisReplacementForAllPunctuation(t *testing.T) {
 	}
 	if !strings.Contains(feedContent, "Third sentence...") {
 		t.Error("Truncated content ending with question should replace with ellipsis")
+	}
+}
+
+func TestTagIndexPreservesOriginalTitles(t *testing.T) {
+	var pages []page
+
+	globalIncludes := map[string]string{
+		"header.html": globalIncludeHeaderContent,
+	}
+	themeIncludes := map[string]string{
+		"header.html": themeIncludeHeaderContent,
+	}
+
+	// three posts using differently-cased labels that normalize to the same URI
+	postA := post{Id: "post-a", Title: "Post A", Body: "body A", Tags: []string{"Three Word Tag"}}
+	postB := post{Id: "post-b", Title: "Post B", Body: "body B", Tags: []string{"Three word tag"}}
+	postC := post{Id: "post-c", Title: "Post C", Body: "body C", Tags: []string{"Three Word Tag"}}
+	posts := []post{postA, postB, postC}
+
+	config := defaultConfig()
+	config.enableSearch = false
+	config.siteName = testSiteName
+
+	output := processOutput(pages, posts, globalIncludes, themeIncludes, config)
+
+	tagIndexPath := deployDirName + "/" + deployTagsDirName + "/" + indexPageFileName
+	tagIndexContent, ok := output[tagIndexPath]
+	if !ok {
+		t.Fatal("Missing tag index output file: " + tagIndexPath)
+	}
+
+	// both distinct original labels should appear on the index
+	if !strings.Contains(tagIndexContent, `<span class="tag-title">Three Word Tag</span>`) {
+		t.Error("Tag index should render label 'Three Word Tag' as-is")
+	}
+	if !strings.Contains(tagIndexContent, `<span class="tag-title">Three word tag</span>`) {
+		t.Error("Tag index should render label 'Three word tag' as-is")
+	}
+
+	// both entries must link to the same normalized URI
+	if strings.Count(tagIndexContent, `href="/tags/three-word-tag/"`) < 2 {
+		t.Error("Tag index should contain at least two links to /tags/three-word-tag/")
+	}
+
+	// per-title counts: 'Three Word Tag' => 2, 'Three word tag' => 1
+	if !strings.Contains(tagIndexContent, `Three Word Tag</span>&nbsp;<span class="tag-cnt">(2)</span>`) {
+		t.Error("Tag index count for 'Three Word Tag' should be 2")
+	}
+	if !strings.Contains(tagIndexContent, `Three word tag</span>&nbsp;<span class="tag-cnt">(1)</span>`) {
+		t.Error("Tag index count for 'Three word tag' should be 1")
+	}
+
+	// exactly one per-tag listing page should be produced; it should list all three posts
+	perTagPath := deployDirName + "/" + deployTagsDirName + "/" + "three-word-tag" + "/" + indexPageFileName
+	perTagContent, ok := output[perTagPath]
+	if !ok {
+		t.Fatalf("Missing per-tag listing page: %s", perTagPath)
+	}
+	for _, p := range posts {
+		if !strings.Contains(perTagContent, "/"+deployPostDirName+"/"+p.Id+contentFileExtension) {
+			t.Errorf("Per-tag page should link to post %s", p.Id)
+		}
+	}
+
+	// no per-tag page should exist under the raw/uppercased title variants
+	for _, badSeg := range []string{"Three Word Tag", "Three word tag", "THREE WORD TAG"} {
+		badPath := deployDirName + "/" + deployTagsDirName + "/" + badSeg + "/" + indexPageFileName
+		if _, exists := output[badPath]; exists {
+			t.Errorf("Unexpected per-tag page generated at %q", badPath)
+		}
 	}
 }

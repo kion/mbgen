@@ -141,6 +141,7 @@ func processPosts(posts []post, searchIndex *mapSlice,
 
 		tagPostCnt := make(map[string]int)
 		tagContent := make(map[string][]string)
+		tagTitlePostCnt := make(map[[2]string]int)
 
 		for _, post := range posts {
 			pagePostCnt++
@@ -234,9 +235,15 @@ func processPosts(posts []post, searchIndex *mapSlice,
 			}
 
 			if len(post.Tags) > 0 {
+				seenUris := map[string]struct{}{}
 				for _, tag := range post.Tags {
-					tagPostCnt[tag]++
-					tagContent[tag] = append(tagContent[tag], postContent)
+					uri := normalizeTagURI(tag)
+					tagTitlePostCnt[[2]string{tag, uri}]++
+					if _, ok := seenUris[uri]; !ok {
+						seenUris[uri] = struct{}{}
+						tagPostCnt[uri]++
+						tagContent[uri] = append(tagContent[uri], postContent)
+					}
 				}
 			}
 
@@ -280,7 +287,7 @@ func processPosts(posts []post, searchIndex *mapSlice,
 			if config.generateTagIndex {
 				minTagPostCnt := -1
 				maxTagPostCnt := 0
-				for _, v := range tagPostCnt {
+				for _, v := range tagTitlePostCnt {
 					if minTagPostCnt == -1 || v < minTagPostCnt {
 						minTagPostCnt = v
 					}
@@ -292,10 +299,15 @@ func processPosts(posts []post, searchIndex *mapSlice,
 				// sort the tags by post count
 				// ======================================================================
 				var sortedTags []tagData
-				for tt, tc := range tagPostCnt {
-					tr := float64(tc-minTagPostCnt) / float64(maxTagPostCnt-minTagPostCnt)
-					tr = float64(int(tr*100))/100 + 1
-					sortedTags = append(sortedTags, tagData{Title: tt, Count: tc, Ratio: tr})
+				for k, tc := range tagTitlePostCnt {
+					var tr float64
+					if maxTagPostCnt == minTagPostCnt {
+						tr = 1
+					} else {
+						tr = float64(tc-minTagPostCnt) / float64(maxTagPostCnt-minTagPostCnt)
+						tr = float64(int(tr*100))/100 + 1
+					}
+					sortedTags = append(sortedTags, tagData{Title: k[0], URI: k[1], Count: tc, Ratio: tr})
 				}
 				sort.Slice(sortedTags, func(i, j int) bool {
 					iCnt := sortedTags[i].Count
@@ -554,13 +566,6 @@ func buildFeedItemTitle(p post) string {
 
 	if p.Title != "" {
 		itemTitle += " | " + p.Title // add title if present
-	} else if len(p.Tags) > 0 {
-		// when no title, append tags
-		var tagStrings []string
-		for _, tag := range p.Tags {
-			tagStrings = append(tagStrings, "#"+tag)
-		}
-		itemTitle += " | " + strings.Join(tagStrings, " ")
 	}
 
 	return itemTitle

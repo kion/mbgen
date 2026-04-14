@@ -204,9 +204,12 @@ func parsePost(postId string, content string, config appConfig, resLoader resour
 	if tags != nil {
 		ti := tags.([]interface{})
 		for _, v := range ti {
-			tag := normalizeTagURI(v.(string))
-			if !slices.Contains(post.Tags, tag) {
-				post.Tags = append(post.Tags, tag)
+			raw := strings.TrimSpace(v.(string))
+			if raw == "" {
+				continue
+			}
+			if !slices.Contains(post.Tags, raw) {
+				post.Tags = append(post.Tags, raw)
 			}
 		}
 	}
@@ -577,4 +580,32 @@ func parseSharedMediaFileNames(mediaFileNames []string, config appConfig) []medi
 		}
 	}
 	return allMedia
+}
+
+// inspectTagTitleDuplicates returns a map of normalized tag URI -> sorted distinct
+// original titles, for URIs that appear with more than one distinct title across the given posts.
+func inspectTagTitleDuplicates(posts []post) map[string][]string {
+	byUri := map[string]map[string]struct{}{}
+	for _, p := range posts {
+		for _, t := range p.Tags {
+			uri := normalizeTagURI(t)
+			if byUri[uri] == nil {
+				byUri[uri] = map[string]struct{}{}
+			}
+			byUri[uri][t] = struct{}{}
+		}
+	}
+	out := map[string][]string{}
+	for uri, titles := range byUri {
+		if len(titles) < 2 {
+			continue
+		}
+		list := make([]string, 0, len(titles))
+		for t := range titles {
+			list = append(list, t)
+		}
+		sort.Strings(list)
+		out[uri] = list
+	}
+	return out
 }

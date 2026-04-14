@@ -129,7 +129,7 @@ func TestParser(t *testing.T) {
 		},
 	}
 
-	expectedTags := []string{tag1, normalizeTagURI(tag2), normalizeTagURI(tag3)}
+	expectedTags := []string{tag1, tag2, tag3}
 
 	defaultThemeTemplatesDir := fmt.Sprintf("%s%c%s%c%s", "../../themes", os.PathSeparator, defaultThemeName, os.PathSeparator, "templates")
 	resLoader := resourceLoader{
@@ -214,9 +214,13 @@ Post body.`
 	config := defaultConfig()
 	post := parsePost("test-post", postContent, config, resLoader)
 
-	// verify tag is stored in normalized form
-	if len(post.Tags) != 1 || post.Tags[0] != testTagMultiWordNormalized {
-		t.Errorf("Expected tag %q, got %v", testTagMultiWordNormalized, post.Tags)
+	// verify tag is stored using its original frontmatter title (preserved as-is)
+	if len(post.Tags) != 1 || post.Tags[0] != testTagMultiWordMetadata {
+		t.Errorf("Expected tag %q, got %v", testTagMultiWordMetadata, post.Tags)
+	}
+	// verify the tag still normalizes to the expected URI
+	if normalizeTagURI(post.Tags[0]) != testTagMultiWordNormalized {
+		t.Errorf("Expected normalized URI %q, got %q", testTagMultiWordNormalized, normalizeTagURI(post.Tags[0]))
 	}
 }
 
@@ -244,9 +248,9 @@ Post body with #HashTagAlpha and #HashTagBeta inline.`
 	config := defaultConfig()
 	post := parsePost("test-post", postContent, config, resLoader)
 
-	// only the explicitly listed YAML metadata tag should be present (normalized)
-	if len(post.Tags) != 1 || post.Tags[0] != "explicittag" {
-		t.Errorf("Expected post.Tags = [explicittag], got %v", post.Tags)
+	// only the explicitly listed YAML metadata tag should be present (raw title preserved)
+	if len(post.Tags) != 1 || post.Tags[0] != "ExplicitTag" {
+		t.Errorf("Expected post.Tags = [ExplicitTag], got %v", post.Tags)
 	}
 
 	// hashtag links should be rendered in the body
@@ -507,5 +511,33 @@ func TestSharedMediaResolution(t *testing.T) {
 	}
 	if result[0].Uri != "/media/post/test-post/shared.jpg" {
 		t.Errorf("expected /media/post/test-post/shared.jpg, got %s", result[0].Uri)
+	}
+}
+
+func TestInspectTagTitleDuplicates(t *testing.T) {
+	posts := []post{
+		{Id: "a", Tags: []string{"Three Word Tag", "Books"}},
+		{Id: "b", Tags: []string{"Three word tag"}},
+		{Id: "c", Tags: []string{"THREE WORD TAG", "Books"}},
+		{Id: "d", Tags: []string{"Sci-Fi"}},
+	}
+	dupes := inspectTagTitleDuplicates(posts)
+
+	// "three-word-tag" has 3 distinct titles; "books" and "sci-fi" have 1 each
+	if len(dupes) != 1 {
+		t.Fatalf("expected 1 URI with duplicates, got %d: %v", len(dupes), dupes)
+	}
+	titles, ok := dupes["three-word-tag"]
+	if !ok {
+		t.Fatalf("expected duplicates under key %q, got keys %v", "three-word-tag", dupes)
+	}
+	expected := []string{"THREE WORD TAG", "Three Word Tag", "Three word tag"}
+	if !slices.Equal(titles, expected) {
+		t.Errorf("expected sorted titles %v, got %v", expected, titles)
+	}
+
+	// confirm single-title URIs are excluded
+	if _, ok := dupes["books"]; ok {
+		t.Error("URI with only one distinct title should not be reported as a duplicate")
 	}
 }

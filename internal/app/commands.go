@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -74,8 +75,11 @@ var (
 		command:     "inspect",
 		description: "inspect content and report/fix any issues found",
 		usage: "mbgen inspect [" + commandInspectOptionFix + "]\n\n" +
+			"reports all detected issues; namely:\n" +
+			" - original images that exceed the `maxImgSize` config option value\n" +
+			" - tag URIs that appear with more than one distinct title across posts (report-only, no auto-fix)\n\n" +
 			"optional flags:\n" +
-			" " + commandInspectOptionFix + ": automatically fixes all detected issues; namely:\n" +
+			" " + commandInspectOptionFix + ": automatically fixes all auto-fixable issues; namely:\n" +
 			"   - resize and replace the original images that exceed the `maxImgSize` config option value\n\n",
 		reqConfig: true,
 		optArgCnt: 1,
@@ -530,13 +534,43 @@ func _inspect(config appConfig, commandArgs ...string) {
 			usage(usageHelp, 1)
 		}
 	} else {
-		if processOriginalMediaFiles(config, true) {
-			sprintln(" - run the following command to fix the issues found:\n\n" +
+		mediaIssues := processOriginalMediaFiles(config, true)
+		tagIssues := reportTagTitleDuplicates(config)
+		if mediaIssues {
+			sprintln(" - run the following command to fix the media issues found:\n\n" +
 				"   mbgen inspect " + commandInspectOptionFix)
-		} else {
+		}
+		if !mediaIssues && !tagIssues {
 			sprintln(" - no issues found")
 		}
 	}
+}
+
+// reportTagTitleDuplicates parses posts and reports any tag URIs that appear with
+// more than one distinct original title. Report-only (no auto-fix). Returns true
+// when duplicates were found.
+func reportTagTitleDuplicates(config appConfig) bool {
+	resLoader := getResourceLoader(config)
+	posts := parsePosts(config, resLoader, nil, false)
+	dupes := inspectTagTitleDuplicates(posts)
+	if len(dupes) == 0 {
+		return false
+	}
+	uris := make([]string, 0, len(dupes))
+	for uri := range dupes {
+		uris = append(uris, uri)
+	}
+	sort.Strings(uris)
+	sprintln(" - tag URIs with duplicate titles (fix manually in post frontmatter):")
+	for _, uri := range uris {
+		titles := dupes[uri]
+		quoted := make([]string, 0, len(titles))
+		for _, t := range titles {
+			quoted = append(quoted, strconv.Quote(t))
+		}
+		sprintln("   - " + uri + ": " + strings.Join(quoted, ", "))
+	}
+	return true
 }
 
 func _stats(config appConfig, commandArgs ...string) {

@@ -430,6 +430,7 @@ type resourceLoader struct {
 
 type tagData struct {
 	Title string
+	URI   string
 	Count int
 	Ratio float64
 }
