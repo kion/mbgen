@@ -231,7 +231,31 @@ func parseContentDirectives(ceType contentEntityType, ceId string, content strin
 	rawBodyContent = contentDirectivePlaceholderRegexp.ReplaceAllString(rawBodyContent, "")
 	rawBodyContent = whitespacePlaceholderRegexp.ReplaceAllString(rawBodyContent, " ")
 	rawBodyContent = strings.TrimSpace(rawBodyContent)
-	var phReps map[string]string
+
+	phReps := make(map[string]string)
+	var expListMedia []string
+
+	// extract {cols}...{//} blocks first so inner {col}...{/} tokens don't get
+	// misinterpreted as generic wrap directives by wrapPlaceholderRegexp downstream
+	var colsBlocks []colsBlock
+	colsMatches := colsPlaceholderRegexp.FindAllStringSubmatch(content, -1)
+	for _, m := range colsMatches {
+		ph := fmt.Sprintf(directivePlaceholderReplacementFormat, uuid.New().String())
+		colsBlocks = append(colsBlocks, colsBlock{ph: ph, weights: m[2], inner: m[3], original: m[0]})
+		content = strings.Replace(content, m[0], ph, 1)
+	}
+
+	content = processInnerDirectives(content, ceType, ceId, config, resLoader, phReps, &expListMedia)
+
+	for _, cb := range colsBlocks {
+		rendered := processColsBlock(cb, ceType, ceId, config, resLoader, phReps, &expListMedia)
+		phReps[cb.ph] = rendered
+	}
+
+	return content, rawBodyContent, phReps
+}
+
+func processInnerDirectives(content string, ceType contentEntityType, ceId string, config appConfig, resLoader resourceLoader, phReps map[string]string, expListMedia *[]string) string {
 	content = hashTagRegex.ReplaceAllStringFunc(content, func(match string) string {
 		tag := match[1:] // strip leading '#'; regex guarantees '#' + tag chars
 		return fmt.Sprintf(hashTagMarkdownReplacementFormat, tag, normalizeTagURI(tag))
@@ -261,16 +285,16 @@ func parseContentDirectives(ceType contentEntityType, ceId string, content strin
 			placeholder := clp[0]
 			entityType := strings.ToLower(clp[1])
 			entryId := clp[2]
-			var ceType contentEntityType
+			var linkCeType contentEntityType
 			switch entityType {
 			case "page":
-				ceType = Page
+				linkCeType = Page
 			case "post":
-				ceType = Post
+				linkCeType = Post
 			}
 			var link string
-			if ceType != UndefinedContentEntityType {
-				link = "/" + strings.ToLower(ceType.String()) + "/" + entryId + contentFileExtension
+			if linkCeType != UndefinedContentEntityType {
+				link = "/" + strings.ToLower(linkCeType.String()) + "/" + entryId + contentFileExtension
 			}
 			content = strings.Replace(content, placeholder, link, 1)
 		}
@@ -285,7 +309,6 @@ func parseContentDirectives(ceType contentEntityType, ceId string, content strin
 			content = strings.Replace(content, placeholder, link, 1)
 		}
 	}
-	var expListMedia []string
 	wrapPlaceholders := wrapPlaceholderRegexp.FindAllStringSubmatch(content, -1)
 	if wrapPlaceholders != nil {
 		sortContentDirectivePlaceholders(wrapPlaceholders)
@@ -294,7 +317,7 @@ func parseContentDirectives(ceType contentEntityType, ceId string, content strin
 			if mediaArg != "" {
 				for _, a := range strings.Split(mediaArg, ",") {
 					m := strings.TrimSpace(a)
-					expListMedia = append(expListMedia, m)
+					*expListMedia = append(*expListMedia, m)
 				}
 			}
 		}
@@ -307,7 +330,7 @@ func parseContentDirectives(ceType contentEntityType, ceId string, content strin
 			if mediaArg != "" {
 				for _, a := range strings.Split(mediaArg, ",") {
 					m := strings.TrimSpace(a)
-					expListMedia = append(expListMedia, m)
+					*expListMedia = append(*expListMedia, m)
 				}
 			}
 		}
@@ -316,6 +339,11 @@ func parseContentDirectives(ceType contentEntityType, ceId string, content strin
 		for _, wp := range wrapPlaceholders {
 			placeholder := wp[0]
 			directive := wp[1]
+			if directive == "col" {
+				// {col}...{/} is a child of a {cols}...{//} block, handled by processColsBlock;
+				// skip here so the generic wrap pipeline doesn't try to compile content-col.html.
+				continue
+			}
 			contentDirectiveTemplate, err := compileContentDirectiveTemplate(directive, resLoader)
 			if err != nil {
 				println(" - failed to process " + directive + " directive for " + ceId + ": " + err.Error())
@@ -338,7 +366,7 @@ func parseContentDirectives(ceType contentEntityType, ceId string, content strin
 				}
 				var mediaFileNames []string
 				if mediaArg == "" {
-					mediaFileNames = listAllMedia(ceType, ceId, expListMedia)
+					mediaFileNames = listAllMedia(ceType, ceId, *expListMedia)
 				} else {
 					for _, a := range strings.Split(mediaArg, ",") {
 						m := strings.TrimSpace(a)
@@ -354,9 +382,6 @@ func parseContentDirectives(ceType contentEntityType, ceId string, content strin
 				})
 				check(err)
 				ph := fmt.Sprintf(directivePlaceholderReplacementFormat, uuid.New().String())
-				if phReps == nil {
-					phReps = make(map[string]string)
-				}
 				phReps[ph] = strings.TrimSpace(contentDirectiveMarkupBuffer.String())
 				content = strings.Replace(content, placeholder, ph, 1)
 			}
@@ -378,7 +403,7 @@ func parseContentDirectives(ceType contentEntityType, ceId string, content strin
 			}
 			var mediaFileNames []string
 			if mediaArg == "" {
-				mediaFileNames = listAllMedia(ceType, ceId, expListMedia)
+				mediaFileNames = listAllMedia(ceType, ceId, *expListMedia)
 			} else {
 				for _, a := range strings.Split(mediaArg, ",") {
 					m := strings.TrimSpace(a)
@@ -395,9 +420,6 @@ func parseContentDirectives(ceType contentEntityType, ceId string, content strin
 				})
 				check(err)
 				ph := fmt.Sprintf(directivePlaceholderReplacementFormat, uuid.New().String())
-				if phReps == nil {
-					phReps = make(map[string]string)
-				}
 				phReps[ph] = strings.TrimSpace(inlineMediaMarkupBuffer.String())
 				content = strings.Replace(content, placeholder, ph, 1)
 			} else {
@@ -429,9 +451,6 @@ func parseContentDirectives(ceType contentEntityType, ceId string, content strin
 				})
 				check(err)
 				ph := fmt.Sprintf(directivePlaceholderReplacementFormat, uuid.New().String())
-				if phReps == nil {
-					phReps = make(map[string]string)
-				}
 				phReps[ph] = strings.TrimSpace(inlineMediaMarkupBuffer.String())
 				content = strings.Replace(content, placeholder, ph, 1)
 			} else {
@@ -439,7 +458,144 @@ func parseContentDirectives(ceType contentEntityType, ceId string, content strin
 			}
 		}
 	}
-	return content, rawBodyContent, phReps
+	return content
+}
+
+func processColsBlock(cb colsBlock, ceType contentEntityType, ceId string, config appConfig, resLoader resourceLoader, phReps map[string]string, expListMedia *[]string) string {
+	weights, weightsErr := parseColsWeights(cb.weights)
+	if weightsErr != "" {
+		println(" - " + weightsErr + " for " + ceId + "; falling back to equal widths")
+		weights = nil
+	}
+
+	// pre-process inner directives on the whole cols body first so that nested
+	// {/} closers (e.g., from {with-media}...{/}) become UUID placeholders and
+	// don't confuse the {col}...{/} matcher's lazy quantifier downstream
+	inner := processInnerDirectives(cb.inner, ceType, ceId, config, resLoader, phReps, expListMedia)
+
+	colMatches := colPlaceholderRegexp.FindAllStringSubmatch(inner, -1)
+	if len(colMatches) == 0 {
+		println(" - {cols} directive has no {col} children for " + ceId + "; leaving raw directive in content")
+		return cb.original
+	}
+
+	if weights != nil && len(weights) != len(colMatches) {
+		println(fmt.Sprintf(" - {cols} weight count (%d) does not match {col} child count (%d) for %s; falling back to equal widths", len(weights), len(colMatches), ceId))
+		weights = nil
+	}
+
+	columns := make([]colData, 0, len(colMatches))
+	for _, cm := range colMatches {
+		propsStr := cm[2]
+		body := cm[3]
+		align := parseColAlign(propsStr, ceId)
+
+		var buf bytes.Buffer
+		err := markdown.Convert([]byte(strings.TrimSpace(body)), &buf)
+		check(err)
+		// Goldmark wraps standalone UUID placeholders in `<p>...</p>`, and with
+		// WithHardWraps multiple consecutive placeholders collapse into a single
+		// paragraph joined by `<br>` tags. When fixed-point replacement later
+		// substitutes block-level directives (e.g., `{with-media}`), the result is
+		// `<p><section>...</section>[<br><section>...</section>]*</p>`, which
+		// browsers parse into empty `<p></p>` artifacts that misalign adjacent
+		// columns. Strip the `<p>` wrapper (and any inter-placeholder `<br>`s) from
+		// paragraphs whose content is only placeholders, whitespace, and `<br>`s.
+		rendered := pWrapperAroundPlaceholdersRegexp.ReplaceAllStringFunc(buf.String(), func(match string) string {
+			sub := pWrapperAroundPlaceholdersRegexp.FindStringSubmatch(match)
+			if len(sub) < 2 {
+				return match
+			}
+			inner := brTagRegexp.ReplaceAllString(sub[1], "\n")
+			return strings.TrimSpace(inner)
+		})
+		columns = append(columns, colData{
+			Body:  strings.TrimSpace(rendered),
+			Align: align,
+		})
+	}
+
+	gtc := buildGridTemplateColumns(weights, len(columns))
+
+	tmplt, err := compileContentDirectiveTemplate("cols", resLoader)
+	if err != nil {
+		println(" - failed to process cols directive for " + ceId + ": " + err.Error())
+		return cb.original
+	}
+	var out bytes.Buffer
+	err = tmplt.Execute(&out, contentDirectiveData{
+		Columns:             columns,
+		GridTemplateColumns: gtc,
+	})
+	check(err)
+	return strings.TrimSpace(out.String())
+}
+
+func parseColsWeights(raw string) ([]int, string) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, ""
+	}
+	parts := strings.Split(raw, ":")
+	weights := make([]int, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		w, err := strconv.Atoi(p)
+		if err != nil || w <= 0 {
+			return nil, "failed to parse cols weight '" + p + "'"
+		}
+		weights = append(weights, w)
+	}
+	if len(weights) == 0 {
+		return nil, ""
+	}
+	return weights, ""
+}
+
+func parseColAlign(propsStr, ceId string) string {
+	propsStr = strings.TrimSpace(propsStr)
+	if propsStr == "" {
+		return ""
+	}
+	for _, pStr := range strings.Split(propsStr, ",") {
+		pStr = strings.TrimSpace(pStr)
+		if pStr == "" {
+			continue
+		}
+		kv := strings.SplitN(pStr, "=", 2)
+		if len(kv) != 2 {
+			println(" - malformed {col} prop '" + pStr + "' for " + ceId)
+			continue
+		}
+		key := strings.TrimSpace(kv[0])
+		val := strings.TrimSpace(kv[1])
+		if key == "a" {
+			if val == "l" || val == "c" || val == "r" {
+				return val
+			}
+			println(" - unknown {col} alignment value '" + val + "' for " + ceId + "; ignoring")
+			continue
+		}
+		println(" - unknown {col} prop '" + key + "' for " + ceId + "; ignoring")
+	}
+	return ""
+}
+
+func buildGridTemplateColumns(weights []int, colCount int) string {
+	parts := make([]string, 0, colCount)
+	if weights == nil {
+		for i := 0; i < colCount; i++ {
+			parts = append(parts, "1fr")
+		}
+	} else {
+		for _, w := range weights {
+			parts = append(parts, fmt.Sprintf("%dfr", w))
+		}
+	}
+	return strings.Join(parts, " ")
 }
 
 func sortContentDirectivePlaceholders(cdPlaceholders [][]string) {
@@ -457,9 +613,22 @@ func sortContentDirectivePlaceholders(cdPlaceholders [][]string) {
 }
 
 func handleContentDirectivePlaceholderReplacements(content string, phReps map[string]string) string {
-	if phReps != nil {
+	if phReps == nil {
+		return content
+	}
+	// iterate to a fixed point: a replacement may itself contain placeholders
+	// (e.g., `{cols}` HTML embeds `{with-media}` UUIDs), and Go's map iteration order
+	// is random; each UUID is unique, so termination is bounded by `len(phReps)`
+	for {
+		changed := false
 		for placeholder, replacement := range phReps {
-			content = strings.Replace(content, placeholder, replacement, 1)
+			if strings.Contains(content, placeholder) {
+				content = strings.Replace(content, placeholder, replacement, 1)
+				changed = true
+			}
+		}
+		if !changed {
+			break
 		}
 	}
 	return content

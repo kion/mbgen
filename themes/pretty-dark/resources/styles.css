@@ -256,6 +256,50 @@ header a.permalink {
     width: var(--media-width-full);
 }
 
+.post .content .cols,
+.page .content .cols {
+    display: grid;
+    gap: 1em;
+    margin: 1em 0;
+}
+
+.post .content .cols .col,
+.page .content .cols .col {
+    min-width: 0;
+}
+
+.post .content .cols .col > *:first-child,
+.page .content .cols .col > *:first-child {
+    margin-top: 0;
+}
+
+.post .content .cols .col > *:last-child,
+.page .content .cols .col > *:last-child {
+    margin-bottom: 0;
+}
+
+.post .content .cols .col.align-l,
+.page .content .cols .col.align-l {
+    text-align: left;
+}
+
+.post .content .cols .col.align-c,
+.page .content .cols .col.align-c {
+    text-align: center;
+}
+
+.post .content .cols .col.align-r,
+.page .content .cols .col.align-r {
+    text-align: right;
+}
+
+@media (max-width: 640px) {
+    .post .content .cols,
+    .page .content .cols {
+        grid-template-columns: 1fr !important;
+    }
+}
+
 .content .media {
     display: flex;
     flex-direction: column;

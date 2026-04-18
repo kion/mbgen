@@ -1,0 +1,5 @@
+<section class="cols" style="grid-template-columns: {{ .GridTemplateColumns }};">
+    {{ range .Columns }}
+    <section class="col{{ if .Align }} align-{{ .Align }}{{ end }}">{{ .Body }}</section>
+    {{ end }}
+</section>

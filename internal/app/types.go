@@ -184,10 +184,24 @@ type templateContent struct {
 }
 
 type contentDirectiveData struct {
-	Text          string
-	Media         []media
-	EmbeddedMedia *embeddedMedia
-	Props         map[string]string
+	Text                string
+	Media               []media
+	EmbeddedMedia       *embeddedMedia
+	Props               map[string]string
+	Columns             []colData
+	GridTemplateColumns string
+}
+
+type colsBlock struct {
+	ph       string
+	weights  string
+	inner    string
+	original string
+}
+
+type colData struct {
+	Body  string
+	Align string
 }
 
 func (c contentDirectiveData) Images() []media {

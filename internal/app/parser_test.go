@@ -563,6 +563,358 @@ func TestSharedMediaResolution(t *testing.T) {
 	}
 }
 
+func newColsTestResLoader() resourceLoader {
+	defaultThemeTemplatesDir := fmt.Sprintf("%s%c%s%c%s", "../../themes", os.PathSeparator, defaultThemeName, os.PathSeparator, "templates")
+	return resourceLoader{
+		config: defaultConfig(),
+		loadTemplate: func(templateFileName string) ([]byte, error) {
+			templateFilePath := fmt.Sprintf("%s%c%s", defaultThemeTemplatesDir, os.PathSeparator, templateFileName)
+			return os.ReadFile(templateFilePath)
+		},
+		loadInclude: func(includeFileName string, level templateIncludeLevel) ([]byte, error) {
+			return nil, nil
+		},
+	}
+}
+
+func TestColsDirectiveBasic(t *testing.T) {
+	postContent := `---
+date: 2026-04-18
+---
+
+Intro paragraph.
+
+{cols}
+{col}
+Left column content.
+{/}
+{col}
+Right column content.
+{/}
+{//}
+
+Outro.`
+
+	post := parsePost("cols-basic", postContent, defaultConfig(), newColsTestResLoader())
+
+	verifyStringContains(post.Body, `<section class="cols"`, t)
+	verifyStringContains(post.Body, `grid-template-columns: 1fr 1fr`, t)
+	if n := strings.Count(post.Body, `<section class="col"`); n != 2 {
+		t.Errorf("expected 2 <section class=\"col\"> elements, got %d\n%s", n, post.Body)
+	}
+	verifyStringContains(post.Body, "Left column content.", t)
+	verifyStringContains(post.Body, "Right column content.", t)
+	verifyStringContains(post.Body, "Intro paragraph.", t)
+	verifyStringContains(post.Body, "Outro.", t)
+}
+
+func TestColsDirectiveWithWeights(t *testing.T) {
+	postContent := `---
+date: 2026-04-18
+---
+
+{cols(3:1:1)}
+{col}
+Wide.
+{/}
+{col}
+N1.
+{/}
+{col}
+N2.
+{/}
+{//}`
+
+	post := parsePost("cols-weights", postContent, defaultConfig(), newColsTestResLoader())
+
+	verifyStringContains(post.Body, `grid-template-columns: 3fr 1fr 1fr`, t)
+	if n := strings.Count(post.Body, `<section class="col"`); n != 3 {
+		t.Errorf("expected 3 cols, got %d\n%s", n, post.Body)
+	}
+}
+
+func TestColsDirectiveWeightCountMismatch(t *testing.T) {
+	postContent := `---
+date: 2026-04-18
+---
+
+{cols(3:1)}
+{col}
+A.
+{/}
+{col}
+B.
+{/}
+{col}
+C.
+{/}
+{//}`
+
+	post := parsePost("cols-mismatch", postContent, defaultConfig(), newColsTestResLoader())
+
+	// weights dropped, equal widths fallback applied
+	verifyStringContains(post.Body, `grid-template-columns: 1fr 1fr 1fr`, t)
+	if strings.Contains(post.Body, "3fr") {
+		t.Errorf("expected no 3fr token after mismatch fallback\n%s", post.Body)
+	}
+}
+
+func TestColsDirectiveEmpty(t *testing.T) {
+	postContent := `---
+date: 2026-04-18
+---
+
+Before.
+
+{cols}
+{//}
+
+After.`
+
+	post := parsePost("cols-empty", postContent, defaultConfig(), newColsTestResLoader())
+
+	// no cols section rendered
+	if strings.Contains(post.Body, `class="cols"`) {
+		t.Errorf("expected no rendered cols section for empty {cols} block\n%s", post.Body)
+	}
+	// the raw directive should be visible to the author (left as literal text)
+	verifyStringContains(post.Body, "{cols}", t)
+	verifyStringContains(post.Body, "{//}", t)
+	verifyStringContains(post.Body, "Before.", t)
+	verifyStringContains(post.Body, "After.", t)
+}
+
+func TestColsDirectiveAlignment(t *testing.T) {
+	postContent := `---
+date: 2026-04-18
+---
+
+{cols}
+{col(a=l)}
+Left.
+{/}
+{col(a=c)}
+Center.
+{/}
+{col(a=r)}
+Right.
+{/}
+{col}
+Plain.
+{/}
+{//}`
+
+	post := parsePost("cols-align", postContent, defaultConfig(), newColsTestResLoader())
+
+	verifyStringContains(post.Body, `<section class="col align-l"`, t)
+	verifyStringContains(post.Body, `<section class="col align-c"`, t)
+	verifyStringContains(post.Body, `<section class="col align-r"`, t)
+	// plain {col} without props: class="col" with no align suffix
+	if !strings.Contains(post.Body, `<section class="col">`) {
+		t.Errorf("expected plain <section class=\"col\"> for unstyled col\n%s", post.Body)
+	}
+}
+
+func TestColsDirectiveInvalidAlignment(t *testing.T) {
+	postContent := `---
+date: 2026-04-18
+---
+
+{cols}
+{col(a=x)}
+Bogus alignment.
+{/}
+{col}
+Normal.
+{/}
+{//}`
+
+	post := parsePost("cols-invalid-align", postContent, defaultConfig(), newColsTestResLoader())
+
+	// column still renders
+	verifyStringContains(post.Body, "Bogus alignment.", t)
+	// no align-x class
+	if strings.Contains(post.Body, "align-x") {
+		t.Errorf("expected no align-x class for invalid alignment value\n%s", post.Body)
+	}
+}
+
+func TestColsDirectiveWithNestedWithMedia(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "mbgen-cols-nested-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(origDir)
+
+	mediaDir := fmt.Sprintf("%s/%s/%s/%s", deployDirName, mediaDirName, "post", "cols-nested")
+	if err := os.MkdirAll(mediaDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(mediaDir+"/book.jpg", []byte("fake jpg"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// resLoader needs to read templates from the real theme dir, which is relative to the
+	// original working dir (not tmpDir). Resolve absolute path before chdir.
+	themeTemplatesAbsDir := fmt.Sprintf("%s%c..%c..%c%s%c%s%c%s", origDir, os.PathSeparator, os.PathSeparator, os.PathSeparator, "themes", os.PathSeparator, defaultThemeName, os.PathSeparator, "templates")
+	resLoader := resourceLoader{
+		config: defaultConfig(),
+		loadTemplate: func(templateFileName string) ([]byte, error) {
+			return os.ReadFile(themeTemplatesAbsDir + string(os.PathSeparator) + templateFileName)
+		},
+		loadInclude: func(includeFileName string, level templateIncludeLevel) ([]byte, error) {
+			return nil, nil
+		},
+	}
+
+	postContent := `---
+date: 2026-04-18
+---
+
+{cols}
+{col}
+Left text.
+{/}
+{col}
+{with-media(p=l,s=s):book.jpg}
+Book caption.
+{/}
+{/}
+{//}`
+
+	post := parsePost("cols-nested", postContent, defaultConfig(), resLoader)
+
+	verifyStringContains(post.Body, `<section class="cols"`, t)
+	verifyStringContains(post.Body, `class="with-media`, t)
+	verifyStringContains(post.Body, "/media/post/cols-nested/book.jpg", t)
+	verifyStringContains(post.Body, "Left text.", t)
+	verifyStringContains(post.Body, "Book caption.", t)
+	// no stray UUID placeholders in the output
+	if strings.Contains(post.Body, ":@@@:") {
+		t.Errorf("output contains unresolved placeholder markers\n%s", post.Body)
+	}
+	// no <p> wrapper around the with-media <section> inside the col (would produce
+	// empty <p></p> artifacts in the browser and misalign adjacent columns).
+	if strings.Contains(post.Body, `<p><section class="with-media`) {
+		t.Errorf("block-level directive should not be wrapped in <p>...</p>\n%s", post.Body)
+	}
+}
+
+func TestColsDirectiveMultipleNestedWithMedia(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "mbgen-cols-multi-nested-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(origDir)
+
+	mediaDir := fmt.Sprintf("%s/%s/%s/%s", deployDirName, mediaDirName, "post", "cols-multi")
+	if err := os.MkdirAll(mediaDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"a.jpg", "b.jpg", "c.jpg"} {
+		if err := os.WriteFile(mediaDir+"/"+name, []byte("fake jpg"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	themeTemplatesAbsDir := fmt.Sprintf("%s%c..%c..%c%s%c%s%c%s", origDir, os.PathSeparator, os.PathSeparator, os.PathSeparator, "themes", os.PathSeparator, defaultThemeName, os.PathSeparator, "templates")
+	resLoader := resourceLoader{
+		config: defaultConfig(),
+		loadTemplate: func(templateFileName string) ([]byte, error) {
+			return os.ReadFile(themeTemplatesAbsDir + string(os.PathSeparator) + templateFileName)
+		},
+		loadInclude: func(includeFileName string, level templateIncludeLevel) ([]byte, error) {
+			return nil, nil
+		},
+	}
+
+	// Three consecutive {with-media} blocks inside a single {col}, no blank lines
+	// between them — exercises the multi-placeholder-per-paragraph code path
+	// (<p>UUID1<br>UUID2<br>UUID3</p>) that goldmark's WithHardWraps produces.
+	postContent := `---
+date: 2026-04-18
+---
+
+{cols}
+{col}
+{with-media(p=l,s=s):a.jpg}
+Caption A
+{/}
+{with-media(p=l,s=s):b.jpg}
+Caption B
+{/}
+{with-media(p=l,s=s):c.jpg}
+Caption C
+{/}
+{/}
+{col}
+right text
+{/}
+{//}`
+
+	post := parsePost("cols-multi", postContent, defaultConfig(), resLoader)
+
+	// all three captions present
+	verifyStringContains(post.Body, "Caption A", t)
+	verifyStringContains(post.Body, "Caption B", t)
+	verifyStringContains(post.Body, "Caption C", t)
+	// no <p> wrappers leaking around block-level section output
+	if strings.Contains(post.Body, `<p><section class="with-media`) {
+		t.Errorf("block-level directives should not be wrapped in <p>...</p>\n%s", post.Body)
+	}
+	// no leftover <br> between sections (would indicate we stripped <p> but not <br>)
+	if strings.Contains(post.Body, `</section><br`) {
+		t.Errorf("unexpected <br> between adjacent <section> elements\n%s", post.Body)
+	}
+	// exactly three with-media sections rendered
+	if n := strings.Count(post.Body, `<section class="with-media`); n != 3 {
+		t.Errorf("expected 3 with-media sections, got %d\n%s", n, post.Body)
+	}
+}
+
+func TestColsDirectiveFeedContentStripping(t *testing.T) {
+	postContent := `---
+date: 2026-04-18
+---
+
+{cols}
+{col}
+Alpha text.
+{/}
+{col}
+Beta text.
+{/}
+{//}`
+
+	post := parsePost("cols-feed", postContent, defaultConfig(), newColsTestResLoader())
+
+	// no raw directive tokens in feed content
+	if strings.Contains(post.FeedContent, "{cols}") || strings.Contains(post.FeedContent, "{//}") || strings.Contains(post.FeedContent, "{col}") || strings.Contains(post.FeedContent, "{/}") {
+		t.Errorf("FeedContent should not contain raw directive tokens, got %q", post.FeedContent)
+	}
+	// inner text preserved for search/excerpt
+	verifyStringContains(post.FeedContent, "Alpha text.", t)
+	verifyStringContains(post.FeedContent, "Beta text.", t)
+}
+
 func TestInspectTagTitleDuplicates(t *testing.T) {
 	posts := []post{
 		{Id: "a", Tags: []string{"Three Word Tag", "Books"}},

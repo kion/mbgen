@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	appVersion                                  = "1.8.6"
+	appVersion                                  = "1.8.7"
 	defaultGitHubRepoUrl                        = "github.com/kion/mbgen"
 	defaultGitHubRepoThemesUrl                  = defaultGitHubRepoUrl + "/themes"
 	defaultGitHubRepoPageContentSamplesUrl      = defaultGitHubRepoUrl + "/content-samples/pages"
@@ -136,6 +136,10 @@ var (
 	embedMediaPlaceholderRegexp          = /* const */ regexp.MustCompile(`{\s*embed\s*:\s*([^}]+)\s*}`)
 	wrapPlaceholderOpeningRegexp         = /* const */ regexp.MustCompile(`\{\s*([\w-_.]+)\s*(\([\s\w=,]+\))?(\s*:\s*([\w\s-_.,*]+))?\s*}`)
 	wrapPlaceholderRegexp                = /* const */ regexp.MustCompile(`\{\s*([\w-_.]+)\s*(\([\s\w=,]+\))?(\s*:\s*([\w\s-_.,*]+))?\s*}([^{}]*){/}`)
+	colsPlaceholderRegexp                = /* const */ regexp.MustCompile(`(?s)\{\s*cols\s*(\(([\s\d:]+)\))?\s*\}(.*?)\{//\}`)
+	colPlaceholderRegexp                 = /* const */ regexp.MustCompile(`(?s)\{\s*col\s*(\(([\s\w=,]+)\))?\s*\}(.*?)\{/\}`)
+	pWrapperAroundPlaceholdersRegexp     = /* const */ regexp.MustCompile(`(?s)<p>\s*((?::@@@:[\w-]+:@@@:\s*(?:<br\s*/?>\s*)?)+)</p>`)
+	brTagRegexp                          = /* const */ regexp.MustCompile(`<br\s*/?>`)
 	hashTagRegex                         = /* const */ regexp.MustCompile(`#([\p{L}\d][\p{L}\d_-]*)`)
 	relativeURLHrefRegexp                = /* const */ regexp.MustCompile(`href="(/[^"]*)"`)
 )
