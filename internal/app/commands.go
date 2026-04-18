@@ -361,7 +361,7 @@ func _cleanup(config appConfig, commandArgs ...string) {
 			var tags []string
 			for _, post := range posts {
 				for _, tag := range post.Tags {
-					t := strings.ToLower(tag)
+					t := normalizeTagURI(tag)
 					if !slices.Contains(tags, t) {
 						tags = append(tags, t)
 					}
