@@ -232,15 +232,10 @@ func parseContentDirectives(ceType contentEntityType, ceId string, content strin
 	rawBodyContent = whitespacePlaceholderRegexp.ReplaceAllString(rawBodyContent, " ")
 	rawBodyContent = strings.TrimSpace(rawBodyContent)
 	var phReps map[string]string
-	hashTagPlaceholders := hashTagRegex.FindAllStringSubmatch(content, -1)
-	if hashTagPlaceholders != nil {
-		for _, htp := range hashTagPlaceholders {
-			placeholder := htp[0]
-			tag := htp[1]
-			replacement := fmt.Sprintf(hashTagMarkdownReplacementFormat, tag, normalizeTagURI(tag))
-			content = strings.Replace(content, placeholder, replacement, 1)
-		}
-	}
+	content = hashTagRegex.ReplaceAllStringFunc(content, func(match string) string {
+		tag := match[1:] // strip leading '#'; regex guarantees '#' + tag chars
+		return fmt.Sprintf(hashTagMarkdownReplacementFormat, tag, normalizeTagURI(tag))
+	})
 	tagAutoLinkPlaceholders := tagAutoLinkPlaceholderRegexp.FindAllStringSubmatch(content, -1)
 	if tagAutoLinkPlaceholders != nil {
 		for _, talp := range tagAutoLinkPlaceholders {

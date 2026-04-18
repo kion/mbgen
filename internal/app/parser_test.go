@@ -262,6 +262,55 @@ Post body with #HashTagAlpha and #HashTagBeta inline.`
 	}
 }
 
+func TestRepeatedHashTagLinkRendering(t *testing.T) {
+	postContent := `---
+date: 2025-08-30
+---
+
+* Item one
+  note: #TagAlpha #TagBeta #TagGamma
+* Item two
+  note: #TagAlpha #TagBeta
+* Item three
+  note: #TagAlpha`
+
+	defaultThemeTemplatesDir := fmt.Sprintf("%s%c%s%c%s", "../../themes", os.PathSeparator, defaultThemeName, os.PathSeparator, "templates")
+	resLoader := resourceLoader{
+		config: defaultConfig(),
+		loadTemplate: func(templateFileName string) ([]byte, error) {
+			templateFilePath := fmt.Sprintf("%s%c%s", defaultThemeTemplatesDir, os.PathSeparator, templateFileName)
+			return os.ReadFile(templateFilePath)
+		},
+		loadInclude: func(includeFileName string, level templateIncludeLevel) ([]byte, error) {
+			return nil, nil
+		},
+	}
+
+	config := defaultConfig()
+	post := parsePost("test-post", postContent, config, resLoader)
+
+	// every hashtag occurrence must render as a proper anchor, not leaked markdown link syntax
+	expectedCounts := map[string]int{
+		`href="/tags/tagalpha/"`: 3,
+		`href="/tags/tagbeta/"`:  2,
+		`href="/tags/taggamma/"`: 1,
+	}
+	for href, want := range expectedCounts {
+		got := strings.Count(post.Body, href)
+		if got != want {
+			t.Errorf("expected %d occurrences of %s, got %d\nBody:\n%s", want, href, got, post.Body)
+		}
+	}
+
+	// no leftover markdown link syntax wrapping an already-rendered anchor
+	if strings.Contains(post.Body, `](/tags/`) {
+		t.Errorf("body still contains unrendered markdown link wrapper `](/tags/`:\n%s", post.Body)
+	}
+	if strings.Contains(post.Body, `[<a href="/tags/`) {
+		t.Errorf("body contains anchor wrapped in leftover `[`:\n%s", post.Body)
+	}
+}
+
 func verifyStringsEqual(value string, expected string, t *testing.T) {
 	if value != expected {
 		t.Errorf("Expected: %s / Found: %s", expected, value)
