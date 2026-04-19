@@ -282,6 +282,18 @@ $ mbgen help [command]
       * `{media}` (without any explicitly listed files)
         renders all the media files from the corresponding `deploy/media/<entry-id>` dir,
         _excluding the explicitly listed media files_
+      * each **explicitly listed** file may optionally be followed by a `|<caption>|` block
+        to attach a caption to that particular media item:
+        * `{media:1.jpg|First image caption|,2.jpg|Second image caption|}`
+        * `{media:1.jpg|Captioned image|,2.png}` (second file has no caption)
+        * captions are rendered as plain text — Markdown is **not** parsed inside them
+        * captions may contain commas, spaces, and other punctuation; commas
+          inside a `|...|` block are preserved as part of the caption rather than
+          being treated as entry separators, e.g.
+          `{media:1.jpg|one, two, three|,2.png|plain|}` renders two items
+        * captions must **not** contain `|`, `{`, or `}` (these remain reserved delimiters)
+        * the caption rendering (position, styling) is theme-specific
+          * see the corresponding theme documentation for details
       * additional properties might be supported by each specific theme to fine-tune the media container rendering
         * properties should be comma-separated and use `=`
           to separate the key (on the left) and the value (on the right) of each particular property:
@@ -289,9 +301,11 @@ $ mbgen help [command]
           * `{media(key1=val1,key2=val2)}`
      * `{with-media(<properties>):<file(s)>} <related-content> {/}` -
        renders images/videos alongside the `<related-content>`
-       * otherwise, works the same way as the `{media}` directive above, e.g.:
+       * otherwise, works the same way as the `{media}` directive above (including
+         the optional per-file `|<caption>|` block), e.g.:
          * `{with-media:1.jpg} ... {/}`
          * `{with-media:1.jpg,1.mp4} ... {/}`
+         * `{with-media:1.mp4|Video caption|,1.png|Image caption|} ... {/}`
          * `{with-media} ... {/}`
     * `{embed:<url>}` - allows to embed media from the supported media content hosting platforms, e.g.:
       * `{embed:youtu.be/A_bCdEfGhIj-X}`

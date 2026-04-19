@@ -527,7 +527,7 @@ func TestSharedMediaResolution(t *testing.T) {
 	config := defaultConfig()
 
 	// content-specific file: should use content-specific URI (takes precedence)
-	result := parseMediaFileNames([]string{"specific.jpg"}, Post, "test-post", config, true)
+	result := parseMediaFileNames([]string{"specific.jpg"}, Post, "test-post", config, true, nil)
 	if len(result) != 1 {
 		t.Fatalf("expected 1 media item, got %d", len(result))
 	}
@@ -536,7 +536,7 @@ func TestSharedMediaResolution(t *testing.T) {
 	}
 
 	// shared file (not in content-specific dir): should fall back to shared URI
-	result = parseMediaFileNames([]string{"shared.jpg"}, Post, "test-post", config, true)
+	result = parseMediaFileNames([]string{"shared.jpg"}, Post, "test-post", config, true, nil)
 	if len(result) != 1 {
 		t.Fatalf("expected 1 media item, got %d", len(result))
 	}
@@ -545,7 +545,7 @@ func TestSharedMediaResolution(t *testing.T) {
 	}
 
 	// missing file (not in either dir): should use content-specific URI (no fallback)
-	result = parseMediaFileNames([]string{"missing.jpg"}, Post, "test-post", config, true)
+	result = parseMediaFileNames([]string{"missing.jpg"}, Post, "test-post", config, true, nil)
 	if len(result) != 1 {
 		t.Fatalf("expected 1 media item, got %d", len(result))
 	}
@@ -554,7 +554,7 @@ func TestSharedMediaResolution(t *testing.T) {
 	}
 
 	// non-explicit call: shared.jpg exists in shared dir but isExplicit=false, so no fallback
-	result = parseMediaFileNames([]string{"shared.jpg"}, Post, "test-post", config, false)
+	result = parseMediaFileNames([]string{"shared.jpg"}, Post, "test-post", config, false, nil)
 	if len(result) != 1 {
 		t.Fatalf("expected 1 media item, got %d", len(result))
 	}
@@ -913,6 +913,201 @@ Beta text.
 	// inner text preserved for search/excerpt
 	verifyStringContains(post.FeedContent, "Alpha text.", t)
 	verifyStringContains(post.FeedContent, "Beta text.", t)
+}
+
+// setupMediaCaptionFixture creates a temp working dir with the given media
+// file names in deploy/media/post/<postId>/, chdirs into it, and returns a
+// resourceLoader pointing at the default theme templates (resolved via the
+// original cwd). Cleanup is handled via t.Cleanup so the caller doesn't need
+// to defer anything. Returns the resourceLoader.
+func setupMediaCaptionFixture(t *testing.T, postId string, mediaFiles []string) resourceLoader {
+	t.Helper()
+	tmpDir, err := os.MkdirTemp("", "mbgen-media-caption-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(tmpDir) })
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chdir(origDir) })
+
+	mediaDir := fmt.Sprintf("%s/%s/%s/%s", deployDirName, mediaDirName, "post", postId)
+	if err := os.MkdirAll(mediaDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range mediaFiles {
+		if err := os.WriteFile(mediaDir+"/"+name, []byte("fake"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	themeTemplatesAbsDir := fmt.Sprintf("%s%c..%c..%c%s%c%s%c%s", origDir, os.PathSeparator, os.PathSeparator, os.PathSeparator, "themes", os.PathSeparator, defaultThemeName, os.PathSeparator, "templates")
+	return resourceLoader{
+		config: defaultConfig(),
+		loadTemplate: func(templateFileName string) ([]byte, error) {
+			return os.ReadFile(themeTemplatesAbsDir + string(os.PathSeparator) + templateFileName)
+		},
+		loadInclude: func(includeFileName string, level templateIncludeLevel) ([]byte, error) {
+			return nil, nil
+		},
+	}
+}
+
+func TestSplitMediaArg(t *testing.T) {
+	cases := []struct {
+		name             string
+		input            string
+		expectedFiles    []string
+		expectedCaptions map[string]string
+	}{
+		{
+			name:             "bare filenames",
+			input:            "a.jpg, b.png ,c.mp4",
+			expectedFiles:    []string{"a.jpg", "b.png", "c.mp4"},
+			expectedCaptions: map[string]string{},
+		},
+		{
+			name:             "all with captions",
+			input:            "a.jpg|Caption A|, b.png|Caption B|",
+			expectedFiles:    []string{"a.jpg", "b.png"},
+			expectedCaptions: map[string]string{"a.jpg": "Caption A", "b.png": "Caption B"},
+		},
+		{
+			name:             "mixed",
+			input:            "a.jpg|Caption A|, b.png, c.jpg|Caption C|",
+			expectedFiles:    []string{"a.jpg", "b.png", "c.jpg"},
+			expectedCaptions: map[string]string{"a.jpg": "Caption A", "c.jpg": "Caption C"},
+		},
+		{
+			name:             "empty caption treated as no caption",
+			input:            "a.jpg||",
+			expectedFiles:    []string{"a.jpg"},
+			expectedCaptions: map[string]string{},
+		},
+		{
+			name:             "caption with spaces and punctuation",
+			input:            "a.jpg|Hello world! This is fine.|",
+			expectedFiles:    []string{"a.jpg"},
+			expectedCaptions: map[string]string{"a.jpg": "Hello world! This is fine."},
+		},
+		{
+			name:             "caption with commas",
+			input:            "a.jpg|one, two, three|,b.png|plain|",
+			expectedFiles:    []string{"a.jpg", "b.png"},
+			expectedCaptions: map[string]string{"a.jpg": "one, two, three", "b.png": "plain"},
+		},
+		{
+			name:             "empty input",
+			input:            "",
+			expectedFiles:    nil,
+			expectedCaptions: nil,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			files, caps := splitMediaArg(tc.input)
+			if !slices.Equal(files, tc.expectedFiles) {
+				t.Errorf("files: expected %v, got %v", tc.expectedFiles, files)
+			}
+			if tc.expectedCaptions == nil {
+				if caps != nil {
+					t.Errorf("captions: expected nil, got %v", caps)
+				}
+				return
+			}
+			if len(caps) != len(tc.expectedCaptions) {
+				t.Errorf("captions: expected %v, got %v", tc.expectedCaptions, caps)
+			}
+			for k, v := range tc.expectedCaptions {
+				if caps[k] != v {
+					t.Errorf("caption[%q]: expected %q, got %q", k, v, caps[k])
+				}
+			}
+		})
+	}
+}
+
+func TestMediaDirectiveWithCaptions(t *testing.T) {
+	resLoader := setupMediaCaptionFixture(t, "caps-basic", []string{"a.jpg", "b.png", "c.jpg"})
+
+	postContent := `---
+date: 2026-04-18
+---
+
+{media:a.jpg|Caption A|,b.png|Caption B|,c.jpg}`
+
+	post := parsePost("caps-basic", postContent, defaultConfig(), resLoader)
+
+	verifyStringContains(post.Body, "/media/post/caps-basic/a.jpg", t)
+	verifyStringContains(post.Body, "/media/post/caps-basic/b.png", t)
+	verifyStringContains(post.Body, "/media/post/caps-basic/c.jpg", t)
+	verifyStringContains(post.Body, `<div class="caption">Caption A</div>`, t)
+	verifyStringContains(post.Body, `<div class="caption">Caption B</div>`, t)
+
+	// c.jpg has no caption — exactly two caption divs should render.
+	if n := strings.Count(post.Body, `class="caption"`); n != 2 {
+		t.Errorf("expected 2 caption divs, got %d\n%s", n, post.Body)
+	}
+}
+
+func TestWithMediaDirectiveWithCaption(t *testing.T) {
+	resLoader := setupMediaCaptionFixture(t, "caps-wm", []string{"book.jpg"})
+
+	postContent := `---
+date: 2026-04-18
+---
+
+{with-media(p=l,s=s):book.jpg|Book title|}
+Commentary about the book.
+{/}`
+
+	post := parsePost("caps-wm", postContent, defaultConfig(), resLoader)
+
+	verifyStringContains(post.Body, `class="with-media`, t)
+	verifyStringContains(post.Body, "/media/post/caps-wm/book.jpg", t)
+	verifyStringContains(post.Body, `<div class="caption">Book title</div>`, t)
+	verifyStringContains(post.Body, "Commentary about the book.", t)
+}
+
+func TestMediaCaptionHtmlEscaping(t *testing.T) {
+	resLoader := setupMediaCaptionFixture(t, "caps-esc", []string{"a.jpg"})
+
+	postContent := `---
+date: 2026-04-18
+---
+
+{media:a.jpg|<script>alert(1)</script>|}`
+
+	post := parsePost("caps-esc", postContent, defaultConfig(), resLoader)
+
+	// Raw script tag must not appear; the escaped form must.
+	if strings.Contains(post.Body, "<script>alert(1)</script>") {
+		t.Errorf("raw <script> tag leaked into output:\n%s", post.Body)
+	}
+	verifyStringContains(post.Body, "&lt;script&gt;alert(1)&lt;/script&gt;", t)
+}
+
+func TestMediaCaptionEmpty(t *testing.T) {
+	resLoader := setupMediaCaptionFixture(t, "caps-empty", []string{"a.jpg"})
+
+	postContent := `---
+date: 2026-04-18
+---
+
+{media:a.jpg||}`
+
+	post := parsePost("caps-empty", postContent, defaultConfig(), resLoader)
+
+	verifyStringContains(post.Body, "/media/post/caps-empty/a.jpg", t)
+	if strings.Contains(post.Body, `class="caption"`) {
+		t.Errorf("empty caption should not render a caption div:\n%s", post.Body)
+	}
 }
 
 func TestInspectTagTitleDuplicates(t *testing.T) {

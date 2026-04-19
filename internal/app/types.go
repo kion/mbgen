@@ -298,9 +298,10 @@ type thumb struct {
 }
 
 type media struct {
-	Type   mediaType
-	Uri    string
-	thumbs []thumb
+	Type    mediaType
+	Uri     string
+	Caption string
+	thumbs  []thumb
 }
 
 func (m media) SrcSet() string {

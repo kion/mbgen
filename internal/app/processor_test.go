@@ -1179,3 +1179,55 @@ func TestTagIndexPreservesOriginalTitles(t *testing.T) {
 		}
 	}
 }
+
+func TestCollapseBlankLines(t *testing.T) {
+	cases := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "no blank lines",
+			input:    "<h1>a</h1>\n<p>b</p>\n",
+			expected: "<h1>a</h1>\n<p>b</p>\n",
+		},
+		{
+			name:     "collapses runs of blank lines",
+			input:    "<h1>a</h1>\n\n\n<p>b</p>\n",
+			expected: "<h1>a</h1>\n<p>b</p>\n",
+		},
+		{
+			name:     "collapses whitespace-only lines",
+			input:    "<h1>a</h1>\n    \n\t\n   \n<p>b</p>\n",
+			expected: "<h1>a</h1>\n<p>b</p>\n",
+		},
+		{
+			name:     "preserves blank lines inside <pre>",
+			input:    "<h1>a</h1>\n\n\n<pre><code>line1\n\nline3\n</code></pre>\n\n\n<p>b</p>\n",
+			expected: "<h1>a</h1>\n<pre><code>line1\n\nline3\n</code></pre>\n<p>b</p>\n",
+		},
+		{
+			name:     "handles multiple <pre> blocks",
+			input:    "<pre>x\n\ny</pre>\n\n\n<pre>a\n\n\nb</pre>\n\n\n<p>c</p>\n",
+			expected: "<pre>x\n\ny</pre>\n<pre>a\n\n\nb</pre>\n<p>c</p>\n",
+		},
+		{
+			name:     "preserves content inside <pre> with attributes",
+			input:    "<pre class=\"language-go\">foo\n\nbar</pre>\n\n\n<p>x</p>\n",
+			expected: "<pre class=\"language-go\">foo\n\nbar</pre>\n<p>x</p>\n",
+		},
+		{
+			name:     "empty input",
+			input:    "",
+			expected: "",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := string(collapseBlankLines([]byte(tc.input)))
+			if got != tc.expected {
+				t.Errorf("collapseBlankLines mismatch:\ninput:    %q\nexpected: %q\ngot:      %q", tc.input, tc.expected, got)
+			}
+		})
+	}
+}

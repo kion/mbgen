@@ -35,6 +35,19 @@ The following properties can be used with `{with-media}` directive only:
     * `{with-media(s=l):1.jpg,1.mp4} ... {/}`
     * `{with-media(s=s):1.jpg} ... {/}`
 
+#### Captions
+
+When an explicitly listed media file is followed by a `|<caption>|` block
+(see the core directive syntax in the main README), the caption is rendered as
+a semi-transparent overlay at the bottom of that particular image/video:
+
+* The caption container spans the full width of the media item and has
+  auto-adjusting height — long captions wrap onto multiple lines.
+* The container background is 50% transparent, so the underlying media stays
+  visible through it.
+* Caption rendering does **not** change the size of the media container or
+  the media itself.
+
 ### Columns (side-by-side content rendering)
 
 * Wrap two or more blocks of content in a `{cols}` ... `{//}` block to render them

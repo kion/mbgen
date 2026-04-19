@@ -404,6 +404,26 @@ func processContent(templateName string, ceType contentEntityType, title string,
 	}
 }
 
+// collapseBlankLines removes runs of blank / whitespace-only lines from HTML
+// output (a cosmetic side-effect of Go-template conditionals like `{{ if ... }}{{ end }}`
+// that leave whitespace behind when the branch is empty);
+// the content of `<pre>...</pre>` blocks is preserved verbatim so
+// that fenced code blocks rendered by goldmark keep their original spacing
+func collapseBlankLines(data []byte) []byte {
+	s := string(data)
+	var out strings.Builder
+	out.Grow(len(s))
+	lastIdx := 0
+	for _, loc := range preRegexp.FindAllStringIndex(s, -1) {
+		start, end := loc[0], loc[1]
+		out.WriteString(blankLineRunRegexp.ReplaceAllString(s[lastIdx:start], "\n"))
+		out.WriteString(s[start:end])
+		lastIdx = end
+	}
+	out.WriteString(blankLineRunRegexp.ReplaceAllString(s[lastIdx:], "\n"))
+	return []byte(out.String())
+}
+
 func processAndHandleStats(config appConfig, resLoader resourceLoader, useCache bool) {
 	generatedCnt := 0
 	pStats := process(
@@ -415,6 +435,9 @@ func processAndHandleStats(config appConfig, resLoader resourceLoader, useCache 
 			if idx != -1 {
 				outputDir := outputFilePath[:idx]
 				createDirIfNotExists(outputDir)
+			}
+			if strings.HasSuffix(outputFilePath, contentFileExtension) {
+				data = collapseBlankLines(data)
 			}
 			generated := writeDataToFileIfChanged(outputFilePath, data)
 			if generated {
@@ -497,7 +520,7 @@ func generateFeeds(posts []post, config appConfig, handleOutput processorOutputH
 		// prepend image to content if post has images
 		mediaFileNames := listAllMedia(Post, p.Id, nil)
 		if len(mediaFileNames) > 0 {
-			mediaList := parseMediaFileNames(mediaFileNames, Post, p.Id, config, false)
+			mediaList := parseMediaFileNames(mediaFileNames, Post, p.Id, config, false, nil)
 
 			// read original markdown content to find first image reference
 			rawContent := getRawPostContent(p.Id)

@@ -324,12 +324,29 @@ header a.permalink {
     padding: 4px;
     border: 1px solid #555;
     border-radius: 2px;
+    position: relative;
+    overflow: hidden;
 }
 
 .content .media .image img,
 .content .media .video video {
     width: 100%;
     display: block;
+}
+
+.content .media .image .caption,
+.content .media .video .caption {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    bottom: 4px;
+    background-color: rgba(0, 0, 0, 0.5);
+    color: #eee;
+    font-size: 0.8em;
+    padding: 4px 6px;
+    border-radius: 2px;
+    box-sizing: border-box;
+    word-break: break-word;
 }
 
 .content .media .image:not(:last-of-type),

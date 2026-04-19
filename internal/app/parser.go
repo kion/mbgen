@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"fmt"
+	"html"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -17,7 +18,7 @@ import (
 	meta "github.com/yuin/goldmark-meta"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
-	"github.com/yuin/goldmark/renderer/html"
+	gmhtml "github.com/yuin/goldmark/renderer/html"
 )
 
 var mainTemplateMarkup /* const */ string
@@ -32,7 +33,7 @@ var markdown = /* const */ goldmark.New(
 		// TODO: support an option to include extension.CJK (?)
 	),
 	goldmark.WithRendererOptions(
-		html.WithHardWraps(),
+		gmhtml.WithHardWraps(),
 	),
 )
 
@@ -313,12 +314,8 @@ func processInnerDirectives(content string, ceType contentEntityType, ceId strin
 	if wrapPlaceholders != nil {
 		sortContentDirectivePlaceholders(wrapPlaceholders)
 		for _, wp := range wrapPlaceholders {
-			mediaArg := wp[4]
-			if mediaArg != "" {
-				for _, a := range strings.Split(mediaArg, ",") {
-					m := strings.TrimSpace(a)
-					*expListMedia = append(*expListMedia, m)
-				}
+			if fileNames, _ := splitMediaArg(wp[4]); fileNames != nil {
+				*expListMedia = append(*expListMedia, fileNames...)
 			}
 		}
 	}
@@ -326,12 +323,8 @@ func processInnerDirectives(content string, ceType contentEntityType, ceId strin
 	if mediaPlaceholders != nil {
 		sortContentDirectivePlaceholders(mediaPlaceholders)
 		for _, mp := range mediaPlaceholders {
-			mediaArg := mp[3]
-			if mediaArg != "" {
-				for _, a := range strings.Split(mediaArg, ",") {
-					m := strings.TrimSpace(a)
-					*expListMedia = append(*expListMedia, m)
-				}
+			if fileNames, _ := splitMediaArg(mp[3]); fileNames != nil {
+				*expListMedia = append(*expListMedia, fileNames...)
 			}
 		}
 	}
@@ -341,7 +334,7 @@ func processInnerDirectives(content string, ceType contentEntityType, ceId strin
 			directive := wp[1]
 			if directive == "col" {
 				// {col}...{/} is a child of a {cols}...{//} block, handled by processColsBlock;
-				// skip here so the generic wrap pipeline doesn't try to compile content-col.html.
+				// skip here so the generic wrap pipeline doesn't try to compile content-col.html
 				continue
 			}
 			contentDirectiveTemplate, err := compileContentDirectiveTemplate(directive, resLoader)
@@ -365,15 +358,13 @@ func processInnerDirectives(content string, ceType contentEntityType, ceId strin
 					}
 				}
 				var mediaFileNames []string
+				var captions map[string]string
 				if mediaArg == "" {
 					mediaFileNames = listAllMedia(ceType, ceId, *expListMedia)
 				} else {
-					for _, a := range strings.Split(mediaArg, ",") {
-						m := strings.TrimSpace(a)
-						mediaFileNames = append(mediaFileNames, m)
-					}
+					mediaFileNames, captions = splitMediaArg(mediaArg)
 				}
-				allMedia := parseMediaFileNames(mediaFileNames, ceType, ceId, config, mediaArg != "")
+				allMedia := parseMediaFileNames(mediaFileNames, ceType, ceId, config, mediaArg != "", captions)
 				var contentDirectiveMarkupBuffer bytes.Buffer
 				err = contentDirectiveTemplate.Execute(&contentDirectiveMarkupBuffer, contentDirectiveData{
 					Text:  text,
@@ -402,15 +393,13 @@ func processInnerDirectives(content string, ceType contentEntityType, ceId strin
 				}
 			}
 			var mediaFileNames []string
+			var captions map[string]string
 			if mediaArg == "" {
 				mediaFileNames = listAllMedia(ceType, ceId, *expListMedia)
 			} else {
-				for _, a := range strings.Split(mediaArg, ",") {
-					m := strings.TrimSpace(a)
-					mediaFileNames = append(mediaFileNames, m)
-				}
+				mediaFileNames, captions = splitMediaArg(mediaArg)
 			}
-			allMedia := parseMediaFileNames(mediaFileNames, ceType, ceId, config, mediaArg != "")
+			allMedia := parseMediaFileNames(mediaFileNames, ceType, ceId, config, mediaArg != "", captions)
 			if allMedia != nil {
 				inlineMediaTemplate := compileMediaTemplate(resLoader)
 				var inlineMediaMarkupBuffer bytes.Buffer
@@ -701,7 +690,66 @@ func buildMediaItem(mediaFileName string, uriSubPath string, dirSubPath string, 
 	return nil
 }
 
-func parseMediaFileNames(mediaFileNames []string, contentEntityType contentEntityType, contentEntityId string, config appConfig, isExplicit bool) []media {
+// splitMediaArg splits the inner argument of a `{media:...}` / `{with-media:...}`
+// directive into entries and extracts an optional caption per entry;
+// each entry has the form `<filename>` or `<filename>|<caption>|`;
+// commas outside of a `|...|` block separate entries — commas inside a caption
+// are preserved as part of the caption text; captions may not contain `|`;
+// returns the list of filenames in input order and a map of filename -> caption for the entries that specified one
+func splitMediaArg(mediaArg string) ([]string, map[string]string) {
+	if strings.TrimSpace(mediaArg) == "" {
+		return nil, nil
+	}
+	// ================================================================================
+	// split on `,` but skip commas inside `|...|` caption blocks;
+	// `inCaption` toggles on every `|`, so an opening `|` enters caption mode
+	// and the matching closing `|` leaves it
+	// ================================================================================
+	var entries []string
+	var cur strings.Builder
+	inCaption := false
+	for _, r := range mediaArg {
+		switch r {
+		case '|':
+			inCaption = !inCaption
+			cur.WriteRune(r)
+		case ',':
+			if inCaption {
+				cur.WriteRune(r)
+			} else {
+				entries = append(entries, cur.String())
+				cur.Reset()
+			}
+		default:
+			cur.WriteRune(r)
+		}
+	}
+	if cur.Len() > 0 {
+		entries = append(entries, cur.String())
+	}
+	// ================================================================================
+	var fileNames []string
+	captions := make(map[string]string)
+	for _, a := range entries {
+		entry := strings.TrimSpace(a)
+		if entry == "" {
+			continue
+		}
+		fileName := entry
+		if m := mediaArgEntryRegexp.FindStringSubmatch(entry); m != nil {
+			fileName = strings.TrimSpace(m[1])
+			if caption := strings.TrimSpace(m[2]); caption != "" {
+				// templates use text/template (no auto-escape),
+				// so escape here to ensure user-supplied caption text can't inject HTML
+				captions[fileName] = html.EscapeString(caption)
+			}
+		}
+		fileNames = append(fileNames, fileName)
+	}
+	return fileNames, captions
+}
+
+func parseMediaFileNames(mediaFileNames []string, contentEntityType contentEntityType, contentEntityId string, config appConfig, isExplicit bool, captions map[string]string) []media {
 	var allMedia []media
 	ceType := strings.ToLower(contentEntityType.String())
 	for _, mediaFileName := range mediaFileNames {
@@ -727,6 +775,9 @@ func parseMediaFileNames(mediaFileNames []string, contentEntityType contentEntit
 			}
 		}
 		if m := buildMediaItem(mediaFileName, uriSubPath, dirSubPath, config); m != nil {
+			if caption, ok := captions[mediaFileName]; ok {
+				m.Caption = caption
+			}
 			allMedia = append(allMedia, *m)
 		}
 	}

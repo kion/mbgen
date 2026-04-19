@@ -369,7 +369,7 @@ func listenAndServe(addr string, admin bool, watch chan watchReloadData, config 
 }
 
 func listMediaResponse(writer http.ResponseWriter, mediaFileNames []string, ceType contentEntityType, ceId string, config appConfig, resLoader resourceLoader) {
-	allMedia := parseMediaFileNames(mediaFileNames, ceType, ceId, config, false)
+	allMedia := parseMediaFileNames(mediaFileNames, ceType, ceId, config, false, nil)
 	if allMedia != nil {
 		inlineMediaTemplate := compileMediaTemplate(resLoader)
 		var inlineMediaMarkupBuffer bytes.Buffer

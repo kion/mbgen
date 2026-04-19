@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	appVersion                                  = "1.8.8"
+	appVersion                                  = "1.8.9"
 	defaultGitHubRepoUrl                        = "github.com/kion/mbgen"
 	defaultGitHubRepoThemesUrl                  = defaultGitHubRepoUrl + "/themes"
 	defaultGitHubRepoPageContentSamplesUrl      = defaultGitHubRepoUrl + "/content-samples/pages"
@@ -132,10 +132,18 @@ var (
 	tagLinkPlaceholderRegexp             = /* const */ regexp.MustCompile(`{%\s*tag\s*:\s*([\w\s-]+)\s*%}`)
 	searchLinkPlaceholderRegexp          = /* const */ regexp.MustCompile(`{%\s*search\s*:\s*([^{}%]+)\s*%}`)
 	contentLinkPlaceholderRegexp         = /* const */ regexp.MustCompile(`{%\s*([\w-_]+)\s*:\s*([\w-_]+)\s*%}`)
-	mediaPlaceholderRegexp               = /* const */ regexp.MustCompile(`{\s*media(\([\s\w=,]+\))?(\s*:\s*([\w\s-_.,*]+))?\s*}`)
+	mediaPlaceholderRegexp               = /* const */ regexp.MustCompile(`{\s*media(\([\s\w=,]+\))?(\s*:\s*([^{}]+))?\s*}`)
+	mediaArgEntryRegexp                  = /* const */ regexp.MustCompile(`^(.+?)\s*\|([^|]*)\|\s*$`)
+	// blankLineRunRegexp matches a newline followed by one or more additional
+	// whitespace-only lines; used to collapse runs of blank/whitespace-only
+	// lines produced by Go-template conditionals into a single newline
+	blankLineRunRegexp = /* const */ regexp.MustCompile(`\n[ \t]*(?:\n[ \t]*)+`)
+	// preRegexp matches `<pre>...</pre>` blocks whose inner whitespace is significant
+	// (e.g. fenced code blocks rendered by goldmark) and must be left untouched
+	preRegexp = /* const */ regexp.MustCompile(`(?is)<pre\b[^>]*>.*?</\s*pre\s*>`)
 	embedMediaPlaceholderRegexp          = /* const */ regexp.MustCompile(`{\s*embed\s*:\s*([^}]+)\s*}`)
-	wrapPlaceholderOpeningRegexp         = /* const */ regexp.MustCompile(`\{\s*([\w-_.]+)\s*(\([\s\w=,]+\))?(\s*:\s*([\w\s-_.,*]+))?\s*}`)
-	wrapPlaceholderRegexp                = /* const */ regexp.MustCompile(`\{\s*([\w-_.]+)\s*(\([\s\w=,]+\))?(\s*:\s*([\w\s-_.,*]+))?\s*}([^{}]*){/}`)
+	wrapPlaceholderOpeningRegexp         = /* const */ regexp.MustCompile(`\{\s*([\w-_.]+)\s*(\([\s\w=,]+\))?(\s*:\s*([^{}]+))?\s*}`)
+	wrapPlaceholderRegexp                = /* const */ regexp.MustCompile(`\{\s*([\w-_.]+)\s*(\([\s\w=,]+\))?(\s*:\s*([^{}]+))?\s*}([^{}]*){/}`)
 	colsPlaceholderRegexp                = /* const */ regexp.MustCompile(`(?s)\{\s*cols\s*(\(([\s\d:]+)\))?\s*\}(.*?)\{//\}`)
 	colPlaceholderRegexp                 = /* const */ regexp.MustCompile(`(?s)\{\s*col\s*(\(([\s\w=,]+)\))?\s*\}(.*?)\{/\}`)
 	pWrapperAroundPlaceholdersRegexp     = /* const */ regexp.MustCompile(`(?s)<p>\s*((?::@@@:[\w-]+:@@@:\s*(?:<br\s*/?>\s*)?)+)</p>`)
