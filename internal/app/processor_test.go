@@ -1231,3 +1231,215 @@ func TestCollapseBlankLines(t *testing.T) {
 		})
 	}
 }
+
+func TestGetFirstImageFromContent(t *testing.T) {
+	img1 := media{Type: Image, Uri: "/media/post/p1/image1.jpg"}
+	img2 := media{Type: Image, Uri: "/media/post/p1/image2.jpg"}
+	vid1 := media{Type: Video, Uri: "/media/post/p1/clip1.mp4"}
+
+	cases := []struct {
+		name        string
+		content     string
+		mediaList   []media
+		expectedURI string // empty string means expect nil
+	}{
+		{
+			name:        "bare {media} returns first image",
+			content:     "Some text.\n\n{media}",
+			mediaList:   []media{img1, img2},
+			expectedURI: img1.Uri,
+		},
+		{
+			name:        "{media:name} returns named image",
+			content:     "Some text.\n\n{media:image2.jpg}",
+			mediaList:   []media{img1, img2},
+			expectedURI: img2.Uri,
+		},
+		{
+			name:        "{media(props)} returns first image",
+			content:     "Some text.\n\n{media(cc=2)}",
+			mediaList:   []media{img1, img2},
+			expectedURI: img1.Uri,
+		},
+		{
+			name:        "{media(props):name} returns named image",
+			content:     "Some text.\n\n{media(cc=2):image2.jpg}",
+			mediaList:   []media{img1, img2},
+			expectedURI: img2.Uri,
+		},
+		{
+			name:        "{with-media:name} returns named image",
+			content:     "{with-media:image1.jpg}\n\nBody.\n\n{/}",
+			mediaList:   []media{img1, img2},
+			expectedURI: img1.Uri,
+		},
+		{
+			name:        "{with-media(props)} returns first image",
+			content:     "{with-media(cc=2,p=r,s=l)}\n\nBody.\n\n{/}",
+			mediaList:   []media{img1, img2},
+			expectedURI: img1.Uri,
+		},
+		{
+			name:        "{with-media(props):name} returns named image",
+			content:     "{with-media(p=r):image2.jpg}\n\nBody.\n\n{/}",
+			mediaList:   []media{img1, img2},
+			expectedURI: img2.Uri,
+		},
+		{
+			name:        "skips non-image entries when falling back",
+			content:     "{media(cc=2)}",
+			mediaList:   []media{vid1, img2},
+			expectedURI: img2.Uri,
+		},
+		{
+			name:        "explicit post-specific wins over implicit (declared after)",
+			content:     "{media}\n\n{with-media(p=l,s=l):image2.jpg}\n\nBody.\n\n{/}",
+			mediaList:   []media{img1, img2},
+			expectedURI: img2.Uri,
+		},
+		{
+			name:        "explicit post-specific wins over implicit (declared before)",
+			content:     "{with-media:image2.jpg}\n\nBody.\n\n{/}\n\n{media}",
+			mediaList:   []media{img1, img2},
+			expectedURI: img2.Uri,
+		},
+		{
+			name:        "empty mediaList returns nil",
+			content:     "{media}",
+			mediaList:   []media{},
+			expectedURI: "",
+		},
+		{
+			name:        "mediaList with no images returns nil",
+			content:     "{media(cc=2)}",
+			mediaList:   []media{vid1},
+			expectedURI: "",
+		},
+	}
+
+	config := defaultConfig()
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := getFirstImageFromContent(tc.content, tc.mediaList, config)
+			if tc.expectedURI == "" {
+				if got != nil {
+					t.Errorf("expected nil, got media with Uri=%q", got.Uri)
+				}
+				return
+			}
+			if got == nil {
+				t.Fatalf("expected image with Uri=%q, got nil", tc.expectedURI)
+			}
+			if got.Uri != tc.expectedURI {
+				t.Errorf("expected Uri=%q, got Uri=%q", tc.expectedURI, got.Uri)
+			}
+		})
+	}
+}
+
+// TestGetFirstImageFromContentSharedPriority covers the interaction with shared
+// media (requires filesystem because shared resolution checks for file existence).
+func TestGetFirstImageFromContentSharedPriority(t *testing.T) {
+	tmpDir := t.TempDir()
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(origDir)
+
+	sharedDir := fmt.Sprintf("%s/%s/%s", deployDirName, mediaDirName, sharedMediaDirName)
+	if err := os.MkdirAll(sharedDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	sharedFile := "shared-bg.jpg"
+	if err := os.WriteFile(sharedDir+"/"+sharedFile, []byte("fake jpg"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	postImg1 := media{Type: Image, Uri: "/media/post/p1/image1.jpg"}
+	postImg2 := media{Type: Image, Uri: "/media/post/p1/image2.jpg"}
+	postMedia := []media{postImg1, postImg2}
+
+	sharedURI := "/media/" + sharedMediaDirName + "/" + sharedFile
+	config := defaultConfig()
+
+	t.Run("implicit {media} wins over explicit shared", func(t *testing.T) {
+		content := fmt.Sprintf("{with-media(p=r):%s}\n\nBody.\n\n{/}\n\n{media}", sharedFile)
+		got := getFirstImageFromContent(content, postMedia, config)
+		if got == nil || got.Uri != postImg1.Uri {
+			var uri string
+			if got != nil {
+				uri = got.Uri
+			}
+			t.Errorf("expected implicit post-specific %q to win over shared, got %q", postImg1.Uri, uri)
+		}
+	})
+
+	t.Run("implicit {with-media(props)} wins over explicit shared", func(t *testing.T) {
+		content := fmt.Sprintf("{with-media(p=r):%s}\n\nBody.\n\n{/}\n\n{with-media(cc=2,p=r)}\n\nSome text.\n\n{/}", sharedFile)
+		got := getFirstImageFromContent(content, postMedia, config)
+		if got == nil || got.Uri != postImg1.Uri {
+			var uri string
+			if got != nil {
+				uri = got.Uri
+			}
+			t.Errorf("expected implicit post-specific %q (via {with-media(props)}) to win over shared, got %q", postImg1.Uri, uri)
+		}
+	})
+
+	t.Run("explicit post-specific wins over explicit shared regardless of order", func(t *testing.T) {
+		content := fmt.Sprintf("{with-media(p=r):%s}\n\nBody.\n\n{/}\n\n{with-media:image2.jpg}\n\nBody.\n\n{/}", sharedFile)
+		got := getFirstImageFromContent(content, postMedia, config)
+		if got == nil || got.Uri != postImg2.Uri {
+			var uri string
+			if got != nil {
+				uri = got.Uri
+			}
+			t.Errorf("expected explicit post-specific %q to win over shared, got %q", postImg2.Uri, uri)
+		}
+	})
+
+	t.Run("explicit shared used when no post-specific references resolve", func(t *testing.T) {
+		content := fmt.Sprintf("{with-media(p=r):%s}\n\nBody.\n\n{/}", sharedFile)
+		got := getFirstImageFromContent(content, nil, config)
+		if got == nil || got.Uri != sharedURI {
+			var uri string
+			if got != nil {
+				uri = got.Uri
+			}
+			t.Errorf("expected shared %q, got %q", sharedURI, uri)
+		}
+	})
+
+	t.Run("implicit with empty mediaList falls through to explicit shared", func(t *testing.T) {
+		content := fmt.Sprintf("{media}\n\n{with-media(p=r):%s}\n\nBody.\n\n{/}", sharedFile)
+		got := getFirstImageFromContent(content, nil, config)
+		if got == nil || got.Uri != sharedURI {
+			var uri string
+			if got != nil {
+				uri = got.Uri
+			}
+			t.Errorf("expected shared %q when post has no media, got %q", sharedURI, uri)
+		}
+	})
+
+	t.Run("first explicit shared wins when multiple shared are listed", func(t *testing.T) {
+		otherShared := "shared-other.jpg"
+		if err := os.WriteFile(sharedDir+"/"+otherShared, []byte("fake jpg"), 0644); err != nil {
+			t.Fatal(err)
+		}
+		content := fmt.Sprintf("{with-media:%s}\n\nBody.\n\n{/}\n\n{with-media:%s}\n\nBody.\n\n{/}", sharedFile, otherShared)
+		got := getFirstImageFromContent(content, nil, config)
+		if got == nil || got.Uri != sharedURI {
+			var uri string
+			if got != nil {
+				uri = got.Uri
+			}
+			t.Errorf("expected first shared %q, got %q", sharedURI, uri)
+		}
+	})
+}

@@ -525,7 +525,7 @@ func generateFeeds(posts []post, config appConfig, handleOutput processorOutputH
 			// read original markdown content to find first image reference
 			rawContent := getRawPostContent(p.Id)
 			if rawContent != "" {
-				firstImage := getFirstImageFromContent(rawContent, mediaList)
+				firstImage := getFirstImageFromContent(rawContent, mediaList, config)
 				if firstImage != nil {
 					// prefer smallest thumbnail over original
 					imageUri := getSmallestThumbnailOrOriginal(*firstImage)
@@ -751,59 +751,83 @@ func getSmallestThumbnailOrOriginal(m media) string {
 	return m.Uri
 }
 
-// getFirstImageFromContent parses post content for media directives and returns the first referenced image
-func getFirstImageFromContent(content string, mediaList []media) *media {
-	if len(mediaList) == 0 {
+// getFirstImageFromContent parses post content for media directives and returns
+// the first referenced image to prepend to a feed item, applying the priorities:
+//  1. first post-specific image referenced explicitly by name
+//  2. first post-specific image pulled in implicitly by any filename-less `{media}` or `{with-media}` directive
+//  3. first shared image referenced explicitly by name
+func getFirstImageFromContent(content string, mediaList []media, config appConfig) *media {
+	findInMediaList := func(filename string) *media {
+		for i := range mediaList {
+			if mediaList[i].Type == Image && strings.Contains(mediaList[i].Uri, filename) {
+				return &mediaList[i]
+			}
+		}
 		return nil
 	}
-
-	// check for {media:filename} or {media(props):filename} directives
-	mediaMatches := mediaPlaceholderRegexp.FindAllStringSubmatch(content, -1)
-	for _, match := range mediaMatches {
-		if len(match) > 3 && match[3] != "" {
-			// has file specification (group 3 is the filename part)
-			files := strings.Split(match[3], ",")
-			if len(files) > 0 {
-				filename := strings.TrimSpace(files[0])
-				// find this file in mediaList
-				for i := range mediaList {
-					if mediaList[i].Type == Image && strings.Contains(mediaList[i].Uri, filename) {
-						return &mediaList[i]
-					}
-				}
-			}
-		}
-	}
-
-	// check for {with-media:filename} style wrap directives
-	wrapMatches := wrapPlaceholderOpeningRegexp.FindAllStringSubmatch(content, -1)
-	for _, match := range wrapMatches {
-		if len(match) > 4 && match[1] == "with-media" && match[4] != "" {
-			// match[1] is the directive name, match[4] is the filename part
-			files := strings.Split(match[4], ",")
-			if len(files) > 0 {
-				filename := strings.TrimSpace(files[0])
-				// find this file in mediaList
-				for i := range mediaList {
-					if mediaList[i].Type == Image && strings.Contains(mediaList[i].Uri, filename) {
-						return &mediaList[i]
-					}
-				}
-			}
-		}
-	}
-
-	// if no specific file reference, check for generic {media} directive
-	if strings.Contains(content, "{media}") {
-		// return first image from mediaList
+	firstPostSpecificImage := func() *media {
 		for i := range mediaList {
 			if mediaList[i].Type == Image {
 				return &mediaList[i]
 			}
 		}
+		return nil
+	}
+	resolveShared := func(filename string) *media {
+		sharedFilePath := fmt.Sprintf("%s%c%s%c%s%c%s",
+			deployDirName, os.PathSeparator,
+			mediaDirName, os.PathSeparator,
+			sharedMediaDirName, os.PathSeparator, filename)
+		if !fileExists(sharedFilePath) {
+			return nil
+		}
+		m := buildMediaItem(filename, sharedMediaDirName, sharedMediaDirName, config)
+		if m == nil || m.Type != Image {
+			return nil
+		}
+		return m
 	}
 
-	return nil
+	var firstSharedExplicit *media
+	var hasImplicitMedia bool
+
+	for _, match := range wrapPlaceholderOpeningRegexp.FindAllStringSubmatch(content, -1) {
+		if len(match) <= 4 {
+			continue
+		}
+		name := match[1]
+		if name != "media" && name != "with-media" {
+			continue
+		}
+		if match[4] == "" {
+			hasImplicitMedia = true
+			continue
+		}
+		files := strings.Split(match[4], ",")
+		if len(files) == 0 {
+			continue
+		}
+		filename := strings.TrimSpace(files[0])
+		if filename == "" {
+			continue
+		}
+		if m := findInMediaList(filename); m != nil {
+			return m // priority 1
+		}
+		if firstSharedExplicit == nil {
+			if m := resolveShared(filename); m != nil {
+				firstSharedExplicit = m // priority 3 candidate
+			}
+		}
+	}
+
+	if hasImplicitMedia {
+		if m := firstPostSpecificImage(); m != nil {
+			return m // priority 2
+		}
+	}
+
+	return firstSharedExplicit // priority 3, or nil
 }
 
 // getRawPostContent reads the original markdown content of a post file

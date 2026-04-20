@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	appVersion                                  = "1.8.9"
+	appVersion                                  = "1.8.10"
 	defaultGitHubRepoUrl                        = "github.com/kion/mbgen"
 	defaultGitHubRepoThemesUrl                  = defaultGitHubRepoUrl + "/themes"
 	defaultGitHubRepoPageContentSamplesUrl      = defaultGitHubRepoUrl + "/content-samples/pages"
@@ -140,16 +140,16 @@ var (
 	blankLineRunRegexp = /* const */ regexp.MustCompile(`\n[ \t]*(?:\n[ \t]*)+`)
 	// preRegexp matches `<pre>...</pre>` blocks whose inner whitespace is significant
 	// (e.g. fenced code blocks rendered by goldmark) and must be left untouched
-	preRegexp = /* const */ regexp.MustCompile(`(?is)<pre\b[^>]*>.*?</\s*pre\s*>`)
-	embedMediaPlaceholderRegexp          = /* const */ regexp.MustCompile(`{\s*embed\s*:\s*([^}]+)\s*}`)
-	wrapPlaceholderOpeningRegexp         = /* const */ regexp.MustCompile(`\{\s*([\w-_.]+)\s*(\([\s\w=,]+\))?(\s*:\s*([^{}]+))?\s*}`)
-	wrapPlaceholderRegexp                = /* const */ regexp.MustCompile(`\{\s*([\w-_.]+)\s*(\([\s\w=,]+\))?(\s*:\s*([^{}]+))?\s*}([^{}]*){/}`)
-	colsPlaceholderRegexp                = /* const */ regexp.MustCompile(`(?s)\{\s*cols\s*(\(([\s\d:]+)\))?\s*\}(.*?)\{//\}`)
-	colPlaceholderRegexp                 = /* const */ regexp.MustCompile(`(?s)\{\s*col\s*(\(([\s\w=,]+)\))?\s*\}(.*?)\{/\}`)
-	pWrapperAroundPlaceholdersRegexp     = /* const */ regexp.MustCompile(`(?s)<p>\s*((?::@@@:[\w-]+:@@@:\s*(?:<br\s*/?>\s*)?)+)</p>`)
-	brTagRegexp                          = /* const */ regexp.MustCompile(`<br\s*/?>`)
-	hashTagRegex                         = /* const */ regexp.MustCompile(`#([\p{L}\d][\p{L}\d_-]*)`)
-	relativeURLHrefRegexp                = /* const */ regexp.MustCompile(`href="(/[^"]*)"`)
+	preRegexp                        = /* const */ regexp.MustCompile(`(?is)<pre\b[^>]*>.*?</\s*pre\s*>`)
+	embedMediaPlaceholderRegexp      = /* const */ regexp.MustCompile(`{\s*embed\s*:\s*([^}]+)\s*}`)
+	wrapPlaceholderOpeningRegexp     = /* const */ regexp.MustCompile(`\{\s*([\w-_.]+)\s*(\([\s\w=,]+\))?(\s*:\s*([^{}]+))?\s*}`)
+	wrapPlaceholderRegexp            = /* const */ regexp.MustCompile(`\{\s*([\w-_.]+)\s*(\([\s\w=,]+\))?(\s*:\s*([^{}]+))?\s*}([^{}]*){/}`)
+	colsPlaceholderRegexp            = /* const */ regexp.MustCompile(`(?s)\{\s*cols\s*(\(([\s\d:]+)\))?\s*\}(.*?)\{//\}`)
+	colPlaceholderRegexp             = /* const */ regexp.MustCompile(`(?s)\{\s*col\s*(\(([\s\w=,]+)\))?\s*\}(.*?)\{/\}`)
+	pWrapperAroundPlaceholdersRegexp = /* const */ regexp.MustCompile(`(?s)<p>\s*((?::@@@:[\w-]+:@@@:\s*(?:<br\s*/?>\s*)?)+)</p>`)
+	brTagRegexp                      = /* const */ regexp.MustCompile(`<br\s*/?>`)
+	hashTagRegex                     = /* const */ regexp.MustCompile(`#([\p{L}\d][\p{L}\d_-]*)`)
+	relativeURLHrefRegexp            = /* const */ regexp.MustCompile(`href="(/[^"]*)"`)
 )
 
 //go:embed inject-js/admin.js
