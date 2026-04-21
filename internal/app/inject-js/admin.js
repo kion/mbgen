@@ -401,7 +401,8 @@ function adminSharedMedia() {
                     (!hasMedia ? '<div class="no-media">No Media</div>' : '') +
                     '<div class="drop-hint">Drag-&-Drop Media Files Here</div>' +
                 '</div>';
-            mediaEl.outerHTML = (hasMedia ? xhr.responseText : '') + dropZoneHtml;
+            mediaEl.innerHTML = hasMedia ? xhr.responseText : '';
+            mediaEl.insertAdjacentHTML('afterend', dropZoneHtml);
             const refreshPanel = function() {
                 adminSharedMedia();
             };
@@ -475,7 +476,9 @@ function adminSharedMedia() {
             }
             document.getElementById(panelId + '-close').onclick = function() {
                 document.getElementById(panelId).remove();
+                document.body.classList.remove('admin-shared-media-open');
             };
+            document.body.classList.add('admin-shared-media-open');
         } else {
             alert('failed to load shared media');
             console.error('failed to load shared media: ' + xhr.responseText);

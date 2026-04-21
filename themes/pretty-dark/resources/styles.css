@@ -536,15 +536,39 @@ button {
     border-color: #cc0000;
 }
 
+body.admin-shared-media-open {
+    height: 100dvh;
+    overflow: hidden;
+}
+
+body.admin-shared-media-open > header,
+body.admin-shared-media-open > .admin-create {
+    flex-shrink: 0;
+}
+
+body.admin-shared-media-open > main {
+    display: none;
+}
+
+body.admin-shared-media-open > #admin-shared-media-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
 #admin-shared-media-panel {
     font-family: SourceCodePro, monospace;
     margin-top: 1em;
+    margin-bottom: 1em;
     border: 2px solid #555;
     border-radius: 4px;
     box-shadow: 0 4px 8px 0 rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 #admin-shared-media-panel > header {
+    flex: 0 0 auto;
     color: #777;
     font-weight: bold;
     padding: 1em;
@@ -559,7 +583,31 @@ button {
 }
 
 #admin-shared-media-panel .content {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
     padding: 1em;
+}
+
+#admin-shared-media-panel .admin-media {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+#admin-shared-media-panel-media {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+#admin-shared-media-panel .admin-media-drop-zone,
+#admin-shared-media-panel .admin-controls {
+    flex: 0 0 auto;
 }
 
 .admin-media-drop-zone {
@@ -595,13 +643,21 @@ button {
 }
 
 .admin-media-controls {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    bottom: 4px;
+    background-color: rgba(0, 0, 0, 0.5);
+    color: #eee;
+    padding: 4px 6px;
+    border-radius: 2px;
+    box-sizing: border-box;
     display: flex;
     flex-direction: row;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-end;
     column-gap: 0.5em;
     font-size: 0.8em;
-    margin-top: 4px;
 }
 
 .admin-media-controls .admin-media-file-name {
