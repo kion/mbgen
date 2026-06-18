@@ -426,9 +426,11 @@ func collapseBlankLines(data []byte) []byte {
 
 func processAndHandleStats(config appConfig, resLoader resourceLoader, useCache bool) {
 	generatedCnt := 0
+	pages := parsePages(config, resLoader, processImgThumbnails, useCache)
+	posts := parsePosts(config, resLoader, processImgThumbnails, useCache)
 	pStats := process(
-		parsePages(config, resLoader, processImgThumbnails, useCache),
-		parsePosts(config, resLoader, processImgThumbnails, useCache),
+		pages,
+		posts,
 		resLoader,
 		func(outputFilePath string, data []byte) bool {
 			idx := strings.LastIndex(outputFilePath, string(os.PathSeparator))
@@ -451,6 +453,41 @@ func processAndHandleStats(config appConfig, resLoader resourceLoader, useCache 
 		deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, sharedMediaDirName)
 	processImgThumbnails(sharedMediaDirPath, config)
 	handleStats(pStats)
+	// surface content-directive warnings at the very end so they are not buried
+	// under the per-file "generated file:" output
+	reportContentWarnings(pages, posts)
+}
+
+// reportContentWarnings prints any accumulated content-directive warnings (malformed captions,
+// unparsed directives) for the given pages/posts, grouped by source markdown file and sorted by
+// file name. Returns whether any warnings were found.
+func reportContentWarnings(pages []page, posts []post) bool {
+	type fileWarnings struct {
+		file     string
+		warnings []string
+	}
+	var entries []fileWarnings
+	for _, p := range pages {
+		if len(p.Warnings) > 0 {
+			entries = append(entries, fileWarnings{filepath.Join(markdownPagesDirName, p.Id+markdownFileExtension), p.Warnings})
+		}
+	}
+	for _, p := range posts {
+		if len(p.Warnings) > 0 {
+			entries = append(entries, fileWarnings{filepath.Join(markdownPostsDirName, p.Id+markdownFileExtension), p.Warnings})
+		}
+	}
+	if len(entries) == 0 {
+		return false
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].file < entries[j].file })
+	sprintln(" - WARNING: content directive issues found (fix to render correctly):")
+	for _, e := range entries {
+		for _, w := range e.warnings {
+			println("   - " + e.file + ": " + w)
+		}
+	}
+	return true
 }
 
 // generateFeeds creates RSS, Atom, and/or JSON feeds based on configuration
@@ -773,15 +810,15 @@ func getFirstImageFromContent(content string, mediaList []media, config appConfi
 		}
 		return nil
 	}
+	sharedMediaDir := fmt.Sprintf("%s%c%s%c%s",
+		deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, sharedMediaDirName)
 	resolveShared := func(filename string) *media {
-		sharedFilePath := fmt.Sprintf("%s%c%s%c%s%c%s",
-			deployDirName, os.PathSeparator,
-			mediaDirName, os.PathSeparator,
-			sharedMediaDirName, os.PathSeparator, filename)
-		if !fileExists(sharedFilePath) {
+		// the reference may omit the extension — resolve it to an actual shared file first
+		resolved := expandMediaFileName(filename, sharedMediaDir)
+		if len(resolved) == 0 {
 			return nil
 		}
-		m := buildMediaItem(filename, sharedMediaDirName, sharedMediaDirName, config)
+		m := buildMediaItem(resolved[0], sharedMediaDirName, sharedMediaDirName, config)
 		if m == nil || m.Type != Image {
 			return nil
 		}
@@ -792,25 +829,19 @@ func getFirstImageFromContent(content string, mediaList []media, config appConfi
 	var hasImplicitMedia bool
 
 	for _, match := range wrapPlaceholderOpeningRegexp.FindAllStringSubmatch(content, -1) {
-		if len(match) <= 4 {
+		if len(match) < 4 {
 			continue
 		}
 		name := match[1]
 		if name != "media" && name != "with-media" {
 			continue
 		}
-		if match[4] == "" {
-			hasImplicitMedia = true
+		fileNames, _, _ := splitMediaArg(match[3])
+		if len(fileNames) == 0 {
+			hasImplicitMedia = true // filename-less directive → all media
 			continue
 		}
-		files := strings.Split(match[4], ",")
-		if len(files) == 0 {
-			continue
-		}
-		filename := strings.TrimSpace(files[0])
-		if filename == "" {
-			continue
-		}
+		filename := fileNames[0]
 		if m := findInMediaList(filename); m != nil {
 			return m // priority 1
 		}

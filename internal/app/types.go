@@ -341,6 +341,7 @@ type page struct {
 	Body           string
 	Media          []media
 	SearchData     searchData
+	Warnings       []string // content-directive warnings (malformed captions, unparsed directives)
 	skipProcessing bool
 }
 
@@ -361,6 +362,7 @@ type post struct {
 	FeedContent    string // cleaned markdown content for feed generation (directives removed)
 	Tags           []string
 	SearchData     searchData
+	Warnings       []string // content-directive warnings (malformed captions, unparsed directives)
 	skipProcessing bool
 }
 

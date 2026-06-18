@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	appVersion                                  = "1.8.11"
+	appVersion                                  = "1.9.0"
 	defaultGitHubRepoUrl                        = "github.com/kion/mbgen"
 	defaultGitHubRepoThemesUrl                  = defaultGitHubRepoUrl + "/themes"
 	defaultGitHubRepoPageContentSamplesUrl      = defaultGitHubRepoUrl + "/content-samples/pages"
@@ -132,8 +132,7 @@ var (
 	tagLinkPlaceholderRegexp             = /* const */ regexp.MustCompile(`{%\s*tag\s*:\s*([\w\s-]+)\s*%}`)
 	searchLinkPlaceholderRegexp          = /* const */ regexp.MustCompile(`{%\s*search\s*:\s*([^{}%]+)\s*%}`)
 	contentLinkPlaceholderRegexp         = /* const */ regexp.MustCompile(`{%\s*([\w-_]+)\s*:\s*([\w-_]+)\s*%}`)
-	mediaPlaceholderRegexp               = /* const */ regexp.MustCompile(`{\s*media(\([\s\w=,]+\))?(\s*:\s*([^{}]+))?\s*}`)
-	mediaArgEntryRegexp                  = /* const */ regexp.MustCompile(`^(.+?)\s*\|([^|]*)\|\s*$`)
+	mediaPlaceholderRegexp               = /* const */ regexp.MustCompile(`{\s*media(\([\s\w=,]+\))?\s*([:|][^{}]*)?\s*}`)
 	// blankLineRunRegexp matches a newline followed by one or more additional
 	// whitespace-only lines; used to collapse runs of blank/whitespace-only
 	// lines produced by Go-template conditionals into a single newline
@@ -142,14 +141,20 @@ var (
 	// (e.g. fenced code blocks rendered by goldmark) and must be left untouched
 	preRegexp                        = /* const */ regexp.MustCompile(`(?is)<pre\b[^>]*>.*?</\s*pre\s*>`)
 	embedMediaPlaceholderRegexp      = /* const */ regexp.MustCompile(`{\s*embed\s*:\s*([^}]+)\s*}`)
-	wrapPlaceholderOpeningRegexp     = /* const */ regexp.MustCompile(`\{\s*([\w-_.]+)\s*(\([\s\w=,]+\))?(\s*:\s*([^{}]+))?\s*}`)
-	wrapPlaceholderRegexp            = /* const */ regexp.MustCompile(`\{\s*([\w-_.]+)\s*(\([\s\w=,]+\))?(\s*:\s*([^{}]+))?\s*}([^{}]*){/}`)
+	wrapPlaceholderOpeningRegexp     = /* const */ regexp.MustCompile(`\{\s*([\w-_.]+)\s*(\([\s\w=,]+\))?\s*([:|][^{}]*)?\s*}`)
+	wrapPlaceholderRegexp            = /* const */ regexp.MustCompile(`\{\s*([\w-_.]+)\s*(\([\s\w=,]+\))?\s*([:|][^{}]*)?\s*}([^{}]*){/}`)
 	colsPlaceholderRegexp            = /* const */ regexp.MustCompile(`(?s)\{\s*cols\s*(\(([\s\d:]+)\))?\s*\}(.*?)\{//\}`)
 	colPlaceholderRegexp             = /* const */ regexp.MustCompile(`(?s)\{\s*col\s*(\(([\s\w=,]+)\))?\s*\}(.*?)\{/\}`)
 	pWrapperAroundPlaceholdersRegexp = /* const */ regexp.MustCompile(`(?s)<p>\s*((?::@@@:[\w-]+:@@@:\s*(?:<br\s*/?>\s*)?)+)</p>`)
 	brTagRegexp                      = /* const */ regexp.MustCompile(`<br\s*/?>`)
 	hashTagRegex                     = /* const */ regexp.MustCompile(`#([\p{L}\d][\p{L}\d_-]*)`)
 	relativeURLHrefRegexp            = /* const */ regexp.MustCompile(`href="(/[^"]*)"`)
+	// unparsedDirectiveRegexp matches a single leftover `{...}` directive (no nested braces or
+	// newlines) in rendered HTML — used to warn about typo'd/unknown content directives
+	unparsedDirectiveRegexp = /* const */ regexp.MustCompile(`\{[^{}\n]*\}`)
+	// codeSpanRegexp matches inline `<code>...</code>` spans (single-backtick code); used together
+	// with preRegexp to mask code regions so braces inside code aren't flagged as unparsed directives
+	codeSpanRegexp = /* const */ regexp.MustCompile(`(?is)<code\b[^>]*>.*?</\s*code\s*>`)
 )
 
 //go:embed inject-js/admin.js

@@ -536,11 +536,15 @@ func _inspect(config appConfig, commandArgs ...string) {
 	} else {
 		mediaIssues := processOriginalMediaFiles(config, true)
 		tagIssues := reportTagTitleDuplicates(config)
+		resLoader := getResourceLoader(config)
+		directiveIssues := reportContentWarnings(
+			parsePages(config, resLoader, nil, false),
+			parsePosts(config, resLoader, nil, false))
 		if mediaIssues {
 			sprintln(" - run the following command to fix the media issues found:\n\n" +
 				"   mbgen inspect " + commandInspectOptionFix)
 		}
-		if !mediaIssues && !tagIssues {
+		if !mediaIssues && !tagIssues && !directiveIssues {
 			sprintln(" - no issues found")
 		}
 	}

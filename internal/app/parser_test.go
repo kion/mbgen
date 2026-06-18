@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -965,61 +966,96 @@ func TestSplitMediaArg(t *testing.T) {
 		input            string
 		expectedFiles    []string
 		expectedCaptions map[string]string
+		expectedBadCount int
 	}{
 		{
-			name:             "bare filenames",
-			input:            "a.jpg, b.png ,c.mp4",
-			expectedFiles:    []string{"a.jpg", "b.png", "c.mp4"},
-			expectedCaptions: map[string]string{},
+			name:          "bare filenames",
+			input:         "a.jpg, b.png ,c.mp4",
+			expectedFiles: []string{"a.jpg", "b.png", "c.mp4"},
 		},
 		{
-			name:             "all with captions",
-			input:            "a.jpg|Caption A|, b.png|Caption B|",
-			expectedFiles:    []string{"a.jpg", "b.png"},
-			expectedCaptions: map[string]string{"a.jpg": "Caption A", "b.png": "Caption B"},
+			name:          "leading colon stripped",
+			input:         ":a.jpg,b.png",
+			expectedFiles: []string{"a.jpg", "b.png"},
 		},
 		{
-			name:             "mixed",
-			input:            "a.jpg|Caption A|, b.png, c.jpg|Caption C|",
-			expectedFiles:    []string{"a.jpg", "b.png", "c.jpg"},
-			expectedCaptions: map[string]string{"a.jpg": "Caption A", "c.jpg": "Caption C"},
+			name:             "targeted captions",
+			input:            "1,2,3 | 2: cap two | 3: cap three",
+			expectedFiles:    []string{"1", "2", "3"},
+			expectedCaptions: map[string]string{"2": "cap two", "3": "cap three"},
 		},
 		{
-			name:             "empty caption treated as no caption",
-			input:            "a.jpg||",
+			name:             "single file nameless caption",
+			input:            "a.jpg|Caption A",
 			expectedFiles:    []string{"a.jpg"},
-			expectedCaptions: map[string]string{},
+			expectedCaptions: map[string]string{"a.jpg": "Caption A"},
 		},
 		{
-			name:             "caption with spaces and punctuation",
-			input:            "a.jpg|Hello world! This is fine.|",
+			name:             "nameless caption with literal colon escape",
+			input:            "a.jpg|Aspect 2::1",
 			expectedFiles:    []string{"a.jpg"},
-			expectedCaptions: map[string]string{"a.jpg": "Hello world! This is fine."},
+			expectedCaptions: map[string]string{"a.jpg": "Aspect 2:1"},
 		},
 		{
-			name:             "caption with commas",
-			input:            "a.jpg|one, two, three|,b.png|plain|",
-			expectedFiles:    []string{"a.jpg", "b.png"},
-			expectedCaptions: map[string]string{"a.jpg": "one, two, three", "b.png": "plain"},
+			name:             "targeted caption with literal colon escape",
+			input:            "1 | 1: Time:: noon",
+			expectedFiles:    []string{"1"},
+			expectedCaptions: map[string]string{"1": "Time: noon"},
 		},
 		{
-			name:             "empty input",
-			input:            "",
+			name:             "all media targeted caption",
+			input:            "| 3: caption three",
 			expectedFiles:    nil,
-			expectedCaptions: nil,
+			expectedCaptions: map[string]string{"3": "caption three"},
+		},
+		{
+			name:             "nameless with multiple files is ambiguous",
+			input:            "a.jpg,b.png|Caption",
+			expectedFiles:    []string{"a.jpg", "b.png"},
+			expectedBadCount: 1,
+		},
+		{
+			name:             "nameless with no files is ambiguous",
+			input:            "|Caption",
+			expectedFiles:    nil,
+			expectedBadCount: 1,
+		},
+		{
+			name:             "trailing pipe is malformed",
+			input:            "a.jpg|Caption|",
+			expectedFiles:    []string{"a.jpg"},
+			expectedBadCount: 2, // "Caption" is no longer a sole spec, and the empty trailing spec
+		},
+		{
+			name:             "dangling pipe is malformed",
+			input:            "a.jpg|",
+			expectedFiles:    []string{"a.jpg"},
+			expectedBadCount: 1,
+		},
+		{
+			name:             "targeted with empty caption is malformed",
+			input:            "1 | 1:",
+			expectedFiles:    []string{"1"},
+			expectedBadCount: 1,
+		},
+		{
+			name:             "double pipe yields empty spec",
+			input:            "1,2 | 1: a || 2: b",
+			expectedFiles:    []string{"1", "2"},
+			expectedCaptions: map[string]string{"1": "a", "2": "b"},
+			expectedBadCount: 1,
+		},
+		{
+			name:          "empty input",
+			input:         "",
+			expectedFiles: nil,
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			files, caps := splitMediaArg(tc.input)
+			files, caps, bad := splitMediaArg(tc.input)
 			if !slices.Equal(files, tc.expectedFiles) {
 				t.Errorf("files: expected %v, got %v", tc.expectedFiles, files)
-			}
-			if tc.expectedCaptions == nil {
-				if caps != nil {
-					t.Errorf("captions: expected nil, got %v", caps)
-				}
-				return
 			}
 			if len(caps) != len(tc.expectedCaptions) {
 				t.Errorf("captions: expected %v, got %v", tc.expectedCaptions, caps)
@@ -1029,7 +1065,49 @@ func TestSplitMediaArg(t *testing.T) {
 					t.Errorf("caption[%q]: expected %q, got %q", k, v, caps[k])
 				}
 			}
+			if len(bad) != tc.expectedBadCount {
+				t.Errorf("malformed count: expected %d, got %d (%v)", tc.expectedBadCount, len(bad), bad)
+			}
 		})
+	}
+}
+
+func TestExpandMediaFileName(t *testing.T) {
+	tmpDir := t.TempDir()
+	for _, name := range []string{"1.jpg", "1.png", "2.mov", "photo.jpeg"} {
+		if err := os.WriteFile(filepath.Join(tmpDir, name), []byte("x"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cases := []struct {
+		name     string
+		input    string
+		expected []string
+	}{
+		// base name matching multiple image extensions (image extension order: jpg, jpeg, png, gif)
+		{"basename multiple extensions", "1", []string{"1.jpg", "1.png"}},
+		{"basename single video", "2", []string{"2.mov"}},
+		{"already-extensioned passthrough", "photo.jpeg", []string{"photo.jpeg"}},
+		{"miss", "missing", nil},
+		{"extensioned but absent", "photo.gif", nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := expandMediaFileName(tc.input, tmpDir); !slices.Equal(got, tc.expected) {
+				t.Errorf("expand %q: expected %v, got %v", tc.input, tc.expected, got)
+			}
+		})
+	}
+}
+
+func TestFindUnparsedDirectives(t *testing.T) {
+	body := "<p>before {medai:1,2} after</p>\n" +
+		"<pre><code>{media:1} inside fenced code</code></pre>\n" +
+		"<p>inline <code>{with-media:x}</code> code</p>\n" +
+		"<p>another {unknown} directive</p>"
+	got := findUnparsedDirectives(body)
+	if !slices.Equal(got, []string{"{medai:1,2}", "{unknown}"}) {
+		t.Errorf("expected [{medai:1,2} {unknown}], got %v", got)
 	}
 }
 
@@ -1040,7 +1118,7 @@ func TestMediaDirectiveWithCaptions(t *testing.T) {
 date: 2026-04-18
 ---
 
-{media:a.jpg|Caption A|,b.png|Caption B|,c.jpg}`
+{media:a.jpg,b.png,c.jpg | a.jpg: Caption A | b.png: Caption B}`
 
 	post := parsePost("caps-basic", postContent, defaultConfig(), resLoader)
 
@@ -1054,6 +1132,33 @@ date: 2026-04-18
 	if n := strings.Count(post.Body, `class="caption"`); n != 2 {
 		t.Errorf("expected 2 caption divs, got %d\n%s", n, post.Body)
 	}
+	if len(post.Warnings) != 0 {
+		t.Errorf("expected no warnings, got %v", post.Warnings)
+	}
+}
+
+func TestMediaDirectiveExtensionlessAndBasenameCaption(t *testing.T) {
+	resLoader := setupMediaCaptionFixture(t, "ext-less", []string{"1.jpg", "1.png", "2.mov"})
+
+	postContent := `---
+date: 2026-04-18
+---
+
+{media:1,2 | 1: Both ones | 2: The clip}`
+
+	post := parsePost("ext-less", postContent, defaultConfig(), resLoader)
+
+	// `1` resolves to both 1.jpg and 1.png; the base-name caption applies to both.
+	verifyStringContains(post.Body, "/media/post/ext-less/1.jpg", t)
+	verifyStringContains(post.Body, "/media/post/ext-less/1.png", t)
+	verifyStringContains(post.Body, "/media/post/ext-less/2.mov", t)
+	if n := strings.Count(post.Body, `<div class="caption">Both ones</div>`); n != 2 {
+		t.Errorf("expected base-name caption on both 1.* files (2), got %d\n%s", n, post.Body)
+	}
+	verifyStringContains(post.Body, `<div class="caption">The clip</div>`, t)
+	if len(post.Warnings) != 0 {
+		t.Errorf("expected no warnings, got %v", post.Warnings)
+	}
 }
 
 func TestWithMediaDirectiveWithCaption(t *testing.T) {
@@ -1063,7 +1168,7 @@ func TestWithMediaDirectiveWithCaption(t *testing.T) {
 date: 2026-04-18
 ---
 
-{with-media(p=l,s=s):book.jpg|Book title|}
+{with-media(p=l,s=s):book.jpg|Book title}
 Commentary about the book.
 {/}`
 
@@ -1082,7 +1187,7 @@ func TestMediaCaptionHtmlEscaping(t *testing.T) {
 date: 2026-04-18
 ---
 
-{media:a.jpg|<script>alert(1)</script>|}`
+{media:a.jpg|<script>alert(1)</script>}`
 
 	post := parsePost("caps-esc", postContent, defaultConfig(), resLoader)
 
@@ -1093,20 +1198,49 @@ date: 2026-04-18
 	verifyStringContains(post.Body, "&lt;script&gt;alert(1)&lt;/script&gt;", t)
 }
 
-func TestMediaCaptionEmpty(t *testing.T) {
-	resLoader := setupMediaCaptionFixture(t, "caps-empty", []string{"a.jpg"})
+func TestMediaCaptionAmbiguousWarns(t *testing.T) {
+	resLoader := setupMediaCaptionFixture(t, "caps-amb", []string{"a.jpg", "b.png"})
 
 	postContent := `---
 date: 2026-04-18
 ---
 
-{media:a.jpg||}`
+{media:a.jpg,b.png|Caption}`
 
-	post := parsePost("caps-empty", postContent, defaultConfig(), resLoader)
+	post := parsePost("caps-amb", postContent, defaultConfig(), resLoader)
 
-	verifyStringContains(post.Body, "/media/post/caps-empty/a.jpg", t)
+	// media still renders, but no caption is applied and a warning is recorded
+	verifyStringContains(post.Body, "/media/post/caps-amb/a.jpg", t)
 	if strings.Contains(post.Body, `class="caption"`) {
-		t.Errorf("empty caption should not render a caption div:\n%s", post.Body)
+		t.Errorf("ambiguous nameless caption should not render a caption div:\n%s", post.Body)
+	}
+	if len(post.Warnings) == 0 {
+		t.Errorf("expected a malformed-caption warning, got none")
+	}
+}
+
+func TestUnparsedDirectiveWarning(t *testing.T) {
+	resLoader := setupMediaCaptionFixture(t, "typo", []string{"a.jpg"})
+
+	postContent := `---
+date: 2026-04-18
+---
+
+A typo'd directive {medai:a.jpg} should be flagged, but ` + "`{media:a.jpg}`" + ` in code should not.`
+
+	post := parsePost("typo", postContent, defaultConfig(), resLoader)
+
+	found := false
+	for _, w := range post.Warnings {
+		if strings.Contains(w, "{medai:a.jpg}") {
+			found = true
+		}
+		if strings.Contains(w, "{media:a.jpg}") {
+			t.Errorf("directive inside inline code should not be flagged: %q", w)
+		}
+	}
+	if !found {
+		t.Errorf("expected unparsed-directive warning for {medai:a.jpg}, got %v", post.Warnings)
 	}
 }
 

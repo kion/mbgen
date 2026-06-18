@@ -137,13 +137,14 @@ func parsePosts(config appConfig, resLoader resourceLoader, thumbHandler imageTh
 
 func parsePage(pageId string, content string, config appConfig, resLoader resourceLoader) page {
 	page := page{Id: pageId}
-	content, rawBodyContent, cdPhReps := parseContentDirectives(Page, pageId, content, config, resLoader)
+	content, rawBodyContent, cdPhReps, warnings := parseContentDirectives(Page, pageId, content, config, resLoader)
 	var buf bytes.Buffer
 	context := parser.NewContext()
 	err := markdown.Convert([]byte(content), &buf, parser.WithContext(context))
 	check(err)
 	page.Body = strings.TrimSpace(buf.String())
 	page.Body = handleContentDirectivePlaceholderReplacements(page.Body, cdPhReps)
+	page.Warnings = appendUnparsedDirectiveWarnings(warnings, page.Body)
 	metaData := meta.Get(context)
 	rawTitle := ""
 	if title, ok := metaData[metaDataKeyTitle].(string); ok {
@@ -171,7 +172,7 @@ func parsePost(postId string, content string, config appConfig, resLoader resour
 		content = metaDataPlaceholderRegexp.ReplaceAllString(content, metadataContent)
 	}
 	// ================================================================================
-	content, rawBodyContent, cdPhReps := parseContentDirectives(Post, postId, content, config, resLoader)
+	content, rawBodyContent, cdPhReps, warnings := parseContentDirectives(Post, postId, content, config, resLoader)
 	post.FeedContent = rawBodyContent // store cleaned markdown for feed generation
 	var buf bytes.Buffer
 	context := parser.NewContext()
@@ -179,6 +180,7 @@ func parsePost(postId string, content string, config appConfig, resLoader resour
 	check(err)
 	post.Body = strings.TrimSpace(buf.String())
 	post.Body = handleContentDirectivePlaceholderReplacements(post.Body, cdPhReps)
+	post.Warnings = appendUnparsedDirectiveWarnings(warnings, post.Body)
 	metaData := meta.Get(context)
 	if date, ok := metaData[metaDataKeyDate].(string); ok {
 		d, err := civil.ParseDate(date)
@@ -227,7 +229,7 @@ func handleThumbnails(mediaDirPath string, config appConfig, thumbHandler imageT
 	}
 }
 
-func parseContentDirectives(ceType contentEntityType, ceId string, content string, config appConfig, resLoader resourceLoader) (string, string, map[string]string) {
+func parseContentDirectives(ceType contentEntityType, ceId string, content string, config appConfig, resLoader resourceLoader) (string, string, map[string]string, []string) {
 	rawBodyContent := metaDataPlaceholderRegexp.ReplaceAllString(content, "")
 	rawBodyContent = contentDirectivePlaceholderRegexp.ReplaceAllString(rawBodyContent, "")
 	rawBodyContent = whitespacePlaceholderRegexp.ReplaceAllString(rawBodyContent, " ")
@@ -235,6 +237,7 @@ func parseContentDirectives(ceType contentEntityType, ceId string, content strin
 
 	phReps := make(map[string]string)
 	var expListMedia []string
+	var warnings []string
 
 	// extract {cols}...{//} blocks first so inner {col}...{/} tokens don't get
 	// misinterpreted as generic wrap directives by wrapPlaceholderRegexp downstream
@@ -246,17 +249,31 @@ func parseContentDirectives(ceType contentEntityType, ceId string, content strin
 		content = strings.Replace(content, m[0], ph, 1)
 	}
 
-	content = processInnerDirectives(content, ceType, ceId, config, resLoader, phReps, &expListMedia)
+	content = processInnerDirectives(content, ceType, ceId, config, resLoader, phReps, &expListMedia, &warnings)
 
 	for _, cb := range colsBlocks {
-		rendered := processColsBlock(cb, ceType, ceId, config, resLoader, phReps, &expListMedia)
+		rendered := processColsBlock(cb, ceType, ceId, config, resLoader, phReps, &expListMedia, &warnings)
 		phReps[cb.ph] = rendered
 	}
 
-	return content, rawBodyContent, phReps
+	return content, rawBodyContent, phReps, warnings
 }
 
-func processInnerDirectives(content string, ceType contentEntityType, ceId string, config appConfig, resLoader resourceLoader, phReps map[string]string, expListMedia *[]string) string {
+// resolveDirectiveMedia parses a media/with-media directive argument into rendered media items,
+// collecting any malformed-caption warnings; an empty file list means "all media".
+func resolveDirectiveMedia(mediaArg string, directive string, ceType contentEntityType, ceId string, config appConfig, expListMedia *[]string, warnings *[]string) []media {
+	fileNames, captions, malformed := splitMediaArg(mediaArg)
+	for _, bad := range malformed {
+		*warnings = append(*warnings, "malformed caption \""+strings.TrimSpace(bad)+"\" in {"+directive+"} directive (expected: name: caption)")
+	}
+	isExplicit := len(fileNames) > 0
+	if !isExplicit {
+		fileNames = listAllMedia(ceType, ceId, *expListMedia)
+	}
+	return parseMediaFileNames(fileNames, ceType, ceId, config, isExplicit, captions)
+}
+
+func processInnerDirectives(content string, ceType contentEntityType, ceId string, config appConfig, resLoader resourceLoader, phReps map[string]string, expListMedia *[]string, warnings *[]string) string {
 	content = hashTagRegex.ReplaceAllStringFunc(content, func(match string) string {
 		tag := match[1:] // strip leading '#'; regex guarantees '#' + tag chars
 		return fmt.Sprintf(hashTagMarkdownReplacementFormat, tag, normalizeTagURI(tag))
@@ -314,7 +331,7 @@ func processInnerDirectives(content string, ceType contentEntityType, ceId strin
 	if wrapPlaceholders != nil {
 		sortContentDirectivePlaceholders(wrapPlaceholders)
 		for _, wp := range wrapPlaceholders {
-			if fileNames, _ := splitMediaArg(wp[4]); fileNames != nil {
+			if fileNames, _, _ := splitMediaArg(wp[3]); fileNames != nil {
 				*expListMedia = append(*expListMedia, fileNames...)
 			}
 		}
@@ -323,7 +340,7 @@ func processInnerDirectives(content string, ceType contentEntityType, ceId strin
 	if mediaPlaceholders != nil {
 		sortContentDirectivePlaceholders(mediaPlaceholders)
 		for _, mp := range mediaPlaceholders {
-			if fileNames, _ := splitMediaArg(mp[3]); fileNames != nil {
+			if fileNames, _, _ := splitMediaArg(mp[2]); fileNames != nil {
 				*expListMedia = append(*expListMedia, fileNames...)
 			}
 		}
@@ -342,8 +359,8 @@ func processInnerDirectives(content string, ceType contentEntityType, ceId strin
 				println(" - failed to process " + directive + " directive for " + ceId + ": " + err.Error())
 			} else {
 				propStr := strings.Trim(wp[2], "()")
-				mediaArg := wp[4]
-				text := strings.TrimSpace(wp[5])
+				mediaArg := wp[3]
+				text := strings.TrimSpace(wp[4])
 				var buf bytes.Buffer
 				err := markdown.Convert([]byte(text), &buf)
 				check(err)
@@ -357,14 +374,7 @@ func processInnerDirectives(content string, ceType contentEntityType, ceId strin
 						props[key] = val
 					}
 				}
-				var mediaFileNames []string
-				var captions map[string]string
-				if mediaArg == "" {
-					mediaFileNames = listAllMedia(ceType, ceId, *expListMedia)
-				} else {
-					mediaFileNames, captions = splitMediaArg(mediaArg)
-				}
-				allMedia := parseMediaFileNames(mediaFileNames, ceType, ceId, config, mediaArg != "", captions)
+				allMedia := resolveDirectiveMedia(mediaArg, directive, ceType, ceId, config, expListMedia, warnings)
 				var contentDirectiveMarkupBuffer bytes.Buffer
 				err = contentDirectiveTemplate.Execute(&contentDirectiveMarkupBuffer, contentDirectiveData{
 					Text:  text,
@@ -382,7 +392,7 @@ func processInnerDirectives(content string, ceType contentEntityType, ceId strin
 		for _, mp := range mediaPlaceholders {
 			placeholder := mp[0]
 			propStr := strings.Trim(mp[1], "()")
-			mediaArg := mp[3]
+			mediaArg := mp[2]
 			props := make(map[string]string)
 			if propStr != "" {
 				for _, pStr := range strings.Split(propStr, ",") {
@@ -392,14 +402,7 @@ func processInnerDirectives(content string, ceType contentEntityType, ceId strin
 					props[key] = val
 				}
 			}
-			var mediaFileNames []string
-			var captions map[string]string
-			if mediaArg == "" {
-				mediaFileNames = listAllMedia(ceType, ceId, *expListMedia)
-			} else {
-				mediaFileNames, captions = splitMediaArg(mediaArg)
-			}
-			allMedia := parseMediaFileNames(mediaFileNames, ceType, ceId, config, mediaArg != "", captions)
+			allMedia := resolveDirectiveMedia(mediaArg, "media", ceType, ceId, config, expListMedia, warnings)
 			if allMedia != nil {
 				inlineMediaTemplate := compileMediaTemplate(resLoader)
 				var inlineMediaMarkupBuffer bytes.Buffer
@@ -450,7 +453,7 @@ func processInnerDirectives(content string, ceType contentEntityType, ceId strin
 	return content
 }
 
-func processColsBlock(cb colsBlock, ceType contentEntityType, ceId string, config appConfig, resLoader resourceLoader, phReps map[string]string, expListMedia *[]string) string {
+func processColsBlock(cb colsBlock, ceType contentEntityType, ceId string, config appConfig, resLoader resourceLoader, phReps map[string]string, expListMedia *[]string, warnings *[]string) string {
 	weights, weightsErr := parseColsWeights(cb.weights)
 	if weightsErr != "" {
 		println(" - " + weightsErr + " for " + ceId + "; falling back to equal widths")
@@ -460,7 +463,7 @@ func processColsBlock(cb colsBlock, ceType contentEntityType, ceId string, confi
 	// pre-process inner directives on the whole cols body first so that nested
 	// {/} closers (e.g., from {with-media}...{/}) become UUID placeholders and
 	// don't confuse the {col}...{/} matcher's lazy quantifier downstream
-	inner := processInnerDirectives(cb.inner, ceType, ceId, config, resLoader, phReps, expListMedia)
+	inner := processInnerDirectives(cb.inner, ceType, ceId, config, resLoader, phReps, expListMedia, warnings)
 
 	colMatches := colPlaceholderRegexp.FindAllStringSubmatch(inner, -1)
 	if len(colMatches) == 0 {
@@ -623,22 +626,46 @@ func handleContentDirectivePlaceholderReplacements(content string, phReps map[st
 	return content
 }
 
+// findUnparsedDirectives returns any leftover `{...}` directives in rendered HTML body
+// that no handler consumed (typos / invalid directives).
+// Code regions (`<pre>` fenced blocks and inline `<code>` spans)
+// are masked first so braces inside code are not flagged.
+func findUnparsedDirectives(body string) []string {
+	masked := preRegexp.ReplaceAllString(body, "")
+	masked = codeSpanRegexp.ReplaceAllString(masked, "")
+	return unparsedDirectiveRegexp.FindAllString(masked, -1)
+}
+
+// appendUnparsedDirectiveWarnings appends a warning for each leftover `{...}` directive
+// found in the rendered body to the given (parse-time) warnings list.
+func appendUnparsedDirectiveWarnings(warnings []string, body string) []string {
+	for _, match := range findUnparsedDirectives(body) {
+		warnings = append(warnings, "unparsed directive: "+match)
+	}
+	return warnings
+}
+
 func listAllMedia(contentEntityType contentEntityType, contentEntityId string, skipFiles []string) []string {
 	ceType := strings.ToLower(contentEntityType.String())
 	var allMedia []string
 	mediaDirPath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, mediaDirName, os.PathSeparator, ceType, os.PathSeparator, contentEntityId)
+	// skip an explicitly-listed file by its full name or its extension-less base name
+	// (an explicit reference may omit the extension, e.g. `{media:3}` excludes `3.jpg`)
+	skip := func(file string) bool {
+		return slices.Contains(skipFiles, file) || slices.Contains(skipFiles, stripExt(file))
+	}
 	if dirExists(mediaDirPath) {
 		videoFiles, err := listFilesByExt(mediaDirPath, videoFileExtensions...)
 		check(err)
 		for _, video := range videoFiles {
-			if !slices.Contains(skipFiles, video) {
+			if !skip(video) {
 				allMedia = append(allMedia, video)
 			}
 		}
 		imageFiles, err := listFilesByExt(mediaDirPath, imageFileExtensions...)
 		check(err)
 		for _, image := range imageFiles {
-			if !slices.Contains(skipFiles, image) && !strings.Contains(image, thumbImgFileSuffix) {
+			if !skip(image) && !strings.Contains(image, thumbImgFileSuffix) {
 				allMedia = append(allMedia, image)
 			}
 		}
@@ -690,95 +717,176 @@ func buildMediaItem(mediaFileName string, uriSubPath string, dirSubPath string, 
 	return nil
 }
 
-// splitMediaArg splits the inner argument of a `{media:...}` / `{with-media:...}`
-// directive into entries and extracts an optional caption per entry;
-// each entry has the form `<filename>` or `<filename>|<caption>|`;
-// commas outside of a `|...|` block separate entries — commas inside a caption
-// are preserved as part of the caption text; captions may not contain `|`;
-// returns the list of filenames in input order and a map of filename -> caption for the entries that specified one
-func splitMediaArg(mediaArg string) ([]string, map[string]string) {
-	if strings.TrimSpace(mediaArg) == "" {
-		return nil, nil
+// splitMediaArg parses the inner argument of a `{media...}` / `{with-media...}` directive.
+// The argument is `[: ]file1,file2,...` (a comma-separated file list, optionally empty for all media)
+// optionally followed by `|`-separated caption specs:
+//   - `name: caption` — targeted caption for a specific file (name with or without extension)
+//   - `caption`       — nameless caption, valid only when exactly one file is listed
+//
+// `::` is an escape for a literal `:` inside caption text. Empty/dangling/trailing `|` segments are rejected.
+// It returns the list of filenames in input order, a map of name -> caption
+// for the captions that were specified, and the list of malformed/ambiguous caption segments (so callers can warn).
+// Captions are HTML-escaped because templates are text/template (no auto-escaping).
+func splitMediaArg(mediaArg string) ([]string, map[string]string, []string) {
+	mediaArg = strings.TrimSpace(mediaArg)
+	// strip a single leading file-list separator `:` (the media regex captures it)
+	mediaArg = strings.TrimSpace(strings.TrimPrefix(mediaArg, ":"))
+	if mediaArg == "" {
+		return nil, nil, nil
 	}
-	// ================================================================================
-	// split on `,` but skip commas inside `|...|` caption blocks;
-	// `inCaption` toggles on every `|`, so an opening `|` enters caption mode
-	// and the matching closing `|` leaves it
-	// ================================================================================
-	var entries []string
-	var cur strings.Builder
-	inCaption := false
-	for _, r := range mediaArg {
-		switch r {
-		case '|':
-			inCaption = !inCaption
-			cur.WriteRune(r)
-		case ',':
-			if inCaption {
-				cur.WriteRune(r)
-			} else {
-				entries = append(entries, cur.String())
-				cur.Reset()
-			}
-		default:
-			cur.WriteRune(r)
+
+	// the file list is everything before the first `|`; the rest is the caption section
+	fileListPart := mediaArg
+	captionSection := ""
+	hasCaptionSection := false
+	if i := strings.IndexByte(mediaArg, '|'); i >= 0 {
+		fileListPart = mediaArg[:i]
+		captionSection = mediaArg[i+1:]
+		hasCaptionSection = true
+	}
+
+	var fileNames []string
+	for _, f := range strings.Split(fileListPart, ",") {
+		if f = strings.TrimSpace(f); f != "" {
+			fileNames = append(fileNames, f)
 		}
 	}
-	if cur.Len() > 0 {
-		entries = append(entries, cur.String())
+
+	if !hasCaptionSection {
+		return fileNames, nil, nil
 	}
-	// ================================================================================
-	var fileNames []string
-	captions := make(map[string]string)
-	for _, a := range entries {
-		entry := strings.TrimSpace(a)
-		if entry == "" {
+
+	var captions map[string]string
+	var malformed []string
+	specs := strings.Split(captionSection, "|")
+	const sentinel = "\x00" // placeholder for the `::` literal-colon escape
+	for _, raw := range specs {
+		spec := strings.TrimSpace(raw)
+		if spec == "" {
+			// dangling/trailing/double pipe — always an error, never silently ignored
+			malformed = append(malformed, raw)
 			continue
 		}
-		fileName := entry
-		if m := mediaArgEntryRegexp.FindStringSubmatch(entry); m != nil {
-			fileName = strings.TrimSpace(m[1])
-			if caption := strings.TrimSpace(m[2]); caption != "" {
-				// templates use text/template (no auto-escape),
-				// so escape here to ensure user-supplied caption text can't inject HTML
-				captions[fileName] = html.EscapeString(caption)
-			}
+		masked := strings.ReplaceAll(spec, "::", sentinel)
+		unescape := func(s string) string {
+			return strings.ReplaceAll(s, sentinel, ":")
 		}
-		fileNames = append(fileNames, fileName)
+		if i := strings.IndexByte(masked, ':'); i >= 0 {
+			// targeted: `name: caption`
+			name := strings.TrimSpace(unescape(masked[:i]))
+			caption := strings.TrimSpace(unescape(masked[i+1:]))
+			if name == "" || caption == "" {
+				malformed = append(malformed, spec)
+				continue
+			}
+			if captions == nil {
+				captions = make(map[string]string)
+			}
+			captions[name] = html.EscapeString(caption)
+			continue
+		}
+		// nameless: valid only when it is the sole spec and exactly one file is listed
+		if len(specs) != 1 || len(fileNames) != 1 {
+			malformed = append(malformed, spec)
+			continue
+		}
+		if captions == nil {
+			captions = make(map[string]string)
+		}
+		captions[fileNames[0]] = html.EscapeString(unescape(masked))
 	}
-	return fileNames, captions
+	return fileNames, captions, malformed
+}
+
+// stripExt returns the file name without its (last) extension.
+func stripExt(name string) string {
+	return strings.TrimSuffix(name, filepath.Ext(name))
+}
+
+// expandMediaFileName resolves a possibly extension-less media reference to the actual file name(s) present in dir.
+// If name already carries a supported image/video extension and that file exists,
+// it is returned as-is. Otherwise name is treated as a base name and every `<name>.<ext>`
+// (for supported video/image extensions) that exists in dir is returned.
+func expandMediaFileName(name string, dir string) []string {
+	ext := strings.ToLower(filepath.Ext(name))
+	if slices.Contains(imageFileExtensions, ext) || slices.Contains(videoFileExtensions, ext) {
+		if fileExists(filepath.Join(dir, name)) {
+			return []string{name}
+		}
+		return nil
+	}
+	var matches []string
+	for _, e := range videoFileExtensions {
+		if fileExists(filepath.Join(dir, name+e)) {
+			matches = append(matches, name+e)
+		}
+	}
+	for _, e := range imageFileExtensions {
+		if fileExists(filepath.Join(dir, name+e)) {
+			matches = append(matches, name+e)
+		}
+	}
+	return matches
 }
 
 func parseMediaFileNames(mediaFileNames []string, contentEntityType contentEntityType, contentEntityId string, config appConfig, isExplicit bool, captions map[string]string) []media {
 	var allMedia []media
 	ceType := strings.ToLower(contentEntityType.String())
+	contentUriSubPath := ceType + "/" + contentEntityId
+	contentDirSubPath := ceType + string(os.PathSeparator) + contentEntityId
+	mediaDirBasePath := filepath.Join(deployDirName, mediaDirName)
+	contentDir := filepath.Join(mediaDirBasePath, contentDirSubPath)
+	sharedDir := filepath.Join(mediaDirBasePath, sharedMediaDirName)
+	// attach a caption to a resolved media item by exact file name first, then base name
+	// (so a base-name caption applies to every file sharing that base name)
+	attach := func(m *media, fileName string) {
+		if caption, ok := captions[fileName]; ok {
+			m.Caption = caption
+		} else if caption, ok := captions[stripExt(fileName)]; ok {
+			m.Caption = caption
+		}
+	}
+	hasSupportedExt := func(name string) bool {
+		ext := strings.ToLower(filepath.Ext(name))
+		return slices.Contains(imageFileExtensions, ext) || slices.Contains(videoFileExtensions, ext)
+	}
 	for _, mediaFileName := range mediaFileNames {
 		if strings.Contains(mediaFileName, thumbImgFileSuffix) {
 			continue
 		}
-		uriSubPath := ceType + "/" + contentEntityId
-		dirSubPath := ceType + string(os.PathSeparator) + contentEntityId
-		if isExplicit {
-			contentSpecificFilePath := fmt.Sprintf("%s%c%s%c%s%c%s",
-				deployDirName, os.PathSeparator,
-				mediaDirName, os.PathSeparator,
-				dirSubPath, os.PathSeparator, mediaFileName)
-			if !fileExists(contentSpecificFilePath) {
-				sharedFilePath := fmt.Sprintf("%s%c%s%c%s%c%s",
-					deployDirName, os.PathSeparator,
-					mediaDirName, os.PathSeparator,
-					sharedMediaDirName, os.PathSeparator, mediaFileName)
-				if fileExists(sharedFilePath) {
-					uriSubPath = sharedMediaDirName
-					dirSubPath = sharedMediaDirName
-				}
+		if !isExplicit {
+			// names came from listAllMedia — already actual content-specific file names
+			if m := buildMediaItem(mediaFileName, contentUriSubPath, contentDirSubPath, config); m != nil {
+				attach(m, mediaFileName)
+				allMedia = append(allMedia, *m)
 			}
+			continue
 		}
-		if m := buildMediaItem(mediaFileName, uriSubPath, dirSubPath, config); m != nil {
-			if caption, ok := captions[mediaFileName]; ok {
-				m.Caption = caption
+		if hasSupportedExt(mediaFileName) {
+			// explicit reference carrying an extension: prefer the content-specific file,
+			// fall back to shared when missing there; still render with the content URI when absent from both
+			uriSubPath, dirSubPath := contentUriSubPath, contentDirSubPath
+			if !fileExists(filepath.Join(contentDir, mediaFileName)) && fileExists(filepath.Join(sharedDir, mediaFileName)) {
+				uriSubPath, dirSubPath = sharedMediaDirName, sharedMediaDirName
 			}
-			allMedia = append(allMedia, *m)
+			if m := buildMediaItem(mediaFileName, uriSubPath, dirSubPath, config); m != nil {
+				attach(m, mediaFileName)
+				allMedia = append(allMedia, *m)
+			}
+			continue
+		}
+		// extension-less reference: expand to the actual file(s) on disk, content dir then shared
+		uriSubPath, dirSubPath := contentUriSubPath, contentDirSubPath
+		resolved := expandMediaFileName(mediaFileName, contentDir)
+		if len(resolved) == 0 {
+			uriSubPath, dirSubPath = sharedMediaDirName, sharedMediaDirName
+			resolved = expandMediaFileName(mediaFileName, sharedDir)
+		}
+		for _, fileName := range resolved {
+			if m := buildMediaItem(fileName, uriSubPath, dirSubPath, config); m != nil {
+				attach(m, fileName)
+				allMedia = append(allMedia, *m)
+			}
 		}
 	}
 	return allMedia

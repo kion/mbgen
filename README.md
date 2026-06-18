@@ -253,45 +253,54 @@ $ mbgen help [command]
     {embed:youtu.be/A_bCdEfGhIj-X}
     ```
   * The following content directives are supported:
-    * `{%<entry-type>:<entry-id>%}` - renders a URI to the given `<entry-id>` of the given `<entry-type>`, e.g.:
-      * `[Sample Page]({%page:sample-page%})` - would render a link with title `Sample Page` to the page defined in the `pages/sample-project.md`
-      * `[Sample Post 1]({%post:sample-post-1%})` - would render a link with title `Sample Post 1` to the post defined in the `posts/sample-post-1.md`
-    * `#<tag>` - renders a hashtag link to the corresponding tag page
+    * `{%<entry-type>:<entry-id>%}` — renders a URI to the given `<entry-id>` of the given `<entry-type>`, e.g.:
+      * `[Sample Page]({%page:sample-page%})` — would render a link with title `Sample Page` to the page defined in the `pages/sample-project.md`
+      * `[Sample Post 1]({%post:sample-post-1%})` — would render a link with title `Sample Post 1` to the post defined in the `posts/sample-post-1.md`
+    * `#<tag>` — renders a hashtag link to the corresponding tag page
       * if you need to render custom / multi-word link text, use one of the following alternatives:
-        * `{%tag%}` (used as a Markdown link URL) - renders a URI to the tag page, auto-deriving the tag from the link text, e.g.:
-          * `[Multi Word Tag]({%tag%})` - renders a link to `/tags/multi-word-tag/` with `Multi Word Tag` as link text
+        * `{%tag%}` (used as a Markdown link URL) — renders a URI to the tag page, auto-deriving the tag from the link text, e.g.:
+          * `[Multi Word Tag]({%tag%})` — renders a link to `/tags/multi-word-tag/` with `Multi Word Tag` as link text
           * The tag URI is auto-derived from the link text using the same normalization rules (non-alphanumeric characters replaced with `-`, surrounding separators trimmed, lowercased)
-        * `{%tag:<tag>%}` - renders a URI to the tag page for the given `<tag>`, e.g.:
-          * `[My Custom Text]({%tag:multi-word-tag%})` - renders a link to `/tags/multi-word-tag/` with `My Custom Text` as link text
-          * `[My Custom Text]({%tag:Multi Word Tag%})` - also renders a link to `/tags/multi-word-tag/` (spaces normalized)
+        * `{%tag:<tag>%}` — renders a URI to the tag page for the given `<tag>`, e.g.:
+          * `[My Custom Text]({%tag:multi-word-tag%})` — renders a link to `/tags/multi-word-tag/` with `My Custom Text` as link text
+          * `[My Custom Text]({%tag:Multi Word Tag%})` — also renders a link to `/tags/multi-word-tag/` (spaces normalized)
           * `<tag>` supports alphanumeric characters, hyphens (`-`), and spaces
       * _note: tag content directives are purely a link rendering convenience — they do **not** add tags to the post's tag list;
         to have a tag appear on the post's tag list, it must be explicitly listed in the YAML metadata `tags` section_
-    * `{%search:<search query>%}` - renders a URI to the search page with the given `<search query>`
+    * `{%search:<search query>%}` — renders a URI to the search page with the given `<search query>`
       (_note: this content directive would work as expected only if
       the `enableSearch` configuration option was not disabled - see more details in the corresponding section below)_, e.g.:
-      * `[Search for "something interesting"]({%search:something interesting%})` - would render a link with title `Search for "something interesting"` pointing to `/search.html?q=something%20interesting`
+      * `[Search for "something interesting"]({%search:something interesting%})` — would render a link with title `Search for "something interesting"` pointing to `/search.html?q=something%20interesting`
         * _Search would return content entries containing the words `something` **or** `interesting`_
-      * `[Search for "something+interesting"]({%search:something+interesting%})` - would render a link with title `Search for "something+interesting"` pointing to `/search.html?q=something%2Binteresting`
+      * `[Search for "something+interesting"]({%search:something+interesting%})` — would render a link with title `Search for "something+interesting"` pointing to `/search.html?q=something%2Binteresting`
         * _Search would return content entries containing the words `something` **and** `interesting`_
-    * `{media(<properties>):<file(s)>}` - renders images/videos from the corresponding `deploy/media/<entry-id>` dir
-      * to render specific media files, list them explicitly, e.g.:
+    * `{media(<properties>):<file(s)>}` — renders images/videos from the corresponding `deploy/media/<entry-id>` dir
+      * to render specific media files, list them explicitly (comma-separated), e.g.:
         * `{media:1.jpg}`
         * `{media:1.jpg,2.png}`
         * `{media:1.mp4,1.jpg,2.png}`
+      * **file extensions are optional** — list just the base name and every file with that name
+        and any supported extension is rendered:
+        * `{media:1,2}` renders e.g. `1.jpg` and `2.png` (and would render both `1.jpg` and
+          `1.png` if both existed)
       * `{media}` (without any explicitly listed files)
         renders all the media files from the corresponding `deploy/media/<entry-id>` dir,
         _excluding the explicitly listed media files_
-      * each **explicitly listed** file may optionally be followed by a `|<caption>|` block
-        to attach a caption to that particular media item:
-        * `{media:1.jpg|First image caption|,2.jpg|Second image caption|}`
-        * `{media:1.jpg|Captioned image|,2.png}` (second file has no caption)
+      * **captions** are an optional, `|`-separated list appended after the file list:
+        * targeted — `<name>: <caption>` attaches a caption to a specific file; the `<name>` may be
+          given with or without an extension (a bare base name applies the caption to every file
+          sharing that name):
+          * `{media:1,2,3 | 2: Second image | 3: Third image}`
+          * `{media | 3: Third image}` (all media, caption only on `3.*`)
+        * nameless — a bare `<caption>` attaches to the directive's **single** file (so you don't
+          have to repeat the file name); valid only when exactly one file is listed:
+          * `{media:1.jpg|Just one image}`
         * captions are rendered as plain text — Markdown is **not** parsed inside them
-        * captions may contain commas, spaces, and other punctuation; commas
-          inside a `|...|` block are preserved as part of the caption rather than
-          being treated as entry separators, e.g.
-          `{media:1.jpg|one, two, three|,2.png|plain|}` renders two items
+        * `:` separates the name from the caption; use `::` to include a literal `:` in a caption
+          (e.g. `{media:1.jpg|Aspect 2::1}` renders the caption `Aspect 2:1`)
         * captions must **not** contain `|`, `{`, or `}` (these remain reserved delimiters)
+        * a trailing/empty/dangling `|`, or a nameless caption with zero or several files listed,
+          is ambiguous and is reported as a warning (see _content directive warnings_ below)
         * the caption rendering (position, styling) is theme-specific
           * see the corresponding theme documentation for details
       * additional properties might be supported by each specific theme to fine-tune the media container rendering
@@ -301,18 +310,27 @@ $ mbgen help [command]
           * `{media(key1=val1,key2=val2)}`
      * `{with-media(<properties>):<file(s)>} <related-content> {/}` -
        renders images/videos alongside the `<related-content>`
-       * otherwise, works the same way as the `{media}` directive above (including
-         the optional per-file `|<caption>|` block), e.g.:
+       * otherwise, works the same way as the `{media}` directive above (including optional
+         extensions and the `|`-separated caption list), e.g.:
          * `{with-media:1.jpg} ... {/}`
          * `{with-media:1.jpg,1.mp4} ... {/}`
-         * `{with-media:1.mp4|Video caption|,1.png|Image caption|} ... {/}`
+         * `{with-media:1,2 | 1: Video caption | 2: Image caption} ... {/}`
+         * `{with-media:1.jpg|Single caption} ... {/}`
          * `{with-media} ... {/}`
-    * `{embed:<url>}` - allows to embed media from the supported media content hosting platforms, e.g.:
+    * `{embed:<url>}` — allows to embed media from the supported media content hosting platforms, e.g.:
       * `{embed:youtu.be/A_bCdEfGhIj-X}`
       * `{embed:vimeo.com/1234567890}`
       * The following platforms are currently supported:
         * YouTube
         * Vimeo
+    * _content directive warnings_ — the `generate` and `inspect` commands report content directive
+      problems so they can be fixed (the list is printed at the end of the `generate` output):
+      * **malformed/ambiguous media captions** - e.g. a nameless caption with zero or several files
+        listed, a dangling/trailing `|`, or a caption spec missing its `name:`
+      * **unparsed directives** — any leftover `{...}` directive that no handler recognized
+        (typically a typo / invalid directive); `{...}` inside code (single/triple
+        backticks) is ignored
+      * each warning lists the source Markdown file and the offending directive
   * Custom/additional resources can be integrated on the global and/or theme level
     by placing a `head.html` file inside the `include` dir (for global level includes)
     and/or the `include/<theme-name>` dir (for theme level includes)
