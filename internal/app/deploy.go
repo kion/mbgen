@@ -8,6 +8,34 @@ import (
 	"strings"
 )
 
+// buildDeployOptions returns the ordered rsync deploy stages: one stage per content dir
+// (ordered so that content that is linked to uploads before the content that links to it,
+// avoiding broken links mid-deploy), followed by a catch-all stage for everything else
+// that excludes the dirs already handled by the dedicated stages
+func buildDeployOptions(source string, destination string, destPathSeparator rune) []deployOptions {
+	stageDirNames := []string{
+		mediaDirName,
+		deployPageDirName,
+		deployPostDirName,
+		deployPostsDirName,
+		deployTagsDirName,
+		deployCollectionsDirName,
+		deployArchiveDirName,
+	}
+	deployOpts := make([]deployOptions, 0, len(stageDirNames)+1)
+	for _, dirName := range stageDirNames {
+		deployOpts = append(deployOpts, deployOptions{
+			source:      fmt.Sprintf("%s%c%s%c", source, os.PathSeparator, dirName, os.PathSeparator),
+			destination: fmt.Sprintf("%s%c%s", destination, destPathSeparator, dirName),
+		})
+	}
+	return append(deployOpts, deployOptions{
+		source:      fmt.Sprintf("%s%c", source, os.PathSeparator),
+		destination: destination,
+		exclude:     stageDirNames,
+	})
+}
+
 func rsyncDeploy(destination string) {
 	if !dirExists(deployDirName) {
 		sprintln("deploy dir does not exist - make sure to run the `mbgen generate` command first")
@@ -28,44 +56,7 @@ func rsyncDeploy(destination string) {
 			}
 		}
 
-		deployOpts := []deployOptions{
-			{
-				source:      fmt.Sprintf("%s%c%s%c", source, os.PathSeparator, mediaDirName, os.PathSeparator),
-				destination: fmt.Sprintf("%s%c%s", destination, destPathSeparator, mediaDirName),
-			},
-			{
-				source:      fmt.Sprintf("%s%c%s%c", source, os.PathSeparator, deployPageDirName, os.PathSeparator),
-				destination: fmt.Sprintf("%s%c%s", destination, destPathSeparator, deployPageDirName),
-			},
-			{
-				source:      fmt.Sprintf("%s%c%s%c", source, os.PathSeparator, deployPostDirName, os.PathSeparator),
-				destination: fmt.Sprintf("%s%c%s", destination, destPathSeparator, deployPostDirName),
-			},
-			{
-				source:      fmt.Sprintf("%s%c%s%c", source, os.PathSeparator, deployPostsDirName, os.PathSeparator),
-				destination: fmt.Sprintf("%s%c%s", destination, destPathSeparator, deployPostsDirName),
-			},
-			{
-				source:      fmt.Sprintf("%s%c%s%c", source, os.PathSeparator, deployTagsDirName, os.PathSeparator),
-				destination: fmt.Sprintf("%s%c%s", destination, destPathSeparator, deployTagsDirName),
-			},
-			{
-				source:      fmt.Sprintf("%s%c%s%c", source, os.PathSeparator, deployArchiveDirName, os.PathSeparator),
-				destination: fmt.Sprintf("%s%c%s", destination, destPathSeparator, deployArchiveDirName),
-			},
-			{
-				source:      fmt.Sprintf("%s%c", source, os.PathSeparator),
-				destination: destination,
-				exclude: []string{
-					mediaDirName,
-					deployPageDirName,
-					deployPostDirName,
-					deployPostsDirName,
-					deployTagsDirName,
-					deployArchiveDirName,
-				},
-			},
-		}
+		deployOpts := buildDeployOptions(source, destination, destPathSeparator)
 
 		for i := 0; i < len(deployOpts); i++ {
 			dOpts := deployOpts[i]
