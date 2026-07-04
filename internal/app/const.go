@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	appVersion                                  = "1.9.0"
+	appVersion                                  = "2.0.0"
 	defaultGitHubRepoUrl                        = "github.com/kion/mbgen"
 	defaultGitHubRepoThemesUrl                  = defaultGitHubRepoUrl + "/themes"
 	defaultGitHubRepoPageContentSamplesUrl      = defaultGitHubRepoUrl + "/content-samples/pages"
@@ -24,6 +24,8 @@ const (
 	mediaTemplateFileName                       = "media" + templateFileExtension
 	archiveTemplateFileName                     = "archive" + templateFileExtension
 	tagIndexTemplateFileName                    = "tag-index" + templateFileExtension
+	collectionTemplateFileName                  = "collection" + templateFileExtension
+	collectionIndexTemplateFileName             = "collection-index" + templateFileExtension
 	searchTemplateFileName                      = "search" + templateFileExtension
 	pagerTemplateFileName                       = "pager" + templateFileExtension
 	contentDirectiveTemplateFileNameFormat      = "content-%s" + templateFileExtension
@@ -45,13 +47,16 @@ const (
 	deployPageDirName                           = "page"
 	deployArchiveDirName                        = "archive"
 	deployTagsDirName                           = "tags"
+	deployCollectionsDirName                    = "collections"
 	metaDataKeyDate                             = "date"
 	metaDataKeyTime                             = "time"
 	metaDataKeyTitle                            = "title"
 	metaDataKeyTags                             = "tags"
+	metaDataKeyCollections                      = "collections"
 	configFileName                              = "config.yml"
 	defaultGenerateArchive                      = true
 	defaultGenerateTagIndex                     = true
+	defaultGenerateCollectionIndex              = true
 	defaultEnableSearch                         = true
 	defaultPageSize                             = 10
 	defaultResizeOrigImages                     = false
@@ -89,6 +94,8 @@ const (
 	commandCleanupTargetThumbs                  = "thumbs"
 	commandCleanupTargetTags                    = "tags"
 	commandCleanupTargetTagIndex                = "tag-index"
+	commandCleanupTargetCollections             = "collections"
+	commandCleanupTargetCollectionIndex         = "collection-index"
 	commandCleanupTargetArchive                 = "archive"
 	commandCleanupTargetSearch                  = "search"
 	commandCleanupTargetMedia                   = "media"

@@ -1,0 +1,28 @@
+{{ $coll := .Content }}
+<section class="collection-shelf">
+    <header>
+        <span class="title">{{ $coll.Title }}</span>
+    </header>
+    <section class="items">
+        {{ range $item := $coll.Items }}
+            <a class="item" href="/collections/{{ $coll.URI }}/{{ $item.URI }}/">
+                {{ $imgCnt := len $item.Media }}
+                {{ if gt $imgCnt 3 }}{{ $imgCnt = 3 }}{{ end }}
+                <div class="item-images cnt-{{ $imgCnt }}">
+                    {{ if eq $imgCnt 0 }}
+                        <div class="placeholder"></div>
+                    {{ else }}
+                        {{ range $i, $m := $item.Media }}
+                            {{ if lt $i 3 }}
+                                <img class="img-{{ $i }}" src="{{ $m.ThumbUri 1 }}" alt="{{ $item.Title }}" loading="lazy" />
+                            {{ end }}
+                        {{ end }}
+                    {{ end }}
+                    <div class="item-info">
+                        <span class="item-title">{{ $item.Title }}</span>{{ if gt $item.PostCnt 1 }}<span class="item-cnt">({{ $item.PostCnt }})</span>{{ end }}
+                    </div>
+                </div>
+            </a>
+        {{ end }}
+    </section>
+</section>

@@ -21,7 +21,7 @@ func process(pages []page, posts []post,
 	resLoader resourceLoader, handleOutput processorOutputHandler) stats {
 	var searchIndex = mapSlice{}
 	pageCnt := processPages(pages, &searchIndex, resLoader, handleOutput)
-	postCnt, tagCnt := processPosts(posts, &searchIndex, resLoader, handleOutput)
+	postCnt, tagCnt, collCnt, collItemCnt := processPosts(posts, &searchIndex, resLoader, handleOutput)
 	config := resLoader.config
 	if len(config.generateFeeds) > 0 {
 		generateFeeds(posts, config, handleOutput)
@@ -42,9 +42,11 @@ func process(pages []page, posts []post,
 		}
 	}
 	return stats{
-		pageCnt: pageCnt,
-		postCnt: postCnt,
-		tagCnt:  tagCnt,
+		pageCnt:     pageCnt,
+		postCnt:     postCnt,
+		tagCnt:      tagCnt,
+		collCnt:     collCnt,
+		collItemCnt: collItemCnt,
 	}
 }
 
@@ -100,8 +102,10 @@ func processPages(pages []page, searchIndex *mapSlice,
 }
 
 func processPosts(posts []post, searchIndex *mapSlice,
-	resLoader resourceLoader, handleOutput processorOutputHandler) (int, int) {
+	resLoader resourceLoader, handleOutput processorOutputHandler) (int, int, int, int) {
 	tagCnt := 0
+	collCnt := 0
+	collItemCnt := 0
 	if posts != nil {
 		sprintln(" - processing posts ...")
 
@@ -142,6 +146,22 @@ func processPosts(posts []post, searchIndex *mapSlice,
 		tagPostCnt := make(map[string]int)
 		tagContent := make(map[string][]string)
 		tagTitlePostCnt := make(map[[2]string]int)
+
+		collPostCnt := make(map[string]int)
+		collContent := make(map[string][]string)
+
+		// aggregate collections up front: post footer rendering needs
+		// the site-wide per-item post counts to decide whether to render item links
+		collections := aggregateCollections(posts)
+		itemPostCnt := make(map[string]int)
+		for _, coll := range collections {
+			for _, item := range coll.Items {
+				itemPostCnt[coll.URI+"/"+item.URI] = item.PostCnt
+			}
+		}
+		for i := range posts {
+			posts[i].collItemPostCnt = itemPostCnt
+		}
 
 		for _, post := range posts {
 			pagePostCnt++
@@ -237,12 +257,29 @@ func processPosts(posts []post, searchIndex *mapSlice,
 			if len(post.Tags) > 0 {
 				seenUris := map[string]struct{}{}
 				for _, tag := range post.Tags {
-					uri := normalizeTagURI(tag)
+					uri := normalizeURIString(tag)
 					tagTitlePostCnt[[2]string{tag, uri}]++
 					if _, ok := seenUris[uri]; !ok {
 						seenUris[uri] = struct{}{}
 						tagPostCnt[uri]++
 						tagContent[uri] = append(tagContent[uri], postContent)
+					}
+				}
+			}
+
+			if len(post.Collections) > 0 {
+				seenKeys := map[string]struct{}{}
+				for _, ref := range post.Collections {
+					collUri := normalizeURIString(ref.Collection)
+					itemUri := normalizeURIString(ref.Item)
+					if collUri == "" || itemUri == "" {
+						continue
+					}
+					key := collUri + "/" + itemUri
+					if _, ok := seenKeys[key]; !ok {
+						seenKeys[key] = struct{}{}
+						collPostCnt[key]++
+						collContent[key] = append(collContent[key], postContent)
 					}
 				}
 			}
@@ -332,8 +369,10 @@ func processPosts(posts []post, searchIndex *mapSlice,
 			tagCnt = tagPostCntLen
 			processPaginatedPostContent(tagPostCnt, tagContent, pageSize, deployTagsDirName, pagerTemplate, resLoader, handleOutput)
 		}
+
+		collCnt, collItemCnt = processCollections(collections, collPostCnt, collContent, pagerTemplate, resLoader, handleOutput)
 	}
-	return len(posts), tagCnt
+	return len(posts), tagCnt, collCnt, collItemCnt
 }
 
 func processPaginatedPostContent(postCnt map[string]int, content map[string][]string, pageSize int,
@@ -369,7 +408,8 @@ func processPaginatedPostContent(postCnt map[string]int, content map[string][]st
 					} else {
 						fileName = strconv.Itoa(pd.CurrPageNum) + contentFileExtension
 					}
-					outputFilePath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, contentDeployDirName, os.PathSeparator, key, os.PathSeparator, fileName)
+					// key may contain a nested sub-path (e.g. collection/item), so join portably
+					outputFilePath := filepath.Join(deployDirName, contentDeployDirName, filepath.FromSlash(key), fileName)
 					processContent(fileName, Post, resLoader.config.siteName+" - "+key, pageContent, outputFilePath, resLoader, handleOutput)
 					pagePostCnt = 0
 					pageContent = ""
@@ -387,7 +427,7 @@ func processPaginatedPostContent(postCnt map[string]int, content map[string][]st
 					check(err)
 					pageContent += pagerBuffer.String()
 				}
-				outputFilePath := fmt.Sprintf("%s%c%s%c%s%c%s", deployDirName, os.PathSeparator, contentDeployDirName, os.PathSeparator, key, os.PathSeparator, fileName)
+				outputFilePath := filepath.Join(deployDirName, contentDeployDirName, filepath.FromSlash(key), fileName)
 				processContent(fileName, Post, resLoader.config.siteName+" - "+key, pageContent, outputFilePath, resLoader, handleOutput)
 			}
 		}

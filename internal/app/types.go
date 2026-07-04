@@ -63,6 +63,7 @@ type appConfig struct {
 	homePage                      string
 	generateArchive               bool
 	generateTagIndex              bool
+	generateCollectionIndex       bool
 	generateFeeds                 []string
 	feedPostCnt                   int
 	feedPostViewOnWebsiteLinkText string
@@ -353,6 +354,44 @@ func (p page) EntityId() string {
 	return p.Id
 }
 
+// collectionItemData is the aggregated view of a single collection item across all posts referencing it
+type collectionItemData struct {
+	Title   string  // display title (first-seen, i.e. from the newest referencing post)
+	URI     string  // normalized URI segment within the collection
+	PostCnt int     // number of distinct posts referencing this item
+	Media   []media // all item images across posts, deduped by URI, newest-post-first
+}
+
+// collectionData is the aggregated view of a collection across all posts referencing its items
+type collectionData struct {
+	Title   string               // display title (first-seen, i.e. from the newest referencing post)
+	URI     string               // normalized URI segment under the collections dir
+	Items   []collectionItemData // ordered by first appearance (items referenced by newer posts first)
+	PostCnt int                  // number of distinct posts referencing any item of this collection
+}
+
+// postCollectionRef is a single collection item reference declared in post frontmatter;
+// Collection/Item hold the raw titles as written (URIs are derived via normalizeURIString),
+// Media holds the item images resolved at parse time (post media dir, shared media fallback)
+type postCollectionRef struct {
+	Collection string
+	Item       string
+	Media      []media
+}
+
+type postCollectionItemLink struct {
+	Title string
+	URI   string
+}
+
+// postCollectionGroup is the per-collection view of a post's collection refs,
+// used by the post footer back-links template
+type postCollectionGroup struct {
+	Title string
+	URI   string
+	Items []postCollectionItemLink
+}
+
 type post struct {
 	Id             string
 	Date           civil.Date
@@ -361,9 +400,13 @@ type post struct {
 	Body           string
 	FeedContent    string // cleaned markdown content for feed generation (directives removed)
 	Tags           []string
+	Collections    []postCollectionRef
 	SearchData     searchData
 	Warnings       []string // content-directive warnings (malformed captions, unparsed directives)
 	skipProcessing bool
+	// site-wide "<collection-uri>/<item-uri>" -> distinct referencing post count,
+	// populated during processing (from the aggregated collections model) for footer rendering
+	collItemPostCnt map[string]int
 }
 
 func (p post) ContentEntityType() contentEntityType {
@@ -372,6 +415,39 @@ func (p post) ContentEntityType() contentEntityType {
 
 func (p post) EntityId() string {
 	return p.Id
+}
+
+// CollectionGroups groups the post's collection refs by collection for footer back-link rendering,
+// preserving ref order and deduplicating items by URI
+func (p post) CollectionGroups() []postCollectionGroup {
+	var groups []postCollectionGroup
+	groupIdx := map[string]int{}
+	seenItems := map[string]struct{}{}
+	for _, ref := range p.Collections {
+		collUri := normalizeURIString(ref.Collection)
+		itemUri := normalizeURIString(ref.Item)
+		if collUri == "" || itemUri == "" {
+			continue
+		}
+		gi, ok := groupIdx[collUri]
+		if !ok {
+			groups = append(groups, postCollectionGroup{Title: ref.Collection, URI: collUri})
+			gi = len(groups) - 1
+			groupIdx[collUri] = gi
+		}
+		key := collUri + "/" + itemUri
+		if _, ok := seenItems[key]; ok {
+			continue
+		}
+		seenItems[key] = struct{}{}
+		// an item link is redundant when this post is the only one referencing the item —
+		// the collection link alone is rendered then (a nil map means no count data; keep all items)
+		if p.collItemPostCnt != nil && p.collItemPostCnt[key] <= 1 {
+			continue
+		}
+		groups[gi].Items = append(groups[gi].Items, postCollectionItemLink{Title: ref.Item, URI: itemUri})
+	}
+	return groups
 }
 
 func (p post) HasDateOrTime() bool {
@@ -453,10 +529,12 @@ type tagData struct {
 }
 
 type stats struct {
-	pageCnt int
-	postCnt int
-	tagCnt  int
-	genCnt  int
+	pageCnt     int
+	postCnt     int
+	tagCnt      int
+	collCnt     int
+	collItemCnt int
+	genCnt      int
 }
 
 type watchReloadData struct {

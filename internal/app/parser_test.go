@@ -170,7 +170,7 @@ func TestParser(t *testing.T) {
 	verifyStringSlicesEqual(post.Tags, expectedTags, t)
 }
 
-func TestNormalizeTagURI(t *testing.T) {
+func TestNormalizeURIString(t *testing.T) {
 	cases := []struct {
 		input    string
 		expected string
@@ -184,9 +184,9 @@ func TestNormalizeTagURI(t *testing.T) {
 		{"TourDeZwift", "tourdezwift"},
 	}
 	for _, c := range cases {
-		result := normalizeTagURI(c.input)
+		result := normalizeURIString(c.input)
 		if result != c.expected {
-			t.Errorf("normalizeTagURI(%q) = %q, want %q", c.input, result, c.expected)
+			t.Errorf("normalizeURIString(%q) = %q, want %q", c.input, result, c.expected)
 		}
 	}
 }
@@ -220,8 +220,8 @@ Post body.`
 		t.Errorf("Expected tag %q, got %v", testTagMultiWordMetadata, post.Tags)
 	}
 	// verify the tag still normalizes to the expected URI
-	if normalizeTagURI(post.Tags[0]) != testTagMultiWordNormalized {
-		t.Errorf("Expected normalized URI %q, got %q", testTagMultiWordNormalized, normalizeTagURI(post.Tags[0]))
+	if normalizeURIString(post.Tags[0]) != testTagMultiWordNormalized {
+		t.Errorf("Expected normalized URI %q, got %q", testTagMultiWordNormalized, normalizeURIString(post.Tags[0]))
 	}
 }
 
@@ -1269,5 +1269,121 @@ func TestInspectTagTitleDuplicates(t *testing.T) {
 	// confirm single-title URIs are excluded
 	if _, ok := dupes["books"]; ok {
 		t.Error("URI with only one distinct title should not be reported as a duplicate")
+	}
+}
+
+func TestCollectionsMetadataParsing(t *testing.T) {
+	resLoader := setupMediaCaptionFixture(t, "coll-post",
+		[]string{"game1-cover1.jpg", "game1-cover2.jpg", "game4.png"})
+
+	sharedDir := fmt.Sprintf("%s/%s/%s", deployDirName, mediaDirName, sharedMediaDirName)
+	if err := os.MkdirAll(sharedDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(sharedDir+"/shared-cover.jpg", []byte("fake"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	postContent := `---
+date: 2026-01-15
+title: Collections Test
+collections:
+  Books:
+    - Some Book
+  Board Games:
+    - Game 1: [game1-cover1.jpg, game1-cover2.jpg]
+    - Game 2: shared-cover.jpg
+    - Game 3
+    - Game 4: game4
+---
+
+Post body.`
+
+	post := parsePost("coll-post", postContent, defaultConfig(), resLoader)
+
+	if len(post.Warnings) != 0 {
+		t.Fatalf("expected no warnings, got %v", post.Warnings)
+	}
+
+	type expRef struct {
+		collection string
+		item       string
+		uris       []string
+	}
+	expected := []expRef{
+		{"Board Games", "Game 1", []string{"/media/post/coll-post/game1-cover1.jpg", "/media/post/coll-post/game1-cover2.jpg"}},
+		{"Board Games", "Game 2", []string{"/media/shared/shared-cover.jpg"}},
+		{"Board Games", "Game 3", nil},
+		{"Board Games", "Game 4", []string{"/media/post/coll-post/game4.png"}},
+		{"Books", "Some Book", nil},
+	}
+
+	if len(post.Collections) != len(expected) {
+		t.Fatalf("expected %d collection refs, got %d: %+v", len(expected), len(post.Collections), post.Collections)
+	}
+	for i, exp := range expected {
+		ref := post.Collections[i]
+		if ref.Collection != exp.collection || ref.Item != exp.item {
+			t.Errorf("ref[%d]: expected %s/%s, got %s/%s", i, exp.collection, exp.item, ref.Collection, ref.Item)
+		}
+		if len(ref.Media) != len(exp.uris) {
+			t.Errorf("ref[%d] %s/%s: expected %d media, got %d", i, exp.collection, exp.item, len(exp.uris), len(ref.Media))
+			continue
+		}
+		for j, uri := range exp.uris {
+			if ref.Media[j].Uri != uri {
+				t.Errorf("ref[%d] media[%d]: expected URI %q, got %q", i, j, uri, ref.Media[j].Uri)
+			}
+			if ref.Media[j].Type != Image {
+				t.Errorf("ref[%d] media[%d]: expected Image type", i, j)
+			}
+		}
+	}
+}
+
+func TestCollectionsMetadataWarnings(t *testing.T) {
+	resLoader := setupMediaCaptionFixture(t, "coll-warn-post", []string{"video.mp4"})
+
+	postContent := `---
+date: 2026-01-15
+collections:
+  Board Games:
+    - Game 1: no-such-image.jpg
+    - Game 2: video.mp4
+    - 12345
+  Books: not-a-list
+---
+
+Post body.`
+
+	post := parsePost("coll-warn-post", postContent, defaultConfig(), resLoader)
+
+	// valid refs are kept (without the unresolvable/non-image media)
+	if len(post.Collections) != 2 {
+		t.Fatalf("expected 2 collection refs, got %d: %+v", len(post.Collections), post.Collections)
+	}
+	for _, ref := range post.Collections {
+		if len(ref.Media) != 0 {
+			t.Errorf("ref %s/%s: expected no media, got %+v", ref.Collection, ref.Item, ref.Media)
+		}
+	}
+
+	expectedWarnings := []string{
+		"no-such-image.jpg", // unresolved image reference
+		"video.mp4",         // not an image
+		"12345",             // malformed item entry (not a string or name→image map)
+		"Books",             // malformed item list (not a list)
+	}
+	for _, exp := range expectedWarnings {
+		found := false
+		for _, w := range post.Warnings {
+			if strings.Contains(w, exp) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected a warning mentioning %q, got %v", exp, post.Warnings)
+		}
 	}
 }

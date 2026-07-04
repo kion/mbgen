@@ -3,6 +3,7 @@
     --media-width-medium: 32%;
     --media-width-large: 49%;
     --media-width-full: 100%;
+    --collection-item-height: 240px;
 }
 
 body {
@@ -62,7 +63,9 @@ body > main .post:last-of-type {
 .page,
 .post,
 .archive,
-.tag-index {
+.tag-index,
+.collection-index,
+.collection-shelf {
     margin-top: 1em;
     border: 2px solid #555;
     border-radius: 4px;
@@ -139,6 +142,11 @@ header a.permalink {
 .post footer {
     padding: 1em;
     border-top: 2px dashed #555;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5em 1.5em;
 }
 
 .post footer .tags,
@@ -182,7 +190,7 @@ header a.permalink {
     }
     &:before {
         font-family: FontAwesome;
-        content: '\23';
+        content: '\f02b';
         margin-right: 0.4em;
     }
 }
@@ -194,6 +202,54 @@ header a.permalink {
     &:hover {
         font-weight: bold;
         background-color: #222;
+    }
+}
+
+.post footer .collections {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    column-gap: 0.5em;
+    row-gap: 0.5em;
+    flex-wrap: wrap;
+    font-size: 0.8em;
+    /* keep collection back-links aligned right, on their own row when tags don't leave enough room */
+    margin-left: auto;
+}
+
+.post footer .collections .collection {
+    font-size: 0.8em;
+    color: #777;
+    background-color: #333;
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 4px 6px;
+}
+
+.post footer .collections .collection .separator {
+    color: #555;
+}
+
+.post footer .collections .collection a {
+    color: #777;
+    text-decoration: none;
+    &:hover {
+        color: #FF9C57;
+    }
+}
+
+.post footer .collections .collection a.collection-link {
+    &:before {
+        font-family: FontAwesome;
+        content: '\f5fd';
+        margin-right: 0.4em;
+    }
+}
+
+.post footer .collections .collection a.collection-item {
+    color: #999;
+    &:hover {
+        color: #FF9C57;
     }
 }
 
@@ -342,7 +398,7 @@ header a.permalink {
     bottom: 4px;
     background-color: rgba(0, 0, 0, 0.5);
     color: #eee;
-    font-size: 0.8em;
+    font-size: 0.8rem;
     padding: 4px 6px;
     border-radius: 2px;
     box-sizing: border-box;
@@ -406,6 +462,191 @@ header a.permalink {
 
 .tag-index {
     padding: 1em;
+}
+
+.collection-index {
+    padding: 1em;
+}
+
+.collection-index .collections {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 1em;
+}
+
+.collection-index .collections .collection {
+    color: #FF9C57;
+    background-color: #333;
+    border: 1px solid #111;
+    border-radius: 4px;
+    padding: 8px 12px;
+    text-decoration: none;
+    white-space: nowrap;
+    &:hover {
+        font-weight: bold;
+        background-color: #222;
+    }
+}
+
+.collection-index .collections .collection .collection-cnt {
+    color: #777;
+}
+
+.collection-index .collections .collection .collection-title {
+    &:before {
+        font-family: FontAwesome;
+        content: '\f5fd';
+        margin-right: 0.4em;
+    }
+}
+
+/* full-width header, structured like the single post header */
+.collection-shelf header {
+    color: #777;
+    font-weight: bold;
+    padding: 1em;
+    border-bottom: 2px dashed #555;
+}
+
+.collection-shelf header .title {
+    color: #999;
+}
+
+/* shelf-style row layout: all tiles share a fixed height, widths vary with image aspect */
+.collection-shelf .items {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 1em;
+    padding: 1em;
+}
+
+.collection-shelf .items .item {
+    display: block;
+    max-width: 100%;
+    text-decoration: none;
+    background-color: #333;
+    border: 1px solid #555;
+    border-radius: 4px;
+    overflow: hidden;
+    &:hover {
+        border-color: #777;
+    }
+}
+
+.collection-shelf .items .item .item-images {
+    position: relative;
+    height: var(--collection-item-height);
+    max-width: 100%;
+    overflow: hidden;
+    background-color: #2b2b2b;
+}
+
+/* placeholder tiles have no image to derive the width from — use a book-cover-ish aspect */
+.collection-shelf .items .item .item-images.cnt-0 {
+    aspect-ratio: 3 / 4;
+}
+
+.collection-shelf .items .item .item-images .placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 0.5em;
+    color: #777;
+    background: repeating-linear-gradient(45deg, #2b2b2b, #2b2b2b 10px, #333 10px, #333 20px);
+}
+
+.collection-shelf .items .item .item-images img {
+    transition: clip-path 0.3s ease-in-out;
+}
+
+/* the first image renders uncropped at its natural aspect ratio and defines the tile width
+   (positioned so z-index applies when its clipped band expands on hover) */
+.collection-shelf .items .item .item-images img.img-0 {
+    position: relative;
+    display: block;
+    height: 100%;
+    width: auto;
+    max-width: 100%;
+    object-fit: contain;
+}
+
+/* additional composite images overlay the container (their diagonal bands crop to fit) */
+.collection-shelf .items .item .item-images img.img-1,
+.collection-shelf .items .item .item-images img.img-2 {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/*
+ * composite item image containers: 2-3 images divided by shallow full-width
+ * diagonal separators (rising left to right), with equal-area bands;
+ * all clip-path polygons use 6 vertices (with degenerate duplicates where needed),
+ * so the expand-on-hover transition can interpolate between the shapes
+ */
+.collection-shelf .items .item .item-images.cnt-2 img.img-0 {
+    clip-path: polygon(0 0, 100% 0, 100% 0, 100% 35%, 0 65%, 0 0);
+}
+
+.collection-shelf .items .item .item-images.cnt-2 img.img-1 {
+    clip-path: polygon(0 65%, 100% 35%, 100% 35%, 100% 100%, 0 100%, 0 65%);
+}
+
+.collection-shelf .items .item .item-images.cnt-3 img.img-0 {
+    clip-path: polygon(0 0, 100% 0, 100% 0, 100% 23.33%, 0 43.33%, 0 0);
+}
+
+.collection-shelf .items .item .item-images.cnt-3 img.img-1 {
+    clip-path: polygon(0 43.33%, 100% 23.33%, 100% 23.33%, 100% 56.66%, 0 76.66%, 0 43.33%);
+}
+
+.collection-shelf .items .item .item-images.cnt-3 img.img-2 {
+    clip-path: polygon(0 76.66%, 100% 56.66%, 100% 56.66%, 100% 100%, 0 100%, 0 76.66%);
+}
+
+/* expand the hovered image to the full container (pointer events respect clip-path) */
+.collection-shelf .items .item .item-images.cnt-2 img:hover,
+.collection-shelf .items .item .item-images.cnt-3 img:hover {
+    clip-path: polygon(0 0, 100% 0, 100% 0, 100% 100%, 0 100%, 0 0);
+    z-index: 1;
+}
+
+/* bottom overlay with the item title and post count, rendered flush with the
+   image edges (like post image captions, which sit inside the media item padding) */
+.collection-shelf .items .item .item-images .item-info {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    color: #eee;
+    padding: 4px 6px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-end;
+    column-gap: 0.5em;
+    font-size: 0.8rem;
+    /* keep the overlay above the expanded (hovered) composite image */
+    z-index: 2;
+}
+
+.collection-shelf .items .item .item-images .item-info .item-title {
+    overflow-wrap: anywhere;
+}
+
+.collection-shelf .items .item .item-images .item-info .item-cnt {
+    color: #bbb;
+    white-space: nowrap;
 }
 
 .pager {

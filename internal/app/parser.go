@@ -216,11 +216,147 @@ func parsePost(postId string, content string, config appConfig, resLoader resour
 			}
 		}
 	}
+	collRefs, collWarnings := parseCollectionsMetaData(metaData, postId, config)
+	post.Collections = collRefs
+	post.Warnings = append(post.Warnings, collWarnings...)
 	post.SearchData = searchData{
 		TypeId:  "post/" + post.Id,
 		Content: strings.ToLower(rawTitle) + " " + strings.ToLower(rawBodyContent) + " " + strings.ToLower(strings.Join(post.Tags[:], " ")),
 	}
 	return post
+}
+
+// toStringKeyMap normalizes a YAML-decoded map value: depending on the YAML library version,
+// nested maps decode as either map[string]interface{} or map[interface{}]interface{}
+func toStringKeyMap(v interface{}) (map[string]interface{}, bool) {
+	switch m := v.(type) {
+	case map[string]interface{}:
+		return m, true
+	case map[interface{}]interface{}:
+		result := make(map[string]interface{}, len(m))
+		for k, val := range m {
+			ks, ok := k.(string)
+			if !ok {
+				return nil, false
+			}
+			result[ks] = val
+		}
+		return result, true
+	}
+	return nil, false
+}
+
+// parseCollectionsMetaData parses the `collections` frontmatter section of a post:
+// a map of collection name -> ordered list of items, where each item is either
+// a bare string (no images) or a single-entry `name: image(s)` map (a string or a list of strings).
+// Images resolve like all other post media (post media dir first, shared media fallback).
+// Returned refs are sorted by collection title (YAML map order is not preserved by the metadata parser,
+// and deterministic order keeps generated output stable across runs);
+// item order within each collection is preserved as written.
+func parseCollectionsMetaData(metaData map[string]interface{}, postId string, config appConfig) ([]postCollectionRef, []string) {
+	raw := metaData[metaDataKeyCollections]
+	if raw == nil {
+		return nil, nil
+	}
+	var warnings []string
+	collMap, ok := toStringKeyMap(raw)
+	if !ok {
+		warnings = append(warnings, "collections: malformed metadata (expected a map of collection name to item list)")
+		return nil, warnings
+	}
+	collTitles := make([]string, 0, len(collMap))
+	for collTitle := range collMap {
+		collTitles = append(collTitles, collTitle)
+	}
+	sort.Strings(collTitles)
+	var refs []postCollectionRef
+	for _, collTitle := range collTitles {
+		items, ok := collMap[collTitle].([]interface{})
+		if !ok {
+			warnings = append(warnings, "collections: malformed item list for collection \""+collTitle+"\" (expected a list of items)")
+			continue
+		}
+		for _, entry := range items {
+			var itemTitle string
+			var imageRefs []string
+			malformed := false
+			switch e := entry.(type) {
+			case string:
+				itemTitle = strings.TrimSpace(e)
+			default:
+				entryMap, ok := toStringKeyMap(entry)
+				if !ok || len(entryMap) != 1 {
+					malformed = true
+					break
+				}
+				for name, images := range entryMap {
+					itemTitle = strings.TrimSpace(name)
+					switch img := images.(type) {
+					case nil:
+						// `- Item Name:` — same as a bare string item
+					case string:
+						imageRefs = append(imageRefs, strings.TrimSpace(img))
+					case []interface{}:
+						for _, v := range img {
+							if s, ok := v.(string); ok {
+								imageRefs = append(imageRefs, strings.TrimSpace(s))
+							} else {
+								warnings = append(warnings, fmt.Sprintf("collections: malformed image reference %v (item \"%s\", collection \"%s\")", v, itemTitle, collTitle))
+							}
+						}
+					default:
+						warnings = append(warnings, fmt.Sprintf("collections: malformed image value %v (item \"%s\", collection \"%s\")", images, itemTitle, collTitle))
+					}
+				}
+			}
+			if malformed || itemTitle == "" {
+				warnings = append(warnings, fmt.Sprintf("collections: malformed item entry in collection \"%s\": %v", collTitle, entry))
+				continue
+			}
+			refs = append(refs, postCollectionRef{
+				Collection: collTitle,
+				Item:       itemTitle,
+				Media:      resolveCollectionRefMedia(imageRefs, itemTitle, collTitle, postId, config, &warnings),
+			})
+		}
+	}
+	return refs, warnings
+}
+
+// resolveCollectionRefMedia resolves collection item image references
+// against the post's media dir with a shared-media fallback (same semantics as explicit `{media:...}` references);
+// warning on (and skipping) references that don't resolve to an existing image file
+func resolveCollectionRefMedia(imageRefs []string, itemTitle string, collTitle string, postId string, config appConfig, warnings *[]string) []media {
+	if len(imageRefs) == 0 {
+		return nil
+	}
+	contentDir := filepath.Join(deployDirName, mediaDirName, strings.ToLower(Post.String()), postId)
+	sharedDir := filepath.Join(deployDirName, mediaDirName, sharedMediaDirName)
+	var result []media
+	for _, ref := range imageRefs {
+		if ref == "" {
+			continue
+		}
+		ext := strings.ToLower(filepath.Ext(ref))
+		var exists bool
+		if slices.Contains(imageFileExtensions, ext) || slices.Contains(videoFileExtensions, ext) {
+			exists = fileExists(filepath.Join(contentDir, ref)) || fileExists(filepath.Join(sharedDir, ref))
+		} else {
+			exists = len(expandMediaFileName(ref, contentDir)) > 0 || len(expandMediaFileName(ref, sharedDir)) > 0
+		}
+		if !exists {
+			*warnings = append(*warnings, fmt.Sprintf("collections: unresolved image reference \"%s\" (item \"%s\", collection \"%s\")", ref, itemTitle, collTitle))
+			continue
+		}
+		for _, m := range parseMediaFileNames([]string{ref}, Post, postId, config, true, nil) {
+			if m.Type != Image {
+				*warnings = append(*warnings, fmt.Sprintf("collections: image reference \"%s\" is not an image (item \"%s\", collection \"%s\")", ref, itemTitle, collTitle))
+				continue
+			}
+			result = append(result, m)
+		}
+	}
+	return result
 }
 
 func handleThumbnails(mediaDirPath string, config appConfig, thumbHandler imageThumbnailHandler) {
@@ -276,14 +412,14 @@ func resolveDirectiveMedia(mediaArg string, directive string, ceType contentEnti
 func processInnerDirectives(content string, ceType contentEntityType, ceId string, config appConfig, resLoader resourceLoader, phReps map[string]string, expListMedia *[]string, warnings *[]string) string {
 	content = hashTagRegex.ReplaceAllStringFunc(content, func(match string) string {
 		tag := match[1:] // strip leading '#'; regex guarantees '#' + tag chars
-		return fmt.Sprintf(hashTagMarkdownReplacementFormat, tag, normalizeTagURI(tag))
+		return fmt.Sprintf(hashTagMarkdownReplacementFormat, tag, normalizeURIString(tag))
 	})
 	tagAutoLinkPlaceholders := tagAutoLinkPlaceholderRegexp.FindAllStringSubmatch(content, -1)
 	if tagAutoLinkPlaceholders != nil {
 		for _, talp := range tagAutoLinkPlaceholders {
 			placeholder := talp[0]
 			linkText := talp[1]
-			tagURI := normalizeTagURI(linkText)
+			tagURI := normalizeURIString(linkText)
 			replacement := fmt.Sprintf("[%s](/%s/%s/)", linkText, deployTagsDirName, tagURI)
 			content = strings.Replace(content, placeholder, replacement, 1)
 		}
@@ -293,7 +429,7 @@ func processInnerDirectives(content string, ceType contentEntityType, ceId strin
 		for _, tlp := range tagLinkPlaceholders {
 			placeholder := tlp[0]
 			tagText := strings.TrimSpace(tlp[1])
-			link := "/" + deployTagsDirName + "/" + normalizeTagURI(tagText) + "/"
+			link := "/" + deployTagsDirName + "/" + normalizeURIString(tagText) + "/"
 			content = strings.Replace(content, placeholder, link, 1)
 		}
 	}
@@ -911,7 +1047,7 @@ func inspectTagTitleDuplicates(posts []post) map[string][]string {
 	byUri := map[string]map[string]struct{}{}
 	for _, p := range posts {
 		for _, t := range p.Tags {
-			uri := normalizeTagURI(t)
+			uri := normalizeURIString(t)
 			if byUri[uri] == nil {
 				byUri[uri] = map[string]struct{}{}
 			}

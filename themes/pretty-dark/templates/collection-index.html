@@ -1,0 +1,9 @@
+<section class="collection-index">
+    <div class="collections">
+        {{ range $collData := .Content }}
+            <a class="collection" href="/collections/{{ $collData.URI }}/">
+                <span class="collection-title">{{ $collData.Title }}</span>&nbsp;<span class="collection-cnt">({{ len $collData.Items }})</span>
+            </a>
+        {{ end }}
+    </div>
+</section>

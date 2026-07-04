@@ -40,9 +40,9 @@ var (
 			}
 			return i
 		},
-		"fmtYearAndMonth": formatYearAndMonth,
-		"toLowerCase":     strings.ToLower,
-		"normalizeTagURI": normalizeTagURI,
+		"fmtYearAndMonth":    formatYearAndMonth,
+		"toLowerCase":        strings.ToLower,
+		"normalizeURIString": normalizeURIString,
 	}
 )
 
@@ -63,6 +63,14 @@ func compileArchiveTemplate(resLoader resourceLoader) *template.Template {
 
 func compileTagIndexTemplate(resLoader resourceLoader) *template.Template {
 	return compileStandalonePageTemplate(tagIndexTemplateFileName, resLoader)
+}
+
+func compileCollectionTemplate(resLoader resourceLoader) *template.Template {
+	return compileStandalonePageTemplate(collectionTemplateFileName, resLoader)
+}
+
+func compileCollectionIndexTemplate(resLoader resourceLoader) *template.Template {
+	return compileStandalonePageTemplate(collectionIndexTemplateFileName, resLoader)
 }
 
 func compileSearchTemplate(resLoader resourceLoader) *template.Template {
@@ -225,9 +233,9 @@ func processDirectives(templateMarkup string, resLoader resourceLoader) string {
 	return templateMarkup
 }
 
-func normalizeTagURI(tag string) string {
+func normalizeURIString(str string) string {
 	var sb strings.Builder
-	for _, r := range tag {
+	for _, r := range str {
 		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-' {
 			sb.WriteRune(r)
 		} else {

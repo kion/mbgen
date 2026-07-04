@@ -107,7 +107,7 @@ func basicTest(t *testing.T, customHomePage bool) {
 	}
 
 	for _, tag := range tags {
-		expectedFiles = append(expectedFiles, deployDirName+"/"+deployTagsDirName+"/"+normalizeTagURI(tag)+"/"+indexPageFileName)
+		expectedFiles = append(expectedFiles, deployDirName+"/"+deployTagsDirName+"/"+normalizeURIString(tag)+"/"+indexPageFileName)
 	}
 
 	if !customHomePage {
@@ -162,7 +162,7 @@ func basicTest(t *testing.T, customHomePage bool) {
 					}
 				}
 				for _, tag := range tags {
-					if strings.Contains(ef, normalizeTagURI(tag)+contentFileExtension) {
+					if strings.Contains(ef, normalizeURIString(tag)+contentFileExtension) {
 						for _, post := range posts {
 							if slices.Contains(post.Tags, tag) {
 								verifyExpectedNonIndexOutputFileContentContainsPostContent(ef, outputFileContent, post, t)
@@ -234,7 +234,7 @@ func testPagination(t *testing.T, postCnt int) {
 	}
 
 	unexpectedFiles := []string{
-		deployDirName + "/" + deployTagsDirName + "/" + normalizeTagURI(tag2) + "/2" + contentFileExtension,
+		deployDirName + "/" + deployTagsDirName + "/" + normalizeURIString(tag2) + "/2" + contentFileExtension,
 	}
 
 	totalPageCnt := postCnt / defaultPageSize
@@ -247,14 +247,14 @@ func testPagination(t *testing.T, postCnt int) {
 	}
 
 	for tag, cnt := range tagCnt {
-		expectedFiles = append(expectedFiles, deployDirName+"/"+deployTagsDirName+"/"+normalizeTagURI(tag)+"/"+indexPageFileName)
+		expectedFiles = append(expectedFiles, deployDirName+"/"+deployTagsDirName+"/"+normalizeURIString(tag)+"/"+indexPageFileName)
 		if cnt > defaultPageSize {
 			tagPageCnt := cnt / defaultPageSize
 			if cnt%defaultPageSize > 0 {
 				tagPageCnt++
 			}
 			for i := 2; i <= tagPageCnt; i++ {
-				expectedFiles = append(expectedFiles, deployDirName+"/"+deployTagsDirName+"/"+normalizeTagURI(tag)+"/"+strconv.Itoa(i)+contentFileExtension)
+				expectedFiles = append(expectedFiles, deployDirName+"/"+deployTagsDirName+"/"+normalizeURIString(tag)+"/"+strconv.Itoa(i)+contentFileExtension)
 			}
 		}
 	}
@@ -290,9 +290,9 @@ func testPagination(t *testing.T, postCnt int) {
 		for i := 1; i <= cnt; i++ {
 			var outputFile string
 			if i == 1 {
-				outputFile = deployDirName + "/" + deployTagsDirName + "/" + normalizeTagURI(tag) + "/" + indexPageFileName
+				outputFile = deployDirName + "/" + deployTagsDirName + "/" + normalizeURIString(tag) + "/" + indexPageFileName
 			} else {
-				outputFile = deployDirName + "/" + deployTagsDirName + "/" + normalizeTagURI(tag) + "/" + strconv.Itoa(i) + contentFileExtension
+				outputFile = deployDirName + "/" + deployTagsDirName + "/" + normalizeURIString(tag) + "/" + strconv.Itoa(i) + contentFileExtension
 			}
 			outputFileContent := output[outputFile]
 			for j := (i - 1) * defaultPageSize; j < i*defaultPageSize && j < cnt; j++ {
@@ -397,7 +397,7 @@ func getExpectedPostFileContent(p post) []string {
 	if len(p.Tags) > 0 {
 		expectedTagsContent := "<span class=\"tags\">"
 		for _, tag := range p.Tags {
-			expectedTagsContent += fmt.Sprintf("<a class=\"tag\" href=\"/tags/%s/\">%s</a>", normalizeTagURI(tag), tag)
+			expectedTagsContent += fmt.Sprintf("<a class=\"tag\" href=\"/tags/%s/\">%s</a>", normalizeURIString(tag), tag)
 		}
 		expectedTagsContent += "</span>"
 		expectedContent = append(expectedContent, expectedTagsContent)
@@ -1442,4 +1442,185 @@ func TestGetFirstImageFromContentSharedPriority(t *testing.T) {
 			t.Errorf("expected first shared %q, got %q", sharedURI, uri)
 		}
 	})
+}
+
+func TestGenerateWithCollections(t *testing.T) {
+	post1 := post{
+		Id:    "coll-post-1",
+		Title: "Coll Post 1 Title",
+		Body:  "Coll Post 1 Body",
+		Collections: []postCollectionRef{
+			{Collection: "Board Games", Item: "Game 1", Media: []media{
+				img("/media/post/coll-post-1/a.jpg"),
+				img("/media/post/coll-post-1/b.jpg"),
+				img("/media/post/coll-post-1/c.jpg"),
+				img("/media/post/coll-post-1/d.jpg"), // 4th image — must NOT be rendered in the tile
+			}},
+			{Collection: "Board Games", Item: "Game 2"},
+		},
+	}
+	post1.Date, _ = civil.ParseDate("2023-09-03")
+
+	post2 := post{
+		Id:    "coll-post-2",
+		Title: "Coll Post 2 Title",
+		Body:  "Coll Post 2 Body",
+		Collections: []postCollectionRef{
+			{Collection: "Board Games", Item: "Game 1"},
+			{Collection: "Books", Item: "Some Book", Media: []media{img("/media/shared/cover.jpg")}},
+		},
+	}
+	post2.Date, _ = civil.ParseDate("2023-09-02")
+
+	post3 := post{
+		Id:    "coll-post-3",
+		Title: "Coll Post 3 Title",
+		Body:  "Coll Post 3 Body",
+		Collections: []postCollectionRef{
+			{Collection: "Board Games", Item: "Game 1"},
+		},
+	}
+	post3.Date, _ = civil.ParseDate("2023-09-01")
+
+	config := defaultConfig()
+	config.enableSearch = false
+	config.siteName = testSiteName
+	config.pageSize = 2 // Game 1 has 3 posts -> index.html + 2.html
+
+	output := processOutput(nil, []post{post1, post2, post3}, nil, nil, config)
+
+	collectionsDir := deployDirName + "/" + deployCollectionsDirName
+
+	// top-level collections index
+	collIndex, ok := output[collectionsDir+"/"+indexPageFileName]
+	if !ok {
+		t.Fatal("missing collections index file")
+	}
+	for _, ec := range []string{
+		"Board Games", "Books",
+		`href="/` + deployCollectionsDirName + `/board-games/"`,
+		`href="/` + deployCollectionsDirName + `/books/"`,
+	} {
+		if !strings.Contains(collIndex, ec) {
+			missingExpectedContentError(t, "collections index", ec)
+		}
+	}
+
+	// shelf page: items with links, images (max 3), placeholder for imageless item
+	shelf, ok := output[collectionsDir+"/board-games/"+indexPageFileName]
+	if !ok {
+		t.Fatal("missing board-games shelf file")
+	}
+	for _, ec := range []string{
+		"Game 1", "Game 2",
+		`href="/` + deployCollectionsDirName + `/board-games/game-1/"`,
+		`href="/` + deployCollectionsDirName + `/board-games/game-2/"`,
+		"/media/post/coll-post-1/a.jpg",
+		"/media/post/coll-post-1/b.jpg",
+		"/media/post/coll-post-1/c.jpg",
+	} {
+		if !strings.Contains(shelf, ec) {
+			missingExpectedContentError(t, "board-games shelf", ec)
+		}
+	}
+	if strings.Contains(shelf, "/media/post/coll-post-1/d.jpg") {
+		t.Error("shelf tile must render at most 3 images, found 4th image")
+	}
+	if !strings.Contains(shelf, "placeholder") {
+		t.Error("shelf must render a placeholder tile for an item without images")
+	}
+	// post counts are only rendered for items with more than one associated post
+	if !strings.Contains(shelf, `<span class="item-cnt">(3)</span>`) {
+		missingExpectedContentError(t, "board-games shelf", `<span class="item-cnt">(3)</span>`)
+	}
+	if strings.Contains(shelf, "(1)") {
+		t.Error("shelf must not render a post count for single-post items")
+	}
+
+	// item pages: paginated post lists like tags
+	game1Page1, ok := output[collectionsDir+"/board-games/game-1/"+indexPageFileName]
+	if !ok {
+		t.Fatal("missing game-1 item page 1")
+	}
+	game1Page2, ok := output[collectionsDir+"/board-games/game-1/2"+contentFileExtension]
+	if !ok {
+		t.Fatal("missing game-1 item page 2")
+	}
+	game1Content := game1Page1 + game1Page2
+	for _, p := range []post{post1, post2, post3} {
+		if !strings.Contains(game1Content, p.Body) {
+			missingExpectedContentError(t, "game-1 item pages", p.Body)
+		}
+	}
+	if _, ok := output[collectionsDir+"/board-games/game-2/"+indexPageFileName]; !ok {
+		t.Error("missing game-2 item page")
+	}
+	if _, ok := output[collectionsDir+"/books/some-book/"+indexPageFileName]; !ok {
+		t.Error("missing some-book item page")
+	}
+
+	// post footer back-links: combined format, collection link + item links,
+	// where item links are only rendered for items referenced by more than one post
+	postFile, ok := output[deployDirName+"/"+deployPostDirName+"/coll-post-1"+contentFileExtension]
+	if !ok {
+		t.Fatal("missing coll-post-1 output file")
+	}
+	for _, ec := range []string{
+		`class="collections"`,
+		`<span class="separator">&bull;</span>`, // collection/item names separated by a bullet
+		`href="/` + deployCollectionsDirName + `/board-games/"`,
+		`href="/` + deployCollectionsDirName + `/board-games/game-1/"`, // Game 1: 3 posts -> item link rendered
+	} {
+		if !strings.Contains(postFile, ec) {
+			missingExpectedContentError(t, "coll-post-1 footer", ec)
+		}
+	}
+	// Game 2 is referenced by a single post -> its item link is redundant (collection link only)
+	if strings.Contains(postFile, `href="/`+deployCollectionsDirName+`/board-games/game-2/"`) {
+		t.Error("footer must not render an item link for a single-post item (game-2)")
+	}
+	// the collection icon is rendered via CSS (Font Awesome :before), not markup
+	if strings.Contains(postFile, "\U000F0A1D") {
+		t.Error("footer must not contain the raw \U000F0A1D glyph (icon is rendered via CSS)")
+	}
+	// a collection whose only referenced item is single-post still renders its collection link
+	post2File, ok := output[deployDirName+"/"+deployPostDirName+"/coll-post-2"+contentFileExtension]
+	if !ok {
+		t.Fatal("missing coll-post-2 output file")
+	}
+	if !strings.Contains(post2File, `href="/`+deployCollectionsDirName+`/books/"`) {
+		missingExpectedContentError(t, "coll-post-2 footer", `href="/`+deployCollectionsDirName+`/books/"`)
+	}
+	if strings.Contains(post2File, `href="/`+deployCollectionsDirName+`/books/some-book/"`) {
+		t.Error("footer must not render an item link for a single-post item (some-book)")
+	}
+}
+
+func TestGenerateWithCollectionsIndexDisabled(t *testing.T) {
+	p := post{
+		Id:   "coll-post-1",
+		Body: "Body",
+		Collections: []postCollectionRef{
+			{Collection: "Board Games", Item: "Game 1"},
+		},
+	}
+	p.Date, _ = civil.ParseDate("2023-09-01")
+
+	config := defaultConfig()
+	config.enableSearch = false
+	config.siteName = testSiteName
+	config.generateCollectionIndex = false
+
+	output := processOutput(nil, []post{p}, nil, nil, config)
+
+	if _, ok := output[deployDirName+"/"+deployCollectionsDirName+"/"+indexPageFileName]; ok {
+		t.Error("collections index must not be generated when generateCollectionIndex is disabled")
+	}
+	// shelf and item pages are still generated
+	if _, ok := output[deployDirName+"/"+deployCollectionsDirName+"/board-games/"+indexPageFileName]; !ok {
+		t.Error("shelf page must still be generated when generateCollectionIndex is disabled")
+	}
+	if _, ok := output[deployDirName+"/"+deployCollectionsDirName+"/board-games/game-1/"+indexPageFileName]; !ok {
+		t.Error("item page must still be generated when generateCollectionIndex is disabled")
+	}
 }

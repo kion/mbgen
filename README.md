@@ -11,6 +11,8 @@ embracing the convention-over-configuration philosophy.
 * Built-in search engine
 * Archive Index generation
 * Tag Index (Tag Cloud) generation
+* Collections: group posts around the collection items they reference (e.g. books, board games, etc.)
+  with auto-generated shelf-style collection pages and per-item post listings
 * Feed generation with support for RSS 2.0, Atom, and JSON Feed formats
 * Built-in support for pagination, as well as tag-based and date-based filtering
 * Simple and intuitive media (image/video) embedding with custom rendering options
@@ -120,6 +122,7 @@ Ideally, the sub-dirs and files inside the `deploy` dir should be uploaded in th
 * `post` dir - all the generated single post files
 * `posts` dir - all the generated paginated post files
 * `tags` dir - all the generated tag-scoped post files
+* `collections` dir - all the generated collection index, shelf, and item-scoped post files
 * `archive` dir - all the generated archive index & month-scoped post files
 * everything else inside the `deploy` dir, excluding the directories listed above
 
@@ -219,6 +222,41 @@ $ mbgen help [command]
     while the corresponding tag page URIs are automatically normalized
     (non-alphanumeric characters replaced with `-`, surrounding separators trimmed, lowercased) —
     e.g. `Multi Word Tag` renders as `Multi Word Tag` in tag links, but points to `/tags/multi-word-tag/`
+  * A post can also reference items of one or more **collections** via the YAML metadata `collections` section —
+    a map of collection name to an ordered list of items, where each item is either a bare item name
+    or a `name: image(s)` entry (with a single image file name or a list of image file names):
+    ```
+    collections:
+      Board Games:
+        - Game 1: [game1-cover1.jpg, game1-cover2.jpg]
+        - Game 2: game2-cover.jpg
+        - Game 3
+      Books:
+        - Some Book: book-cover.jpg
+    ```
+    * item images are resolved the same way as all other post media:
+      the post media dir (`deploy/media/post/<post-id>/`) is checked first,
+      with a fallback to the shared media dir (`deploy/media/shared/`);
+      file extensions are optional (e.g. `game2-cover` resolves `game2-cover.*`)
+    * an item does not have to be associated with an image in every referencing post (or at all) —
+      all the images for a given item are aggregated across all the posts referencing it
+      (deduplicated, ordered from the most recent post to the oldest),
+      and up to 3 of them are rendered within a single composite image container
+      on the corresponding collection page (items without any image get a placeholder container)
+    * collection and item titles are rendered as-is, while the corresponding page URIs
+      are automatically normalized the same way as tag URIs
+    * the `generate` command then generates:
+      * a collection page for each referenced collection (a shelf-style item grid,
+        with each item linking to the corresponding item page;
+        items are ordered by first appearance, i.e. items referenced by newer posts come first),
+        available under `/collections/<collection-uri>/`
+      * a paginated list of the referencing posts for each collection item
+        (structured the same way as tag pages), available under `/collections/<collection-uri>/<item-uri>/`
+      * a collection index page listing all the collections (see the `generateCollectionIndex` config option),
+        available under `/collections/`
+    * each post referencing collection items also renders the corresponding collection/item links in its footer
+      (an item link is only rendered when the item is referenced by more than one post —
+      for single-post items the collection link only is rendered instead)
   * Post content file example:
     ```
     ---
@@ -392,8 +430,7 @@ or can even be completely omitted from the config):
     (retrieved from the `date` property of each corresponding post content `.md` file) -
     the generated index page lists all the year/month combinations (along with the corresponding post counts)
     with links to the corresponding content pages
-  - the generated archive index page is available under `/archive/` URI, e.g.:
-    - `<a href="/archive/">Archive</a>`
+  - the generated archive index page is available under `/archive/` URI
   - set this setting to `no` to disable archive generation
 * [optional] `generateTagIndex` - the tag index generation is enabled by default,
   unless this setting is set to `no`
@@ -401,9 +438,15 @@ or can even be completely omitted from the config):
     (note, that the pages with posts for each tag are generated always, even if tag index is not) -
     the generated tag index page lists all the tags (along with the corresponding post counts)
     with links to the corresponding content pages
-  - the generated archive index page is available under `/tags/` URI, e.g.:
-    - `<a href="/tags/">Tags</a>`
+  - the generated archive index page is available under `/tags/` URI
   - set this setting to `no` to disable archive generation
+* [optional] `generateCollectionIndex` - the collection index generation is enabled by default,
+  unless this setting is set to `no`
+  - `generate` command generates a collection index page listing all the collections
+    (along with the corresponding item counts) with links to the corresponding collection pages
+    (note, that the individual collection and collection item pages are generated always, even if the collection index is not)
+  - the generated collection index page is available under `/collections/` URI
+  - set this setting to `no` to disable collection index generation
 * [optional] `generateFeeds` - the feed generation is disabled by default,
   unless this setting is set to a comma-separated list of feed formats to generate:
     * `rss` - RSS 2.0 feed
@@ -426,8 +469,7 @@ or can even be completely omitted from the config):
     * a search index file (`/search.json`),
       containing searchable text content for all the page and post content (`.md`) files
       (including the content body, as well as the `title` and the `tags` property values)
-    * a search UI page, which is available under `/search.html` URI, e.g.:
-      - `<a href="/search.html">Search</a>`)
+    * a search UI page, which is available under `/search.html` URI
   * _note: the search functionality requires JavaScript to be enabled in the browser_
 * [optional] `pageSize` - controls the maximum number of posts
   on any page that renders a list of posts

@@ -21,9 +21,10 @@
     <section class="content">
         {{ $post.Body }}
     </section>
-    {{ if $post.Tags }}
+    {{ if or $post.Tags $post.Collections }}
     <footer>
         {{@ post-tags.html @}}
+        {{@ post-collections.html @}}
     </footer>
     {{ end }}
 </article>

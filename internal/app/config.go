@@ -17,6 +17,7 @@ func defaultConfig() appConfig {
 		feedPostViewOnWebsiteLinkText: defaultFeedPostViewOnWebsiteLinkText,
 		generateArchive:               defaultGenerateArchive,
 		generateTagIndex:              defaultGenerateTagIndex,
+		generateCollectionIndex:       defaultGenerateCollectionIndex,
 		enableSearch:                  defaultEnableSearch,
 		pageSize:                      defaultPageSize,
 		resizeOrigImages:              defaultResizeOrigImages,
@@ -113,6 +114,12 @@ func readConfig() appConfig {
 	if generateTagIndex != "" {
 		v := strings.ToLower(generateTagIndex)
 		config.generateTagIndex = v != "no" && v != "false"
+	}
+
+	generateCollectionIndex := cm["generateCollectionIndex"]
+	if generateCollectionIndex != "" {
+		v := strings.ToLower(generateCollectionIndex)
+		config.generateCollectionIndex = v != "no" && v != "false"
 	}
 
 	enableSearch := cm["enableSearch"]
@@ -339,6 +346,21 @@ func writeConfig(config appConfig) {
 		yml += "generateTagIndex: "
 	}
 	if generateTagIndex {
+		yml += "yes"
+	} else {
+		yml += "no"
+	}
+
+	yml += "\n"
+	var generateCollectionIndex bool
+	if defaultGenerateCollectionIndex == config.generateCollectionIndex {
+		generateCollectionIndex = defaultGenerateCollectionIndex
+		yml += "#generateCollectionIndex: "
+	} else {
+		generateCollectionIndex = config.generateCollectionIndex
+		yml += "generateCollectionIndex: "
+	}
+	if generateCollectionIndex {
 		yml += "yes"
 	} else {
 		yml += "no"

@@ -47,6 +47,9 @@ var (
 			"   - " + commandCleanupTargetTags + ": deletes all previously generated tag files\n" +
 			"     that are no longer referenced by any markdown (" + markdownFileExtension + ") content files\n\n" +
 			"   - " + commandCleanupTargetTagIndex + ": deletes the previously generated tag index file\n\n" +
+			"   - " + commandCleanupTargetCollections + ": deletes all previously generated collection/item dirs\n" +
+			"     that are no longer referenced by any markdown (" + markdownFileExtension + ") content files\n\n" +
+			"   - " + commandCleanupTargetCollectionIndex + ": deletes the previously generated collection index file\n\n" +
 			"   - " + commandCleanupTargetArchive + ": deletes the previously generated archive files\n\n" +
 			"   - " + commandCleanupTargetSearch + ": deletes all previously generated search files\n\n" +
 			"   - " + commandCleanupTargetMedia + ": deletes all previously generated media directories\n" +
@@ -55,8 +58,10 @@ var (
 			" - if no <target> is specified, each target is performed based on the following conditions:\n\n" +
 			"   - " + commandCleanupTargetContent + ": always\n\n" +
 			"   - " + commandCleanupTargetTags + ": always\n\n" +
+			"   - " + commandCleanupTargetCollections + ": always\n\n" +
 			"   - " + commandCleanupTargetThumbs + ": if `useThumbs` config option is disabled\n\n" +
 			"   - " + commandCleanupTargetTagIndex + ": if `generateTagIndex` config option is disabled\n\n" +
+			"   - " + commandCleanupTargetCollectionIndex + ": if `generateCollectionIndex` config option is disabled\n\n" +
 			"   - " + commandCleanupTargetArchive + ": if `generateArchive` config option is disabled\n\n" +
 			"   - " + commandCleanupTargetSearch + ": if `enableSearch` config option is disabled\n\n" +
 			"   - " + commandCleanupTargetMedia + ": never (must be specified explicitly)\n\n" +
@@ -77,7 +82,8 @@ var (
 		usage: "mbgen inspect [" + commandInspectOptionFix + "]\n\n" +
 			"reports all detected issues; namely:\n" +
 			" - original images that exceed the `maxImgSize` config option value\n" +
-			" - tag URIs that appear with more than one distinct title across posts (report-only, no auto-fix)\n\n" +
+			" - tag URIs that appear with more than one distinct title across posts (report-only, no auto-fix)\n" +
+			" - collection/item URIs that appear with more than one distinct title across posts (report-only, no auto-fix)\n\n" +
 			"optional flags:\n" +
 			" " + commandInspectOptionFix + ": automatically fixes all auto-fixable issues; namely:\n" +
 			"   - resize and replace the original images that exceed the `maxImgSize` config option value\n\n",
@@ -222,6 +228,7 @@ func _cleanup(config appConfig, commandArgs ...string) {
 			dryRun = true
 		case commandCleanupTargetContent, commandCleanupTargetThumbs,
 			commandCleanupTargetTags, commandCleanupTargetTagIndex,
+			commandCleanupTargetCollections, commandCleanupTargetCollectionIndex,
 			commandCleanupTargetArchive, commandCleanupTargetSearch,
 			commandCleanupTargetMedia:
 			target = arg
@@ -233,13 +240,16 @@ func _cleanup(config appConfig, commandArgs ...string) {
 
 	cleanupContent, cleanupThumbs, cleanupTags := false, false, false
 	cleanupTagIndex, cleanupArchive, cleanupSearch, cleanupMedia := false, false, false, false
+	cleanupCollections, cleanupCollectionIndex := false, false
 
 	if target == "" {
 		cleanupContent = true
 		cleanupTags = true
+		cleanupCollections = true
 		cleanupThumbs = !config.useThumbs
 		cleanupArchive = !config.generateArchive
 		cleanupTagIndex = !config.generateTagIndex
+		cleanupCollectionIndex = !config.generateCollectionIndex
 		cleanupSearch = !config.enableSearch
 		// cleanupMedia intentionally stays false
 	} else {
@@ -252,6 +262,10 @@ func _cleanup(config appConfig, commandArgs ...string) {
 			cleanupTags = true
 		case commandCleanupTargetTagIndex:
 			cleanupTagIndex = true
+		case commandCleanupTargetCollections:
+			cleanupCollections = true
+		case commandCleanupTargetCollectionIndex:
+			cleanupCollectionIndex = true
 		case commandCleanupTargetArchive:
 			cleanupArchive = true
 		case commandCleanupTargetSearch:
@@ -262,13 +276,15 @@ func _cleanup(config appConfig, commandArgs ...string) {
 	}
 
 	targetCnt := map[string]int{
-		commandCleanupTargetContent:  0,
-		commandCleanupTargetThumbs:   0,
-		commandCleanupTargetTags:     0,
-		commandCleanupTargetTagIndex: 0,
-		commandCleanupTargetArchive:  0,
-		commandCleanupTargetSearch:   0,
-		commandCleanupTargetMedia:    0,
+		commandCleanupTargetContent:         0,
+		commandCleanupTargetThumbs:          0,
+		commandCleanupTargetTags:            0,
+		commandCleanupTargetTagIndex:        0,
+		commandCleanupTargetCollections:     0,
+		commandCleanupTargetCollectionIndex: 0,
+		commandCleanupTargetArchive:         0,
+		commandCleanupTargetSearch:          0,
+		commandCleanupTargetMedia:           0,
 	}
 
 	if cleanupContent {
@@ -361,7 +377,7 @@ func _cleanup(config appConfig, commandArgs ...string) {
 			var tags []string
 			for _, post := range posts {
 				for _, tag := range post.Tags {
-					t := normalizeTagURI(tag)
+					t := normalizeURIString(tag)
 					if !slices.Contains(tags, t) {
 						tags = append(tags, t)
 					}
@@ -398,6 +414,85 @@ func _cleanup(config appConfig, commandArgs ...string) {
 			if deleteIfExists(deployTagIndexPath) {
 				sprintln(" - deleted tag index file: " + deployTagIndexPath)
 				targetCnt[commandCleanupTargetTagIndex]++
+			}
+		}
+	}
+	if cleanupCollections {
+		deployCollectionsDirPath := fmt.Sprintf("%s%c%s", deployDirName, os.PathSeparator, deployCollectionsDirName)
+		if dirExists(deployCollectionsDirPath) {
+			deployCollectionsDirEntries, err := os.ReadDir(deployCollectionsDirPath)
+			check(err)
+			if len(deployCollectionsDirEntries) > 0 {
+				posts := parsePosts(config, getResourceLoader(config), nil, false)
+				collItems := map[string][]string{} // collection URI -> referenced item URIs
+				for _, post := range posts {
+					for _, ref := range post.Collections {
+						collUri := normalizeURIString(ref.Collection)
+						itemUri := normalizeURIString(ref.Item)
+						if collUri == "" || itemUri == "" {
+							continue
+						}
+						if !slices.Contains(collItems[collUri], itemUri) {
+							collItems[collUri] = append(collItems[collUri], itemUri)
+						}
+					}
+				}
+				for _, deployCollDirEntry := range deployCollectionsDirEntries {
+					deployCollDirEntryInfo, err := deployCollDirEntry.Info()
+					check(err)
+					if !deployCollDirEntryInfo.IsDir() {
+						continue
+					}
+					deployCollDirName := deployCollDirEntryInfo.Name()
+					deployCollDirPath := fmt.Sprintf("%s%c%s", deployCollectionsDirPath, os.PathSeparator, deployCollDirName)
+					itemUris, referenced := collItems[deployCollDirName]
+					if !referenced {
+						if dryRun {
+							sprintln(" - [dry-run] delete collection dir: " + deployCollDirPath)
+						} else {
+							sprintln(" - collection no longer referenced: " + deployCollDirName)
+							deleteIfExists(deployCollDirPath)
+							sprintln(" - deleted collection dir: " + deployCollDirPath)
+						}
+						targetCnt[commandCleanupTargetCollections]++
+						continue
+					}
+					deployItemDirEntries, err := os.ReadDir(deployCollDirPath)
+					check(err)
+					for _, deployItemDirEntry := range deployItemDirEntries {
+						deployItemDirEntryInfo, err := deployItemDirEntry.Info()
+						check(err)
+						if !deployItemDirEntryInfo.IsDir() {
+							continue
+						}
+						deployItemDirName := deployItemDirEntryInfo.Name()
+						if !slices.Contains(itemUris, deployItemDirName) {
+							deployItemDirPath := fmt.Sprintf("%s%c%s", deployCollDirPath, os.PathSeparator, deployItemDirName)
+							if dryRun {
+								sprintln(" - [dry-run] delete collection item dir: " + deployItemDirPath)
+							} else {
+								sprintln(" - collection item no longer referenced: " + deployCollDirName + "/" + deployItemDirName)
+								deleteIfExists(deployItemDirPath)
+								sprintln(" - deleted collection item dir: " + deployItemDirPath)
+							}
+							targetCnt[commandCleanupTargetCollections]++
+						}
+					}
+				}
+			}
+		}
+	}
+	if cleanupCollectionIndex {
+		deployCollectionIndexPath := fmt.Sprintf("%s%c%s%c%s", deployDirName, os.PathSeparator, deployCollectionsDirName, os.PathSeparator, indexPageFileName)
+		if dryRun {
+			if fileExists(deployCollectionIndexPath) {
+				sprintln(" - [dry-run] delete collection index file: " + deployCollectionIndexPath)
+				targetCnt[commandCleanupTargetCollectionIndex]++
+			}
+		} else {
+			if deleteIfExists(deployCollectionIndexPath) {
+				sprintln(" - deleted collection index file: " + deployCollectionIndexPath)
+				targetCnt[commandCleanupTargetCollectionIndex]++
 			}
 		}
 	}
@@ -536,6 +631,7 @@ func _inspect(config appConfig, commandArgs ...string) {
 	} else {
 		mediaIssues := processOriginalMediaFiles(config, true)
 		tagIssues := reportTagTitleDuplicates(config)
+		collectionIssues := reportCollectionTitleDuplicates(config)
 		resLoader := getResourceLoader(config)
 		directiveIssues := reportContentWarnings(
 			parsePages(config, resLoader, nil, false),
@@ -544,7 +640,7 @@ func _inspect(config appConfig, commandArgs ...string) {
 			sprintln(" - run the following command to fix the media issues found:\n\n" +
 				"   mbgen inspect " + commandInspectOptionFix)
 		}
-		if !mediaIssues && !tagIssues && !directiveIssues {
+		if !mediaIssues && !tagIssues && !collectionIssues && !directiveIssues {
 			sprintln(" - no issues found")
 		}
 	}
@@ -574,6 +670,40 @@ func reportTagTitleDuplicates(config appConfig) bool {
 		}
 		sprintln("   - " + uri + ": " + strings.Join(quoted, ", "))
 	}
+	return true
+}
+
+// reportCollectionTitleDuplicates parses posts and reports any collection/item URIs
+// that appear with more than one distinct original title.
+// Report-only (no auto-fix). Returns true when duplicates were found.
+func reportCollectionTitleDuplicates(config appConfig) bool {
+	resLoader := getResourceLoader(config)
+	posts := parsePosts(config, resLoader, nil, false)
+	collDupes, itemDupes := inspectCollectionTitleDuplicates(posts)
+	if len(collDupes) == 0 && len(itemDupes) == 0 {
+		return false
+	}
+	report := func(dupes map[string][]string, header string) {
+		if len(dupes) == 0 {
+			return
+		}
+		uris := make([]string, 0, len(dupes))
+		for uri := range dupes {
+			uris = append(uris, uri)
+		}
+		sort.Strings(uris)
+		sprintln(header)
+		for _, uri := range uris {
+			titles := dupes[uri]
+			quoted := make([]string, 0, len(titles))
+			for _, t := range titles {
+				quoted = append(quoted, strconv.Quote(t))
+			}
+			sprintln("   - " + uri + ": " + strings.Join(quoted, ", "))
+		}
+	}
+	report(collDupes, " - collection URIs with duplicate titles (fix manually in post frontmatter):")
+	report(itemDupes, " - collection item URIs with duplicate titles (fix manually in post frontmatter):")
 	return true
 }
 
@@ -934,6 +1064,8 @@ func handleStats(stats stats) {
 		fmt.Sprintf(" - pages: %d", stats.pageCnt),
 		fmt.Sprintf(" - posts: %d", stats.postCnt),
 		fmt.Sprintf(" - tags: %d", stats.tagCnt),
+		fmt.Sprintf(" - collections: %d", stats.collCnt),
+		fmt.Sprintf(" - collection items: %d", stats.collItemCnt),
 		fmt.Sprintf(" - files generated: %d\n", stats.genCnt),
 		"[----------------------]",
 	)

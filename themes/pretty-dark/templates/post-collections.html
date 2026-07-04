@@ -1,0 +1,9 @@
+{{ if $post.Collections }}
+<span class="collections">
+    {{ range $group := $post.CollectionGroups }}
+    <span class="collection">
+        <a class="collection-link" href="/collections/{{ $group.URI }}/">{{ $group.Title }}</a>{{ range $item := $group.Items }} <span class="separator">&bull;</span> <a class="collection-item" href="/collections/{{ $group.URI }}/{{ $item.URI }}/">{{ $item.Title }}</a>{{ end }}
+    </span>
+    {{ end }}
+</span>
+{{ end }}
