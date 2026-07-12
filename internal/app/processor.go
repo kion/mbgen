@@ -20,8 +20,35 @@ import (
 func process(pages []page, posts []post,
 	resLoader resourceLoader, handleOutput processorOutputHandler) stats {
 	var searchIndex = mapSlice{}
-	pageCnt := processPages(pages, &searchIndex, resLoader, handleOutput)
-	postCnt, tagCnt, collCnt, collItemCnt := processPosts(posts, &searchIndex, resLoader, handleOutput)
+	// aggregate collections up front: embedded collection views on pages,
+	// post footer back-links, and collection page generation all depend on the aggregated model
+	collections := aggregateCollections(posts)
+	// fatal collection/meta collection misconfiguration fails the whole run
+	// before a single output file is written
+	if errs := validateCollectionUsage(pages, posts, collections); len(errs) > 0 {
+		exitWithError("collection validation errors:\n - " + strings.Join(errs, "\n - "))
+	}
+	itemPostCnt := make(map[string]int)
+	for _, coll := range collections {
+		for _, item := range coll.Items {
+			itemPostCnt[coll.URI+"/"+item.URI] = item.PostCnt
+		}
+	}
+	metaColls := buildMetaCollections(pages)
+	for i := range posts {
+		posts[i].collItemPostCnt = itemPostCnt
+		for _, title := range posts[i].MetaCollections {
+			if mc, ok := metaColls[normalizeURIString(title)]; ok {
+				link := "/" + deployPageDirName + "/" + mc.PageId + contentFileExtension
+				if mc.PageId == resLoader.config.homePage {
+					link = "/"
+				}
+				posts[i].metaCollGroups = append(posts[i].metaCollGroups, postCollectionGroup{Title: mc.Title, Link: link})
+			}
+		}
+	}
+	pageCnt := processPages(pages, collections, &searchIndex, resLoader, handleOutput)
+	postCnt, tagCnt, collCnt, collItemCnt := processPosts(posts, collections, &searchIndex, resLoader, handleOutput)
 	config := resLoader.config
 	if len(config.generateFeeds) > 0 {
 		generateFeeds(posts, config, handleOutput)
@@ -50,7 +77,7 @@ func process(pages []page, posts []post,
 	}
 }
 
-func processPages(pages []page, searchIndex *mapSlice,
+func processPages(pages []page, collections []collectionData, searchIndex *mapSlice,
 	resLoader resourceLoader, handleOutput processorOutputHandler) int {
 	if pages != nil {
 		sprintln(" - processing pages ...")
@@ -72,7 +99,12 @@ func processPages(pages []page, searchIndex *mapSlice,
 		}
 
 		for _, page := range pages {
-			if !page.skipProcessing {
+			// a page embedding collections via {collection:...} directives is always (re)processed
+			// — its output depends on post data, not just its own file
+			if !page.skipProcessing || len(page.CollectionRefs) > 0 {
+				if len(page.CollectionRefs) > 0 {
+					page.Body = renderEmbeddedCollections(page.Body, collections, resLoader)
+				}
 				pageTemplate := compilePageTemplate(page, resLoader)
 				outputFileName := page.Id + contentFileExtension
 				var outputFilePath string
@@ -101,7 +133,7 @@ func processPages(pages []page, searchIndex *mapSlice,
 	return len(pages)
 }
 
-func processPosts(posts []post, searchIndex *mapSlice,
+func processPosts(posts []post, collections []collectionData, searchIndex *mapSlice,
 	resLoader resourceLoader, handleOutput processorOutputHandler) (int, int, int, int) {
 	tagCnt := 0
 	collCnt := 0
@@ -149,19 +181,6 @@ func processPosts(posts []post, searchIndex *mapSlice,
 
 		collPostCnt := make(map[string]int)
 		collContent := make(map[string][]string)
-
-		// aggregate collections up front: post footer rendering needs
-		// the site-wide per-item post counts to decide whether to render item links
-		collections := aggregateCollections(posts)
-		itemPostCnt := make(map[string]int)
-		for _, coll := range collections {
-			for _, item := range coll.Items {
-				itemPostCnt[coll.URI+"/"+item.URI] = item.PostCnt
-			}
-		}
-		for i := range posts {
-			posts[i].collItemPostCnt = itemPostCnt
-		}
 
 		for _, post := range posts {
 			pagePostCnt++

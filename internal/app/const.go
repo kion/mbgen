@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	appVersion                                  = "2.0.1"
+	appVersion                                  = "2.0.2"
 	defaultGitHubRepoUrl                        = "github.com/kion/mbgen"
 	defaultGitHubRepoThemesUrl                  = defaultGitHubRepoUrl + "/themes"
 	defaultGitHubRepoPageContentSamplesUrl      = defaultGitHubRepoUrl + "/content-samples/pages"
@@ -53,6 +53,9 @@ const (
 	metaDataKeyTitle                            = "title"
 	metaDataKeyTags                             = "tags"
 	metaDataKeyCollections                      = "collections"
+	metaDataKeyMetaCollections                  = "meta-collections"
+	metaDataKeyMetaCollection                   = "meta-collection"
+	collectionDirectivePlaceholderFormat        = ":@@@:collection:%s:@@@:"
 	configFileName                              = "config.yml"
 	defaultGenerateArchive                      = true
 	defaultGenerateTagIndex                     = true
@@ -140,6 +143,8 @@ var (
 	searchLinkPlaceholderRegexp          = /* const */ regexp.MustCompile(`{%\s*search\s*:\s*([^{}%]+)\s*%}`)
 	contentLinkPlaceholderRegexp         = /* const */ regexp.MustCompile(`{%\s*([\w-_]+)\s*:\s*([\w-_]+)\s*%}`)
 	mediaPlaceholderRegexp               = /* const */ regexp.MustCompile(`{\s*media(\([\s\w=,]+\))?\s*([:|][^{}]*)?\s*}`)
+	collectionDirectiveRegexp            = /* const */ regexp.MustCompile(`{\s*collection\s*:\s*([^{}]+?)\s*}`)
+	collectionDirectivePlaceholderRegexp = /* const */ regexp.MustCompile(`:@@@:collection:([^:\s]+):@@@:`)
 	// blankLineRunRegexp matches a newline followed by one or more additional
 	// whitespace-only lines; used to collapse runs of blank/whitespace-only
 	// lines produced by Go-template conditionals into a single newline

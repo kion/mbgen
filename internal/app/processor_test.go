@@ -1624,3 +1624,144 @@ func TestGenerateWithCollectionsIndexDisabled(t *testing.T) {
 		t.Error("item page must still be generated when generateCollectionIndex is disabled")
 	}
 }
+
+func TestGenerateWithCollectionDirective(t *testing.T) {
+	post1 := post{
+		Id:    "coll-post-1",
+		Title: "Coll Post 1",
+		Body:  "Coll Post 1 Body",
+		Collections: []postCollectionRef{
+			{Collection: "Board Games", Item: "Game 1", Media: []media{img("/media/post/coll-post-1/a.jpg")}},
+		},
+	}
+	post1.Date, _ = civil.ParseDate("2023-09-01")
+
+	embedPage := page{
+		Id:             "travel",
+		Title:          "Travel",
+		Body:           "<p>Intro text.</p>\n<p>:@@@:collection:board-games:@@@:</p>\n<p>Outro text.</p>",
+		CollectionRefs: []string{"board-games"},
+	}
+	unknownRefPage := page{
+		Id:             "unknown-ref",
+		Title:          "Unknown",
+		Body:           "<p>:@@@:collection:no-such-collection:@@@:</p>",
+		CollectionRefs: []string{"no-such-collection"},
+	}
+	// a page with collection refs must be (re)processed even when its parse-cache
+	// entry is fresh, because its output depends on post data
+	cachedEmbedPage := page{
+		Id:             "cached-travel",
+		Title:          "Cached Travel",
+		Body:           "<p>:@@@:collection:board-games:@@@:</p>",
+		CollectionRefs: []string{"board-games"},
+		skipProcessing: true,
+	}
+	cachedPlainPage := page{
+		Id:             "cached-plain",
+		Title:          "Cached Plain",
+		Body:           "<p>Plain.</p>",
+		skipProcessing: true,
+	}
+
+	config := defaultConfig()
+	config.enableSearch = false
+	config.siteName = testSiteName
+
+	pages := []page{embedPage, unknownRefPage, cachedEmbedPage, cachedPlainPage}
+	output := processOutput(pages, []post{post1}, nil, nil, config)
+
+	// inline embed: shelf block rendered in place of the placeholder, page text preserved
+	embedFile, ok := output[deployDirName+"/"+deployPageDirName+"/travel"+contentFileExtension]
+	if !ok {
+		t.Fatal("missing travel page output file")
+	}
+	for _, ec := range []string{
+		"Intro text.", "Outro text.",
+		`class="collection-shelf"`,
+		"Board Games",
+		`href="/` + deployCollectionsDirName + `/board-games/game-1/"`,
+	} {
+		if !strings.Contains(embedFile, ec) {
+			missingExpectedContentError(t, "travel page", ec)
+		}
+	}
+	if strings.Contains(embedFile, ":@@@:collection:") {
+		t.Error("collection placeholder left in embed page output")
+	}
+
+	// the standalone collection page is still generated
+	if _, ok := output[deployDirName+"/"+deployCollectionsDirName+"/board-games/"+indexPageFileName]; !ok {
+		t.Error("standalone collection page must still be generated when embedded via directive")
+	}
+
+	// unknown collection: placeholder removed, nothing rendered
+	unknownFile, ok := output[deployDirName+"/"+deployPageDirName+"/unknown-ref"+contentFileExtension]
+	if !ok {
+		t.Fatal("missing unknown-ref page output file")
+	}
+	if strings.Contains(unknownFile, ":@@@:collection:") || strings.Contains(unknownFile, "collection-shelf") {
+		t.Error("unknown collection directive must render nothing")
+	}
+
+	// skipProcessing override: embed page is regenerated, plain cached page is not
+	if _, ok := output[deployDirName+"/"+deployPageDirName+"/cached-travel"+contentFileExtension]; !ok {
+		t.Error("page with collection refs must be processed despite skipProcessing")
+	}
+	if _, ok := output[deployDirName+"/"+deployPageDirName+"/cached-plain"+contentFileExtension]; ok {
+		t.Error("plain page with skipProcessing must not be processed")
+	}
+}
+
+func TestGenerateWithMetaCollections(t *testing.T) {
+	buildContent := func(homePage string) (pages []page, posts []post, config appConfig) {
+		p := post{
+			Id:    "meta-post",
+			Title: "Meta Post",
+			Body:  "Meta Post Body",
+			Collections: []postCollectionRef{
+				{Collection: "Board Games", Item: "Game 1"},
+			},
+			MetaCollections: []string{"travel destinations"}, // URI form resolves too
+		}
+		p.Date, _ = civil.ParseDate("2023-09-01")
+		pages = []page{{
+			Id:             "travel",
+			Title:          "Travel Destinations",
+			Body:           "<p>:@@@:collection:board-games:@@@:</p>",
+			MetaCollection: "Travel Destinations",
+			CollectionRefs: []string{"board-games"},
+		}}
+		posts = []post{p}
+		config = defaultConfig()
+		config.enableSearch = false
+		config.siteName = testSiteName
+		config.homePage = homePage
+		return
+	}
+
+	// meta footer link points to the defining page, canonical title, no item links
+	pages, posts, config := buildContent("")
+	output := processOutput(pages, posts, nil, nil, config)
+	postFile, ok := output[deployDirName+"/"+deployPostDirName+"/meta-post"+contentFileExtension]
+	if !ok {
+		t.Fatal("missing meta-post output file")
+	}
+	if !strings.Contains(postFile, `href="/`+deployPageDirName+`/travel`+contentFileExtension+`"`) {
+		missingExpectedContentError(t, "meta-post footer", "link to the defining page")
+	}
+	if !strings.Contains(postFile, "Travel Destinations") {
+		missingExpectedContentError(t, "meta-post footer", "canonical meta collection title")
+	}
+
+	// when the defining page is the home page, the meta link points to "/"
+	pages, posts, config = buildContent("travel")
+	output = processOutput(pages, posts, nil, nil, config)
+	postFile, ok = output[deployDirName+"/"+deployPostDirName+"/meta-post"+contentFileExtension]
+	if !ok {
+		t.Fatal("missing meta-post output file (homePage variant)")
+	}
+	if !strings.Contains(postFile, `class="collection-link" href="/"`) {
+		missingExpectedContentError(t, "meta-post footer (homePage variant)", `class="collection-link" href="/"`)
+	}
+}

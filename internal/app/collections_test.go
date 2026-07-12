@@ -1,6 +1,7 @@
 package app
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -210,5 +211,103 @@ func TestCollectionGroupsWithoutPostCounts(t *testing.T) {
 	groups := p.CollectionGroups()
 	if len(groups) != 1 || len(groups[0].Items) != 1 {
 		t.Errorf("expected all items kept when no post-count data is available, got %+v", groups)
+	}
+}
+
+func TestValidateCollectionUsageErrors(t *testing.T) {
+	collections := []collectionData{
+		{Title: "Board Games", URI: "board-games"},
+	}
+
+	// duplicate meta collection titles (URI-normalized) across pages
+	pages := []page{
+		{Id: "page-a", MetaCollection: "Travel Destinations", CollectionRefs: []string{"board-games"}},
+		{Id: "page-b", MetaCollection: "travel destinations", CollectionRefs: []string{"board-games"}},
+	}
+	errs := validateCollectionUsage(pages, nil, collections)
+	if len(errs) != 1 || !strings.Contains(errs[0], "page-a") || !strings.Contains(errs[0], "page-b") {
+		t.Errorf("expected a duplicate meta collection error naming both pages, got %v", errs)
+	}
+
+	// meta collection URI colliding with a regular collection URI
+	pages = []page{
+		{Id: "page-a", MetaCollection: "Board Games", CollectionRefs: []string{"board-games"}},
+	}
+	errs = validateCollectionUsage(pages, nil, collections)
+	if len(errs) != 1 || !strings.Contains(errs[0], "board-games") || !strings.Contains(errs[0], "page-a") {
+		t.Errorf("expected a meta/regular collision error, got %v", errs)
+	}
+
+	// valid setup -> no errors
+	pages = []page{
+		{Id: "page-a", MetaCollection: "Travel Destinations", CollectionRefs: []string{"board-games"}},
+	}
+	if errs = validateCollectionUsage(pages, nil, collections); len(errs) != 0 {
+		t.Errorf("expected no errors, got %v", errs)
+	}
+}
+
+func TestValidateCollectionUsageWarnings(t *testing.T) {
+	collections := []collectionData{
+		{Title: "Board Games", URI: "board-games"},
+	}
+	pages := []page{
+		// unknown collection embedded via directive
+		{Id: "page-a", CollectionRefs: []string{"no-such-collection"}},
+		// meta collection defined without embedding any collections
+		{Id: "page-b", MetaCollection: "Lonely Meta"},
+	}
+	posts := []post{
+		// unknown meta collection reference
+		{Id: "post-a", MetaCollections: []string{"No Such Meta"}},
+		// valid meta collection reference
+		{Id: "post-b", MetaCollections: []string{"Lonely Meta"}},
+	}
+
+	errs := validateCollectionUsage(pages, posts, collections)
+	if len(errs) != 0 {
+		t.Fatalf("expected no errors, got %v", errs)
+	}
+
+	expectWarning := func(warnings []string, substr string, entity string) {
+		for _, w := range warnings {
+			if strings.Contains(w, substr) {
+				return
+			}
+		}
+		t.Errorf("expected %s warning mentioning %q, got %v", entity, substr, warnings)
+	}
+	expectWarning(pages[0].Warnings, "no-such-collection", "page-a")
+	expectWarning(pages[1].Warnings, "Lonely Meta", "page-b")
+	expectWarning(posts[0].Warnings, "No Such Meta", "post-a")
+	if len(posts[1].Warnings) != 0 {
+		t.Errorf("expected no warnings for a valid meta reference, got %v", posts[1].Warnings)
+	}
+}
+
+func TestCollectionGroupsWithMetaCollections(t *testing.T) {
+	p := post{
+		Id: "p1",
+		Collections: []postCollectionRef{
+			{Collection: "Board Games", Item: "Chess"},
+		},
+		collItemPostCnt: map[string]int{"board-games/chess": 2},
+		metaCollGroups: []postCollectionGroup{
+			{Title: "Travel Destinations", Link: "/page/travel.html"},
+		},
+	}
+
+	groups := p.CollectionGroups()
+
+	if len(groups) != 2 {
+		t.Fatalf("expected 2 groups, got %d: %+v", len(groups), groups)
+	}
+	// meta group first, linking to the defining page, no items
+	if groups[0].Title != "Travel Destinations" || groups[0].Link != "/page/travel.html" || len(groups[0].Items) != 0 {
+		t.Errorf("expected meta group linking to /page/travel.html with no items, got %+v", groups[0])
+	}
+	// regular group after, with a collections link
+	if groups[1].Title != "Board Games" || groups[1].Link != "/collections/board-games/" {
+		t.Errorf("expected regular group with /collections/board-games/ link, got %+v", groups[1])
 	}
 }

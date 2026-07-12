@@ -154,6 +154,16 @@ func parsePage(pageId string, content string, config appConfig, resLoader resour
 		}
 		page.Title = title
 	}
+	if metaCollection, ok := metaData[metaDataKeyMetaCollection].(string); ok {
+		page.MetaCollection = strings.TrimSpace(metaCollection)
+	}
+	// collect the (deduplicated) collection URIs embedded via {collection:...} directives
+	// — derived from the rendered body placeholders, which are deterministic and cache-safe
+	for _, m := range collectionDirectivePlaceholderRegexp.FindAllStringSubmatch(page.Body, -1) {
+		if !slices.Contains(page.CollectionRefs, m[1]) {
+			page.CollectionRefs = append(page.CollectionRefs, m[1])
+		}
+	}
 	page.SearchData = searchData{
 		TypeId:  "page/" + page.Id,
 		Content: strings.ToLower(rawTitle) + " " + strings.ToLower(rawBodyContent),
@@ -219,6 +229,22 @@ func parsePost(postId string, content string, config appConfig, resLoader resour
 	collRefs, collWarnings := parseCollectionsMetaData(metaData, postId, config)
 	post.Collections = collRefs
 	post.Warnings = append(post.Warnings, collWarnings...)
+	if metaCollections := metaData[metaDataKeyMetaCollections]; metaCollections != nil {
+		if mcList, ok := metaCollections.([]interface{}); ok {
+			for _, v := range mcList {
+				if title, ok := v.(string); ok {
+					title = strings.TrimSpace(title)
+					if title != "" && !slices.Contains(post.MetaCollections, title) {
+						post.MetaCollections = append(post.MetaCollections, title)
+					}
+				} else {
+					post.Warnings = append(post.Warnings, fmt.Sprintf("meta-collections: malformed entry: %v", v))
+				}
+			}
+		} else {
+			post.Warnings = append(post.Warnings, "meta-collections: malformed metadata (expected a list of meta collection names)")
+		}
+	}
 	post.SearchData = searchData{
 		TypeId:  "post/" + post.Id,
 		Content: strings.ToLower(rawTitle) + " " + strings.ToLower(rawBodyContent) + " " + strings.ToLower(strings.Join(post.Tags[:], " ")),
@@ -463,6 +489,23 @@ func processInnerDirectives(content string, ceType contentEntityType, ceId strin
 			content = strings.Replace(content, placeholder, link, 1)
 		}
 	}
+	// collection directives are handled before the generic wrap pipeline
+	// so a stray `{/}` further down the content can never swallow one as a wrap directive;
+	// they resolve to deterministic placeholders substituted at process time
+	// (collection data is aggregated from posts, while pages are parsed/cached independently)
+	content = collectionDirectiveRegexp.ReplaceAllStringFunc(content, func(match string) string {
+		m := collectionDirectiveRegexp.FindStringSubmatch(match)
+		if ceType != Page {
+			*warnings = append(*warnings, "collection directive is only supported in pages: "+match)
+			return ""
+		}
+		uri := normalizeURIString(strings.TrimSpace(m[1]))
+		if uri == "" {
+			*warnings = append(*warnings, "collection directive references an invalid collection name: "+match)
+			return ""
+		}
+		return fmt.Sprintf(collectionDirectivePlaceholderFormat, uri)
+	})
 	wrapPlaceholders := wrapPlaceholderRegexp.FindAllStringSubmatch(content, -1)
 	if wrapPlaceholders != nil {
 		sortContentDirectivePlaceholders(wrapPlaceholders)

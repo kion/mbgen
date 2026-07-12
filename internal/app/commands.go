@@ -83,7 +83,9 @@ var (
 			"reports all detected issues; namely:\n" +
 			" - original images that exceed the `maxImgSize` config option value\n" +
 			" - tag URIs that appear with more than one distinct title across posts (report-only, no auto-fix)\n" +
-			" - collection/item URIs that appear with more than one distinct title across posts (report-only, no auto-fix)\n\n" +
+			" - collection/item URIs that appear with more than one distinct title across posts (report-only, no auto-fix)\n" +
+			" - meta collection definition errors (duplicate titles, collisions with collection URIs) that would fail the generate command\n" +
+			" - collection directive and meta collection reference issues (unknown collections, directive used in a post, etc.)\n\n" +
 			"optional flags:\n" +
 			" " + commandInspectOptionFix + ": automatically fixes all auto-fixable issues; namely:\n" +
 			"   - resize and replace the original images that exceed the `maxImgSize` config option value\n\n",
@@ -633,14 +635,22 @@ func _inspect(config appConfig, commandArgs ...string) {
 		tagIssues := reportTagTitleDuplicates(config)
 		collectionIssues := reportCollectionTitleDuplicates(config)
 		resLoader := getResourceLoader(config)
-		directiveIssues := reportContentWarnings(
-			parsePages(config, resLoader, nil, false),
-			parsePosts(config, resLoader, nil, false))
+		pages := parsePages(config, resLoader, nil, false)
+		posts := parsePosts(config, resLoader, nil, false)
+		// appends non-fatal usage warnings to pages/posts (surfaced via reportContentWarnings below)
+		collectionUsageErrs := validateCollectionUsage(pages, posts, aggregateCollections(posts))
+		if len(collectionUsageErrs) > 0 {
+			sprintln(" - collection validation errors (the generate command will fail until these are fixed):")
+			for _, e := range collectionUsageErrs {
+				sprintln("   - " + e)
+			}
+		}
+		directiveIssues := reportContentWarnings(pages, posts)
 		if mediaIssues {
 			sprintln(" - run the following command to fix the media issues found:\n\n" +
 				"   mbgen inspect " + commandInspectOptionFix)
 		}
-		if !mediaIssues && !tagIssues && !collectionIssues && !directiveIssues {
+		if !mediaIssues && !tagIssues && !collectionIssues && len(collectionUsageErrs) == 0 && !directiveIssues {
 			sprintln(" - no issues found")
 		}
 	}

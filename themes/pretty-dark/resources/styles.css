@@ -4,6 +4,7 @@
     --media-width-large: 49%;
     --media-width-full: 100%;
     --collection-item-height: 240px;
+    --collection-item-image-separator: 2px;
 }
 
 body {
@@ -247,7 +248,7 @@ header a.permalink {
 }
 
 .post footer .collections .collection a.collection-item {
-    color: #999;
+    color: #777;
     &:hover {
         color: #FF9C57;
     }
@@ -593,23 +594,23 @@ header a.permalink {
  * so the expand-on-hover transition can interpolate between the shapes
  */
 .collection-shelf .items .item .item-images.cnt-2 img.img-0 {
-    clip-path: polygon(0 0, 100% 0, 100% 0, 100% 35%, 0 65%, 0 0);
+    clip-path: polygon(0 0, 100% 0, 100% 0, 100% calc(35% - var(--collection-item-image-separator)), 0 calc(65% - var(--collection-item-image-separator)), 0 0);
 }
 
 .collection-shelf .items .item .item-images.cnt-2 img.img-1 {
-    clip-path: polygon(0 65%, 100% 35%, 100% 35%, 100% 100%, 0 100%, 0 65%);
+    clip-path: polygon(0 calc(65% + var(--collection-item-image-separator)), 100% calc(35% + var(--collection-item-image-separator)), 100% calc(35% + var(--collection-item-image-separator)), 100% 100%, 0 100%, 0 calc(65% + var(--collection-item-image-separator)));
 }
 
 .collection-shelf .items .item .item-images.cnt-3 img.img-0 {
-    clip-path: polygon(0 0, 100% 0, 100% 0, 100% 23.33%, 0 43.33%, 0 0);
+    clip-path: polygon(0 0, 100% 0, 100% 0, 100% calc(23.33% - var(--collection-item-image-separator)), 0 calc(43.33% - var(--collection-item-image-separator)), 0 0);
 }
 
 .collection-shelf .items .item .item-images.cnt-3 img.img-1 {
-    clip-path: polygon(0 43.33%, 100% 23.33%, 100% 23.33%, 100% 56.66%, 0 76.66%, 0 43.33%);
+    clip-path: polygon(0 calc(43.33% + var(--collection-item-image-separator)), 100% calc(23.33% + var(--collection-item-image-separator)), 100% calc(23.33% + var(--collection-item-image-separator)), 100% calc(56.66% - var(--collection-item-image-separator)), 0 calc(76.66% - var(--collection-item-image-separator)), 0 calc(43.33% + var(--collection-item-image-separator)));
 }
 
 .collection-shelf .items .item .item-images.cnt-3 img.img-2 {
-    clip-path: polygon(0 76.66%, 100% 56.66%, 100% 56.66%, 100% 100%, 0 100%, 0 76.66%);
+    clip-path: polygon(0 calc(76.66% + var(--collection-item-image-separator)), 100% calc(56.66% + var(--collection-item-image-separator)), 100% calc(56.66% + var(--collection-item-image-separator)), 100% 100%, 0 100%, 0 calc(76.66% + var(--collection-item-image-separator)));
 }
 
 /* expand the hovered image to the full container (pointer events respect clip-path) */
@@ -620,8 +621,11 @@ header a.permalink {
 }
 
 /* bottom overlay with the item title and post count, rendered flush with the
-   image edges (like post image captions, which sit inside the media item padding) */
+   image edges (like post image captions, which sit inside the media item padding);
+   hidden by default (cover images usually render the title already) and revealed on hover */
 .collection-shelf .items .item .item-images .item-info {
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
     position: absolute;
     left: 0;
     right: 0;
@@ -644,9 +648,22 @@ header a.permalink {
     overflow-wrap: anywhere;
 }
 
+.collection-shelf .items .item:hover .item-images .item-info,
+.collection-shelf .items .item:focus-visible .item-images .item-info {
+    opacity: 1;
+}
+
 .collection-shelf .items .item .item-images .item-info .item-cnt {
     color: #bbb;
     white-space: nowrap;
+}
+
+/* embedded collection views ({collection:...} page directive) sit inside an
+   already-bordered page — tone down the standalone container chrome */
+.page .content .collection-shelf {
+    margin: 1em 0;
+    border: 1px solid #555;
+    box-shadow: none;
 }
 
 .pager {

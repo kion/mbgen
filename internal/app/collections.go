@@ -2,8 +2,10 @@ package app
 
 import (
 	"bytes"
+	"fmt"
 	"path/filepath"
 	"sort"
+	"strings"
 	"text/template"
 )
 
@@ -81,6 +83,119 @@ func aggregateCollections(posts []post) []collectionData {
 		return collections[i].Title < collections[j].Title
 	})
 	return collections
+}
+
+// metaCollection is a meta collection definition: a named grouping declared by a page
+// (via the `meta-collection` frontmatter key) that embeds collections via `{collection:...}` directives;
+// posts reference it via the `meta-collections` frontmatter key, and their footers link back to the defining page
+type metaCollection struct {
+	Title  string
+	PageId string
+}
+
+// buildMetaCollections returns a map of normalized URI -> meta collection definition;
+// on duplicates, the first defining page (in slice order) wins
+// — duplicates are fatal generate errors anyway (see validateCollectionUsage)
+func buildMetaCollections(pages []page) map[string]metaCollection {
+	metaColls := map[string]metaCollection{}
+	for _, p := range pages {
+		if p.MetaCollection == "" {
+			continue
+		}
+		uri := normalizeURIString(p.MetaCollection)
+		if uri == "" {
+			continue
+		}
+		if _, ok := metaColls[uri]; !ok {
+			metaColls[uri] = metaCollection{Title: p.MetaCollection, PageId: p.Id}
+		}
+	}
+	return metaColls
+}
+
+// validateCollectionUsage validates collection directive and meta collection usage across pages and posts.
+// It returns fatal errors (the generate command must fail without writing any files until they are fixed):
+//   - the same meta collection title (URI-normalized) defined by more than one page
+//   - a meta collection URI colliding with a regular collection URI
+//
+// and appends non-fatal warnings to the pages/posts (by index, so callers holding the slices see them):
+//   - a page {collection:...} directive referencing an unknown collection
+//   - a page defining a meta collection without embedding any collections
+//   - a post referencing an unknown meta collection
+func validateCollectionUsage(pages []page, posts []post, collections []collectionData) []string {
+	var errs []string
+	collUris := map[string]string{} // URI -> title
+	for _, coll := range collections {
+		collUris[coll.URI] = coll.Title
+	}
+	metaCollPages := map[string][]string{} // meta URI -> defining page ids
+	for i := range pages {
+		p := &pages[i]
+		if p.MetaCollection != "" {
+			uri := normalizeURIString(p.MetaCollection)
+			metaCollPages[uri] = append(metaCollPages[uri], p.Id)
+			if collTitle, ok := collUris[uri]; ok {
+				errs = append(errs, fmt.Sprintf(
+					"meta collection \"%s\" (defined by page \"%s\") collides with collection \"%s\" (/%s/%s/)",
+					p.MetaCollection, p.Id, collTitle, deployCollectionsDirName, uri))
+			}
+			if len(p.CollectionRefs) == 0 {
+				p.Warnings = append(p.Warnings, fmt.Sprintf(
+					"meta collection \"%s\" is defined, but the page does not embed any collections via {collection:...} directives",
+					p.MetaCollection))
+			}
+		}
+		for _, ref := range p.CollectionRefs {
+			if _, ok := collUris[ref]; !ok {
+				p.Warnings = append(p.Warnings, "collection directive references an unknown collection: \""+ref+"\"")
+			}
+		}
+	}
+	metaUris := make([]string, 0, len(metaCollPages))
+	for uri := range metaCollPages {
+		metaUris = append(metaUris, uri)
+	}
+	sort.Strings(metaUris)
+	for _, uri := range metaUris {
+		if pageIds := metaCollPages[uri]; len(pageIds) > 1 {
+			errs = append(errs, fmt.Sprintf(
+				"meta collection \"%s\" is defined by multiple pages (titles must be unique): %s",
+				uri, strings.Join(pageIds, ", ")))
+		}
+	}
+	for i := range posts {
+		p := &posts[i]
+		for _, title := range p.MetaCollections {
+			if _, ok := metaCollPages[normalizeURIString(title)]; !ok {
+				p.Warnings = append(p.Warnings, "post references an unknown meta collection: \""+title+"\"")
+			}
+		}
+	}
+	return errs
+}
+
+// renderEmbeddedCollections substitutes collection directive placeholders in a page body
+// with the rendered collection shelf blocks (reusing the standalone collection.html template,
+// compiled bare, i.e. without the main.html page wrapper);
+// placeholders referencing unknown collections render nothing
+// (validateCollectionUsage warned about them already)
+func renderEmbeddedCollections(body string, collections []collectionData, resLoader resourceLoader) string {
+	collByUri := make(map[string]collectionData, len(collections))
+	for _, coll := range collections {
+		collByUri[coll.URI] = coll
+	}
+	return collectionDirectivePlaceholderRegexp.ReplaceAllStringFunc(body, func(match string) string {
+		m := collectionDirectivePlaceholderRegexp.FindStringSubmatch(match)
+		coll, ok := collByUri[m[1]]
+		if !ok {
+			return ""
+		}
+		var collContentBuffer bytes.Buffer
+		err := compileCollectionBlockTemplate(resLoader).Execute(&collContentBuffer,
+			templateContent{EntityType: Page, Content: coll, Config: buildTemplateConfigMap(resLoader.config)})
+		check(err)
+		return collContentBuffer.String()
+	})
 }
 
 // inspectCollectionTitleDuplicates returns two maps of normalized URI -> sorted distinct original titles,

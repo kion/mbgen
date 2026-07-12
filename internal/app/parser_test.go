@@ -1387,3 +1387,125 @@ Post body.`
 		}
 	}
 }
+
+func TestCollectionDirectiveInPage(t *testing.T) {
+	pageContent := `---
+title: Travel Destinations
+meta-collection: Travel Destinations
+---
+
+Intro text.
+
+{collection: Board Games}
+
+More text.
+
+{collection:board-games}
+{collection: Настольные игры}
+`
+
+	resLoader := testResLoader()
+	page := parsePage("travel", pageContent, defaultConfig(), resLoader)
+
+	if len(page.Warnings) != 0 {
+		t.Fatalf("expected no warnings, got %v", page.Warnings)
+	}
+
+	// directive is replaced with a deterministic placeholder (expanded at process time)
+	expectedPlaceholder := ":@@@:collection:board-games:@@@:"
+	if cnt := strings.Count(page.Body, expectedPlaceholder); cnt != 2 {
+		t.Errorf("expected 2 %q placeholders in body, got %d (body: %s)", expectedPlaceholder, cnt, page.Body)
+	}
+	if !strings.Contains(page.Body, ":@@@:collection:настольные-игры:@@@:") {
+		t.Errorf("expected unicode collection placeholder in body, got: %s", page.Body)
+	}
+	if strings.Contains(page.Body, "{collection") {
+		t.Errorf("raw directive left in body: %s", page.Body)
+	}
+
+	// referenced collection URIs are recorded (deduplicated)
+	expectedRefs := []string{"board-games", "настольные-игры"}
+	if !slices.Equal(page.CollectionRefs, expectedRefs) {
+		t.Errorf("expected CollectionRefs %v, got %v", expectedRefs, page.CollectionRefs)
+	}
+
+	// meta collection definition is parsed
+	if page.MetaCollection != "Travel Destinations" {
+		t.Errorf("expected MetaCollection %q, got %q", "Travel Destinations", page.MetaCollection)
+	}
+}
+
+func TestCollectionDirectiveInPostWarns(t *testing.T) {
+	postContent := `---
+date: 2026-07-01
+---
+
+Post body.
+
+{collection: Board Games}
+`
+
+	resLoader := testResLoader()
+	post := parsePost("test-post", postContent, defaultConfig(), resLoader)
+
+	found := false
+	for _, w := range post.Warnings {
+		if strings.Contains(w, "only supported in pages") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected a pages-only warning, got %v", post.Warnings)
+	}
+	if strings.Contains(post.Body, "{collection") || strings.Contains(post.Body, ":@@@:collection:") {
+		t.Errorf("collection directive must render nothing in posts, body: %s", post.Body)
+	}
+}
+
+func TestMetaCollectionsMetadata(t *testing.T) {
+	postContent := `---
+date: 2026-07-01
+meta-collections:
+  - Travel Destinations
+  - " Travel Destinations "
+  - Another Meta
+  - 12345
+---
+
+Post body.`
+
+	resLoader := testResLoader()
+	post := parsePost("test-post", postContent, defaultConfig(), resLoader)
+
+	// trimmed, deduplicated, valid entries kept
+	expected := []string{"Travel Destinations", "Another Meta"}
+	if !slices.Equal(post.MetaCollections, expected) {
+		t.Errorf("expected MetaCollections %v, got %v", expected, post.MetaCollections)
+	}
+	// malformed (non-string) entry produces a warning
+	found := false
+	for _, w := range post.Warnings {
+		if strings.Contains(w, "12345") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected a malformed meta-collections warning mentioning 12345, got %v", post.Warnings)
+	}
+}
+
+// testResLoader returns a resourceLoader backed by the default theme templates
+// (resolved relative to the repo layout) with no includes.
+func testResLoader() resourceLoader {
+	defaultThemeTemplatesDir := fmt.Sprintf("%s%c%s%c%s", "../../themes", os.PathSeparator, defaultThemeName, os.PathSeparator, "templates")
+	return resourceLoader{
+		config: defaultConfig(),
+		loadTemplate: func(templateFileName string) ([]byte, error) {
+			templateFilePath := fmt.Sprintf("%s%c%s", defaultThemeTemplatesDir, os.PathSeparator, templateFileName)
+			return os.ReadFile(templateFilePath)
+		},
+		loadInclude: func(includeFileName string, level templateIncludeLevel) ([]byte, error) {
+			return nil, nil
+		},
+	}
+}

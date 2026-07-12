@@ -341,6 +341,8 @@ type page struct {
 	Title          string
 	Body           string
 	Media          []media
+	MetaCollection string   // meta collection defined by this page (raw title from the `meta-collection` frontmatter key)
+	CollectionRefs []string // normalized URIs of collections embedded via `{collection:...}` directives (deduplicated)
 	SearchData     searchData
 	Warnings       []string // content-directive warnings (malformed captions, unparsed directives)
 	skipProcessing bool
@@ -385,28 +387,33 @@ type postCollectionItemLink struct {
 }
 
 // postCollectionGroup is the per-collection view of a post's collection refs,
-// used by the post footer back-links template
+// used by the post footer back-links template;
+// for meta collection groups, Link points to the defining page and Items is always empty
 type postCollectionGroup struct {
 	Title string
 	URI   string
+	Link  string
 	Items []postCollectionItemLink
 }
 
 type post struct {
-	Id             string
-	Date           civil.Date
-	Time           civil.Time
-	Title          string
-	Body           string
-	FeedContent    string // cleaned markdown content for feed generation (directives removed)
-	Tags           []string
-	Collections    []postCollectionRef
-	SearchData     searchData
-	Warnings       []string // content-directive warnings (malformed captions, unparsed directives)
-	skipProcessing bool
+	Id              string
+	Date            civil.Date
+	Time            civil.Time
+	Title           string
+	Body            string
+	FeedContent     string // cleaned markdown content for feed generation (directives removed)
+	Tags            []string
+	Collections     []postCollectionRef
+	MetaCollections []string // referenced meta collection titles (raw, from the `meta-collections` frontmatter key)
+	SearchData      searchData
+	Warnings        []string // content-directive warnings (malformed captions, unparsed directives)
+	skipProcessing  bool
 	// site-wide "<collection-uri>/<item-uri>" -> distinct referencing post count,
 	// populated during processing (from the aggregated collections model) for footer rendering
 	collItemPostCnt map[string]int
+	// resolved meta collection footer groups (links to the defining pages), populated during processing
+	metaCollGroups []postCollectionGroup
 }
 
 func (p post) ContentEntityType() contentEntityType {
@@ -418,7 +425,9 @@ func (p post) EntityId() string {
 }
 
 // CollectionGroups groups the post's collection refs by collection for footer back-link rendering,
-// preserving ref order and deduplicating items by URI
+// preserving ref order and deduplicating items by URI;
+// resolved meta collection groups (populated during processing)
+// are prepended before the regular collection groups
 func (p post) CollectionGroups() []postCollectionGroup {
 	var groups []postCollectionGroup
 	groupIdx := map[string]int{}
@@ -431,7 +440,11 @@ func (p post) CollectionGroups() []postCollectionGroup {
 		}
 		gi, ok := groupIdx[collUri]
 		if !ok {
-			groups = append(groups, postCollectionGroup{Title: ref.Collection, URI: collUri})
+			groups = append(groups, postCollectionGroup{
+				Title: ref.Collection,
+				URI:   collUri,
+				Link:  "/" + deployCollectionsDirName + "/" + collUri + "/",
+			})
 			gi = len(groups) - 1
 			groupIdx[collUri] = gi
 		}
@@ -447,7 +460,11 @@ func (p post) CollectionGroups() []postCollectionGroup {
 		}
 		groups[gi].Items = append(groups[gi].Items, postCollectionItemLink{Title: ref.Item, URI: itemUri})
 	}
-	return groups
+	// meta collection groups come first; build a fresh slice so the shared
+	// metaCollGroups backing array is never mutated by the append
+	all := make([]postCollectionGroup, 0, len(p.metaCollGroups)+len(groups))
+	all = append(all, p.metaCollGroups...)
+	return append(all, groups...)
 }
 
 func (p post) HasDateOrTime() bool {

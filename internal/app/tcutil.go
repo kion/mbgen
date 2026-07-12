@@ -73,6 +73,25 @@ func compileCollectionIndexTemplate(resLoader resourceLoader) *template.Template
 	return compileStandalonePageTemplate(collectionIndexTemplateFileName, resLoader)
 }
 
+// compileCollectionBlockTemplate compiles the collection template bare (without the main.html page wrapper)
+// for rendering collection views embedded in pages via the {collection:...} directive;
+// cached under a distinct key so it does not clash
+// with the standalone collection page compile of the same template file
+func compileCollectionBlockTemplate(resLoader resourceLoader) *template.Template {
+	const cacheKey = "collection-block"
+	collectionBlockTemplate, ok := templateCache[cacheKey]
+	if !ok {
+		collectionTemplateMarkup, err := readTemplateFile(collectionTemplateFileName, resLoader)
+		check(err)
+		collectionTemplateMarkup = processDirectives(collectionTemplateMarkup, resLoader)
+		tmplt, err := template.New(collectionTemplateFileName).Funcs(funcMap).Parse(collectionTemplateMarkup)
+		check(err)
+		collectionBlockTemplate = tmplt
+		templateCache[cacheKey] = tmplt
+	}
+	return collectionBlockTemplate
+}
+
 func compileSearchTemplate(resLoader resourceLoader) *template.Template {
 	return compileStandalonePageTemplate(searchTemplateFileName, resLoader)
 }

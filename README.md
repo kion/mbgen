@@ -257,6 +257,40 @@ $ mbgen help [command]
     * each post referencing collection items also renders the corresponding collection/item links in its footer
       (an item link is only rendered when the item is referenced by more than one post —
       for single-post items the collection link only is rendered instead)
+  * A collection can also be embedded within any **page**
+    (pages only — using it in a post produces a warning and renders nothing)
+    via the `{collection:...}` content directive,
+    which renders the same collection view (title header + items section) inline
+    (might be used to group collections and/or decorate them with additional text, media, etc.)
+    * collection can be referenced either by its title or by its normalized URI
+      — `{collection: Board Games}` and `{collection:board-games}` are equivalent
+    * referencing an unknown collection produces a warning and renders nothing
+    * default/standalone collection page is still generated
+      even when the corresponding collection is embedded within one or more pages
+  * A page that embeds collections via `{collection:...}` directives can additionally define a **meta collection**
+    — a named grouping for ALL the collections it embeds — via the `meta-collection` metadata property:
+    ```
+    ---
+    title: Travel Destinations
+    meta-collection: Travel Destinations
+    ---
+
+    Intro text.
+
+    {collection: Grand Landscapes}
+    {collection: Cities}
+    ```
+    * meta collections produce no generated artifacts of their own —
+      their only purpose is to be referenceable from posts
+      via the `meta-collections` metadata property:
+      ```
+      meta-collections:
+        - Travel Destinations
+      ```
+      (post footer then renders the meta collection title linking to the defining page)
+    * each meta collection title MUST be unique across pages and must not collide with a regular collection URI
+      — violations fail the `generate` command with an error (no files are written until fixed);
+      referencing an unknown meta collection from a post produces a (non-fatal) warning
   * Post content file example:
     ```
     ---
