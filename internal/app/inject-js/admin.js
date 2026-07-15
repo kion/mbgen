@@ -71,8 +71,23 @@ function renderAdminButtons(headerEl) {
     }
 }
 
+// returns the content entry's own (direct child) header element, creating and prepending one if absent
+// (a page without a title renders no header, but admin controls still need one to live in);
+// a descendant search would wrongly match nested headers,
+// e.g. those of collection views embedded via the {collection:...} directive
+function ensureContentEntryHeaderEl(contentEntryEl) {
+    let headerEl = contentEntryEl.querySelector(':scope > header');
+    if (!headerEl) {
+        headerEl = document.createElement('header');
+        headerEl.className = 'title';
+        headerEl.innerHTML = '<span class="title"></span>';
+        contentEntryEl.prepend(headerEl);
+    }
+    return headerEl;
+}
+
 function renderContentEntryAdminLinks(entryType, entryId, contentEntryEl) {
-    const headerEl = contentEntryEl.getElementsByTagName('header')[0];
+    const headerEl = ensureContentEntryHeaderEl(contentEntryEl);
     const linksEl = headerEl.getElementsByClassName('links')[0];
     if (!linksEl || linksEl.getElementsByClassName('admin-link').length === 0) {
         // render admin links only if there are no admin links already
@@ -187,7 +202,7 @@ function adminEdit(entryType, entryId, contentEntryEl) {
                             contentEntryEl.outerHTML = xhr.responseText;
                             contentEntryEl = document.getElementById(entryId);
                             if (location.pathname !== '/' + typeIdPath + '.html') {
-                                const ceHeaderEl = contentEntryEl.getElementsByTagName('header')[0];
+                                const ceHeaderEl = ensureContentEntryHeaderEl(contentEntryEl);
                                 ceHeaderEl.innerHTML += '<span class="links"><a href="/' + typeIdPath + '.html" class="permalink"><i class="fa-solid fa-link"></i></a></span>';
                             }
                             renderContentEntryAdminLinks(entryType, entryId, contentEntryEl);

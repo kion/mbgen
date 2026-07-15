@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	appVersion                                  = "2.0.2"
+	appVersion                                  = "2.0.3"
 	defaultGitHubRepoUrl                        = "github.com/kion/mbgen"
 	defaultGitHubRepoThemesUrl                  = defaultGitHubRepoUrl + "/themes"
 	defaultGitHubRepoPageContentSamplesUrl      = defaultGitHubRepoUrl + "/content-samples/pages"
@@ -145,6 +145,9 @@ var (
 	mediaPlaceholderRegexp               = /* const */ regexp.MustCompile(`{\s*media(\([\s\w=,]+\))?\s*([:|][^{}]*)?\s*}`)
 	collectionDirectiveRegexp            = /* const */ regexp.MustCompile(`{\s*collection\s*:\s*([^{}]+?)\s*}`)
 	collectionDirectivePlaceholderRegexp = /* const */ regexp.MustCompile(`:@@@:collection:([^:\s]+):@@@:`)
+	// a collection directive on its own line gets wrapped in a <p> element by markdown rendering
+	// — the wrapper must be stripped along with the placeholder (a <section> inside a <p> is invalid HTML)
+	collectionDirectiveWrappedPlaceholderRegexp = /* const */ regexp.MustCompile(`<p>\s*:@@@:collection:([^:\s]+):@@@:\s*</p>`)
 	// blankLineRunRegexp matches a newline followed by one or more additional
 	// whitespace-only lines; used to collapse runs of blank/whitespace-only
 	// lines produced by Go-template conditionals into a single newline

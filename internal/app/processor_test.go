@@ -1689,6 +1689,11 @@ func TestGenerateWithCollectionDirective(t *testing.T) {
 	if strings.Contains(embedFile, ":@@@:collection:") {
 		t.Error("collection placeholder left in embed page output")
 	}
+	// the markdown <p> wrapper around a placeholder must be stripped along with it
+	// — a <section> inside a <p> is invalid HTML and leaves stray empty <p> elements behind
+	if strings.Contains(embedFile, "<p><section") {
+		t.Error("embedded collection block must not be wrapped in a <p> element")
+	}
 
 	// the standalone collection page is still generated
 	if _, ok := output[deployDirName+"/"+deployCollectionsDirName+"/board-games/"+indexPageFileName]; !ok {
@@ -1763,5 +1768,45 @@ func TestGenerateWithMetaCollections(t *testing.T) {
 	}
 	if !strings.Contains(postFile, `class="collection-link" href="/"`) {
 		missingExpectedContentError(t, "meta-post footer (homePage variant)", `class="collection-link" href="/"`)
+	}
+}
+
+func TestPageHeaderRendering(t *testing.T) {
+	titledPage := page{
+		Id:    "titled",
+		Title: "Titled Page",
+		Body:  "<p>Titled body.</p>",
+	}
+	titleLessPage := page{
+		Id:   "title-less",
+		Body: "<p>Title-less body.</p>",
+	}
+
+	config := defaultConfig()
+	config.enableSearch = false
+	config.siteName = testSiteName
+
+	output := processOutput([]page{titledPage, titleLessPage}, nil, nil, nil, config)
+
+	titledFile, ok := output[deployDirName+"/"+deployPageDirName+"/titled"+contentFileExtension]
+	if !ok {
+		t.Fatal("missing titled page output file")
+	}
+	if !strings.Contains(titledFile, `<header class="title">`) || !strings.Contains(titledFile, "Titled Page") {
+		t.Error("titled page must render its title header")
+	}
+	if strings.Contains(titledFile, "no-title") {
+		t.Error("titled page must not carry the no-title class")
+	}
+
+	titleLessFile, ok := output[deployDirName+"/"+deployPageDirName+"/title-less"+contentFileExtension]
+	if !ok {
+		t.Fatal("missing title-less page output file")
+	}
+	if !strings.Contains(titleLessFile, `class="content-entry page no-title"`) {
+		missingExpectedContentError(t, "title-less page", `class="content-entry page no-title"`)
+	}
+	if strings.Contains(titleLessFile, `<header class="title">`) {
+		t.Error("title-less page must not render an (empty) title header")
 	}
 }

@@ -1,8 +1,10 @@
 {{ $page := .Content }}
-<section class="content-entry page" id="{{$page.Id}}" data-type="page">
+<section class="content-entry page{{ if not $page.Title }} no-title{{ end }}" id="{{$page.Id}}" data-type="page">
+    {{ if $page.Title }}
     <header class="title">
         <span class="title">{{ $page.Title }}</span>
     </header>
+    {{ end }}
     <section class="content">
         {{ $page.Body }}
     </section>

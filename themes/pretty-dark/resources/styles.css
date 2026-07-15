@@ -73,6 +73,10 @@ body > main .post:last-of-type {
     box-shadow: 0 4px 8px 0 rgba(0,0,0,0.5);
 }
 
+.page.no-title {
+    box-shadow: unset;
+}
+
 header a.permalink {
     color: #555;
     &:hover {
@@ -355,6 +359,31 @@ header a.permalink {
     .page .content .cols {
         grid-template-columns: 1fr !important;
     }
+}
+
+/* a page without a title renders no header
+   — drop the content padding so nested containers
+   (e.g. embedded collections) render full-width */
+.page.no-title .content {
+    padding: 0;
+}
+
+.page.no-title .content .collection-shelf {
+    margin: 0;
+    border: none;
+    border-radius: 0;
+}
+
+/* dashed divider between stacked full-width shelves (mirrors the shelf header divider);
+   the general sibling combinator is used because markdown rendering
+   leaves stray empty <p> elements between the embedded shelf sections */
+.page.no-title .content .collection-shelf ~ .collection-shelf {
+    border-top: 2px dashed #555;
+}
+
+/* keep plain text readable when mixed with full-width blocks */
+.page.no-title .content > p {
+    padding: 0 1em;
 }
 
 .content .media {

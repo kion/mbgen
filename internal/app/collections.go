@@ -184,9 +184,8 @@ func renderEmbeddedCollections(body string, collections []collectionData, resLoa
 	for _, coll := range collections {
 		collByUri[coll.URI] = coll
 	}
-	return collectionDirectivePlaceholderRegexp.ReplaceAllStringFunc(body, func(match string) string {
-		m := collectionDirectivePlaceholderRegexp.FindStringSubmatch(match)
-		coll, ok := collByUri[m[1]]
+	render := func(collUri string) string {
+		coll, ok := collByUri[collUri]
 		if !ok {
 			return ""
 		}
@@ -195,6 +194,14 @@ func renderEmbeddedCollections(body string, collections []collectionData, resLoa
 			templateContent{EntityType: Page, Content: coll, Config: buildTemplateConfigMap(resLoader.config)})
 		check(err)
 		return collContentBuffer.String()
+	}
+	// the <p>-wrapped form is substituted first, so the wrapper is stripped along with the placeholder;
+	// the bare form handles placeholders embedded in other markup
+	body = collectionDirectiveWrappedPlaceholderRegexp.ReplaceAllStringFunc(body, func(match string) string {
+		return render(collectionDirectiveWrappedPlaceholderRegexp.FindStringSubmatch(match)[1])
+	})
+	return collectionDirectivePlaceholderRegexp.ReplaceAllStringFunc(body, func(match string) string {
+		return render(collectionDirectivePlaceholderRegexp.FindStringSubmatch(match)[1])
 	})
 }
 
