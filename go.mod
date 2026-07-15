@@ -1,4 +1,4 @@
-module github.com/kion/mbgen
+module github.com/kion/mbgen/v2
 
 go 1.25.8
 
